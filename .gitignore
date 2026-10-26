@@ -22,3 +22,7 @@ scratch/
 Thumbs.db
 .vscode/
 .idea/
+
+# Backups
+*.bak
+*_backup.html

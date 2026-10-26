@@ -1,5 +1,5 @@
 {
-  "evaluation_timestamp": "2026-09-20T15:42:00.125358+00:00",
+  "evaluation_timestamp": "2026-10-26T08:31:50.511784+00:00",
   "target": "127.0.0.1:3000",
   "scoring_methodology": {
     "framework": "Explainable Risk-Based Vulnerability Management (RBVM)",
@@ -10,16 +10,14 @@
   },
   "environment_context": {
     "web_framework": "Express (Node.js)",
-    "scanned_ports": [
-      3000
-    ]
+    "scanned_ports": []
   },
   "total_analyzed": 5,
   "priority_breakdown": {
     "critical_p1": 1,
-    "high_p2": 4,
-    "medium_p3": 0,
-    "low_p4": 0
+    "high_p2": 0,
+    "medium_p3": 3,
+    "low_p4": 1
   },
   "prioritized_findings": [
     {
@@ -31,16 +29,16 @@
       "summary": "Express.js Open Redirect in malformed URLs",
       "contextual_risk_score": 8.8,
       "priority_level": "P1 - Critical",
-      "exposure_context": "Directly Exposed via Web Interface (Port 3000)",
-      "recommended_remediation": "Update package dependency in package.json and apply WAF input validation rule.",
+      "exposure_context": "Internal / Secondary Dependency (No Ingress)",
+      "recommended_remediation": "Review application routing logic and sanitize redirect targets.",
       "cvss_base_score": 5.8,
-      "environmental_reachability_score": 9.5,
-      "epss_percentile_score": 5.46,
+      "environmental_reachability_score": 2.5,
+      "epss_percentile_score": 5.58,
       "threat_intel": {
         "epss_score": 0.00786,
         "epss_percent": 0.79,
-        "epss_percentile": 54.6,
-        "epss_date": "2026-09-20",
+        "epss_percentile": 55.8,
+        "epss_date": "2026-10-25",
         "epss_source": "FIRST.org Live API v1.0",
         "epss_citation": "https://www.first.org/epss",
         "mitre_attack": "T1566.002 (Spearphishing Link / Open Redirect)",
@@ -51,88 +49,10 @@
       },
       "xai_formula": {
         "cvss_component": 2.03,
-        "reachability_component": 2.85,
-        "epss_component": 1.36,
+        "reachability_component": 0.75,
+        "epss_component": 1.4,
         "criticality_component": 0.85,
-        "formula_string": "(0.35*5.8) + (0.3*9.5) + (0.25*5.46) + (0.1*8.5) = 7.1"
-      },
-      "call_graph_trace": {
-        "entry_point": "GET /public/redirect?target=//attacker.com",
-        "network_socket": "TCP 0.0.0.0:3000 (HTTP Ingress)",
-        "call_stack": [
-          {
-            "step": 1,
-            "module": "net.Server",
-            "function": "onconnection()",
-            "file": "node:net:312",
-            "desc": "Raw TCP socket handshake"
-          },
-          {
-            "step": 2,
-            "module": "http.Server",
-            "function": "parserOnIncoming()",
-            "file": "node:_http_server:841",
-            "desc": "HTTP stream header parse"
-          },
-          {
-            "step": 3,
-            "module": "express.app",
-            "function": "app.handle(req, res)",
-            "file": "node_modules/express/lib/application.js:158",
-            "desc": "Top-level application router"
-          },
-          {
-            "step": 4,
-            "module": "express.router",
-            "function": "router.process_params()",
-            "file": "node_modules/express/lib/router/index.js:335",
-            "desc": "URL parameter extraction"
-          },
-          {
-            "step": 5,
-            "module": "express.response",
-            "function": "res.redirect(url)",
-            "file": "node_modules/express/lib/response.js:883",
-            "desc": "VULNERABLE HANDLER: Malformed URL parsing trigger (CVE-2024-29041)"
-          }
-        ],
-        "is_reachable_at_runtime": true,
-        "verification_method": "Dynamic Socket Trace + AST Routing Map"
-      }
-    },
-    {
-      "vuln_id": "GHSA-cm5g-3pgc-8rg4",
-      "cve_aliases": [
-        "CVE-2024-10491"
-      ],
-      "component": "express",
-      "summary": "Express ressource injection",
-      "contextual_risk_score": 6.7,
-      "priority_level": "P2 - High",
-      "exposure_context": "Directly Exposed via Web Interface (Port 3000)",
-      "recommended_remediation": "Update package dependency in package.json and apply WAF input validation rule.",
-      "cvss_base_score": 5.8,
-      "environmental_reachability_score": 9.5,
-      "epss_percentile_score": 3.77,
-      "threat_intel": {
-        "epss_score": 0.00441,
-        "epss_percent": 0.44,
-        "epss_percentile": 37.7,
-        "epss_date": "2026-09-20",
-        "epss_source": "FIRST.org Live API v1.0",
-        "epss_citation": "https://www.first.org/epss",
-        "mitre_attack": "T1190 (Exploit Public-Facing Application)",
-        "compliance_impact": "PCI-DSS 4.0 Req 6.2.4, NIST CSF PR.IP-1",
-        "cisa_kev_status": "Known Threat Category",
-        "cisa_due_date": "N/A",
-        "cisa_ransomware": "None Observed"
-      },
-      "xai_formula": {
-        "cvss_component": 2.03,
-        "reachability_component": 2.85,
-        "epss_component": 0.94,
-        "criticality_component": 0.85,
-        "formula_string": "(0.35*5.8) + (0.3*9.5) + (0.25*3.77) + (0.1*8.5) = 6.7"
+        "formula_string": "(0.35*5.8) + (0.3*2.5) + (0.25*5.58) + (0.1*8.5) = 5.0"
       },
       "call_graph_trace": {
         "entry_point": "GET /public/redirect?target=//attacker.com",
@@ -185,18 +105,18 @@
       ],
       "component": "express",
       "summary": "No Charset in Content-Type Header in express",
-      "contextual_risk_score": 6.6,
-      "priority_level": "P2 - High",
-      "exposure_context": "Exposed Port 3000 Service",
-      "recommended_remediation": "Update package dependency in package.json and apply WAF input validation rule.",
+      "contextual_risk_score": 5.3,
+      "priority_level": "P3 - Medium",
+      "exposure_context": "Internal / Secondary Dependency (No Ingress)",
+      "recommended_remediation": "Review application routing logic and sanitize redirect targets.",
       "cvss_base_score": 5.8,
-      "environmental_reachability_score": 7.0,
-      "epss_percentile_score": 6.51,
+      "environmental_reachability_score": 2.5,
+      "epss_percentile_score": 6.65,
       "threat_intel": {
-        "epss_score": 0.01135,
+        "epss_score": 0.01144,
         "epss_percent": 1.14,
-        "epss_percentile": 65.1,
-        "epss_date": "2026-09-20",
+        "epss_percentile": 66.5,
+        "epss_date": "2026-10-25",
         "epss_source": "FIRST.org Live API v1.0",
         "epss_citation": "https://www.first.org/epss",
         "mitre_attack": "T1195.002 (Compromise Software Dependencies)",
@@ -207,10 +127,88 @@
       },
       "xai_formula": {
         "cvss_component": 2.03,
-        "reachability_component": 2.1,
-        "epss_component": 1.63,
+        "reachability_component": 0.75,
+        "epss_component": 1.66,
         "criticality_component": 0.85,
-        "formula_string": "(0.35*5.8) + (0.3*7.0) + (0.25*6.51) + (0.1*8.5) = 6.6"
+        "formula_string": "(0.35*5.8) + (0.3*2.5) + (0.25*6.65) + (0.1*8.5) = 5.3"
+      }
+    },
+    {
+      "vuln_id": "GHSA-cm5g-3pgc-8rg4",
+      "cve_aliases": [
+        "CVE-2024-10491"
+      ],
+      "component": "express",
+      "summary": "Express ressource injection",
+      "contextual_risk_score": 4.6,
+      "priority_level": "P3 - Medium",
+      "exposure_context": "Internal / Secondary Dependency (No Ingress)",
+      "recommended_remediation": "Review application routing logic and sanitize redirect targets.",
+      "cvss_base_score": 5.8,
+      "environmental_reachability_score": 2.5,
+      "epss_percentile_score": 3.8,
+      "threat_intel": {
+        "epss_score": 0.00441,
+        "epss_percent": 0.44,
+        "epss_percentile": 38.0,
+        "epss_date": "2026-10-25",
+        "epss_source": "FIRST.org Live API v1.0",
+        "epss_citation": "https://www.first.org/epss",
+        "mitre_attack": "T1190 (Exploit Public-Facing Application)",
+        "compliance_impact": "PCI-DSS 4.0 Req 6.2.4, NIST CSF PR.IP-1",
+        "cisa_kev_status": "Known Threat Category",
+        "cisa_due_date": "N/A",
+        "cisa_ransomware": "None Observed"
+      },
+      "xai_formula": {
+        "cvss_component": 2.03,
+        "reachability_component": 0.75,
+        "epss_component": 0.95,
+        "criticality_component": 0.85,
+        "formula_string": "(0.35*5.8) + (0.3*2.5) + (0.25*3.8) + (0.1*8.5) = 4.6"
+      },
+      "call_graph_trace": {
+        "entry_point": "GET /public/redirect?target=//attacker.com",
+        "network_socket": "TCP 0.0.0.0:3000 (HTTP Ingress)",
+        "call_stack": [
+          {
+            "step": 1,
+            "module": "net.Server",
+            "function": "onconnection()",
+            "file": "node:net:312",
+            "desc": "Raw TCP socket handshake"
+          },
+          {
+            "step": 2,
+            "module": "http.Server",
+            "function": "parserOnIncoming()",
+            "file": "node:_http_server:841",
+            "desc": "HTTP stream header parse"
+          },
+          {
+            "step": 3,
+            "module": "express.app",
+            "function": "app.handle(req, res)",
+            "file": "node_modules/express/lib/application.js:158",
+            "desc": "Top-level application router"
+          },
+          {
+            "step": 4,
+            "module": "express.router",
+            "function": "router.process_params()",
+            "file": "node_modules/express/lib/router/index.js:335",
+            "desc": "URL parameter extraction"
+          },
+          {
+            "step": 5,
+            "module": "express.response",
+            "function": "res.redirect(url)",
+            "file": "node_modules/express/lib/response.js:883",
+            "desc": "VULNERABLE HANDLER: Malformed URL parsing trigger (CVE-2024-29041)"
+          }
+        ],
+        "is_reachable_at_runtime": true,
+        "verification_method": "Dynamic Socket Trace + AST Routing Map"
       }
     },
     {
@@ -220,18 +218,18 @@
       ],
       "component": "express",
       "summary": "express vulnerable to XSS via response.redirect()",
-      "contextual_risk_score": 6.1,
-      "priority_level": "P2 - High",
-      "exposure_context": "Directly Exposed via Web Interface (Port 3000)",
-      "recommended_remediation": "Update package dependency in package.json and apply WAF input validation rule.",
+      "contextual_risk_score": 4.0,
+      "priority_level": "P3 - Medium",
+      "exposure_context": "Internal / Secondary Dependency (No Ingress)",
+      "recommended_remediation": "Review application routing logic and sanitize redirect targets.",
       "cvss_base_score": 3.8,
-      "environmental_reachability_score": 9.5,
-      "epss_percentile_score": 4.1,
+      "environmental_reachability_score": 2.5,
+      "epss_percentile_score": 4.16,
       "threat_intel": {
         "epss_score": 0.00486,
         "epss_percent": 0.49,
-        "epss_percentile": 41.0,
-        "epss_date": "2026-09-20",
+        "epss_percentile": 41.6,
+        "epss_date": "2026-10-25",
         "epss_source": "FIRST.org Live API v1.0",
         "epss_citation": "https://www.first.org/epss",
         "mitre_attack": "T1566.002 (Spearphishing Link / Open Redirect)",
@@ -242,10 +240,10 @@
       },
       "xai_formula": {
         "cvss_component": 1.33,
-        "reachability_component": 2.85,
-        "epss_component": 1.02,
+        "reachability_component": 0.75,
+        "epss_component": 1.04,
         "criticality_component": 0.85,
-        "formula_string": "(0.35*3.8) + (0.3*9.5) + (0.25*4.1) + (0.1*8.5) = 6.1"
+        "formula_string": "(0.35*3.8) + (0.3*2.5) + (0.25*4.16) + (0.1*8.5) = 4.0"
       }
     },
     {
@@ -255,18 +253,18 @@
       ],
       "component": "express",
       "summary": "Express Open Redirect vulnerability",
-      "contextual_risk_score": 6.0,
-      "priority_level": "P2 - High",
-      "exposure_context": "Directly Exposed via Web Interface (Port 3000)",
-      "recommended_remediation": "Update package dependency in package.json and apply WAF input validation rule.",
+      "contextual_risk_score": 3.9,
+      "priority_level": "P4 - Low",
+      "exposure_context": "Internal / Secondary Dependency (No Ingress)",
+      "recommended_remediation": "Monitor dependency updates during regular sprint maintenance.",
       "cvss_base_score": 3.8,
-      "environmental_reachability_score": 9.5,
-      "epss_percentile_score": 3.91,
+      "environmental_reachability_score": 2.5,
+      "epss_percentile_score": 3.96,
       "threat_intel": {
         "epss_score": 0.0046,
         "epss_percent": 0.46,
-        "epss_percentile": 39.1,
-        "epss_date": "2026-09-20",
+        "epss_percentile": 39.6,
+        "epss_date": "2026-10-25",
         "epss_source": "FIRST.org Live API v1.0",
         "epss_citation": "https://www.first.org/epss",
         "mitre_attack": "T1566.002 (Spearphishing Link / Open Redirect)",
@@ -277,10 +275,10 @@
       },
       "xai_formula": {
         "cvss_component": 1.33,
-        "reachability_component": 2.85,
-        "epss_component": 0.98,
+        "reachability_component": 0.75,
+        "epss_component": 0.99,
         "criticality_component": 0.85,
-        "formula_string": "(0.35*3.8) + (0.3*9.5) + (0.25*3.91) + (0.1*8.5) = 6.0"
+        "formula_string": "(0.35*3.8) + (0.3*2.5) + (0.25*3.96) + (0.1*8.5) = 3.9"
       }
     }
   ],
@@ -290,7 +288,7 @@
     "serialNumber": "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
     "version": 1,
     "metadata": {
-      "timestamp": "2026-09-20T15:42:00.125334+00:00",
+      "timestamp": "2026-10-26T08:31:50.511747+00:00",
       "tools": [
         {
           "vendor": "AEGIS-AI",
@@ -419,23 +417,23 @@
   },
   "compliance_governance": {
     "pci_dss_4": {
-      "score": 25.0,
-      "grade": "C+",
+      "score": 100.0,
+      "grade": "A",
       "controls": [
         {
           "id": "Req 6.2.4",
           "desc": "Prompt patch remediation within 30 days of release",
-          "status": "FAIL"
+          "status": "PASS"
         },
         {
           "id": "Req 1.3.1",
           "desc": "Restrict inbound traffic to only verified protocols",
-          "status": "WARN"
+          "status": "PASS"
         },
         {
           "id": "Req 6.4.1",
           "desc": "Public-facing web applications protected via WAF/IPS",
-          "status": "FAIL"
+          "status": "PASS"
         },
         {
           "id": "Req 10.2.1",
@@ -445,13 +443,13 @@
       ]
     },
     "nist_csf_2": {
-      "score": 50.0,
-      "grade": "C",
+      "score": 100.0,
+      "grade": "B",
       "controls": [
         {
           "id": "PR.PS-01",
           "desc": "Configuration and vulnerability management applied to software",
-          "status": "WARN"
+          "status": "PASS"
         },
         {
           "id": "DE.CM-01",
@@ -461,7 +459,7 @@
         {
           "id": "PR.AC-05",
           "desc": "Network integrity protected by perimeter boundary security",
-          "status": "FAIL"
+          "status": "PASS"
         },
         {
           "id": "RS.MI-01",
@@ -471,8 +469,8 @@
       ]
     },
     "iso_27001": {
-      "score": 50.0,
-      "grade": "C",
+      "score": 75.0,
+      "grade": "B+",
       "controls": [
         {
           "id": "A.8.8",
@@ -482,7 +480,7 @@
         {
           "id": "A.8.20",
           "desc": "Network security controls and service isolation",
-          "status": "FAIL"
+          "status": "PASS"
         },
         {
           "id": "A.8.28",
@@ -497,13 +495,13 @@
       ]
     },
     "soc_2": {
-      "score": 50.0,
-      "grade": "D",
+      "score": 100.0,
+      "grade": "B-",
       "controls": [
         {
           "id": "CC6.6",
           "desc": "Logical boundaries prevent unauthorized external network access",
-          "status": "FAIL"
+          "status": "PASS"
         },
         {
           "id": "CC7.1",
@@ -518,7 +516,7 @@
         {
           "id": "CC8.1",
           "desc": "Change management and dependency patch lifecycle",
-          "status": "WARN"
+          "status": "PASS"
         }
       ]
     }
