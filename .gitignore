@@ -26,3 +26,5 @@ Thumbs.db
 # Backups
 *.bak
 *_backup.html
+.vercel
+.env*

@@ -1,5 +1,5 @@
 {
-  "evaluation_timestamp": "2026-10-26T08:31:50.511784+00:00",
+  "evaluation_timestamp": "2026-10-26T09:25:11.827780+00:00",
   "target": "127.0.0.1:3000",
   "scoring_methodology": {
     "framework": "Explainable Risk-Based Vulnerability Management (RBVM)",
@@ -288,7 +288,7 @@
     "serialNumber": "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
     "version": 1,
     "metadata": {
-      "timestamp": "2026-10-26T08:31:50.511747+00:00",
+      "timestamp": "2026-10-26T09:25:11.827569+00:00",
       "tools": [
         {
           "vendor": "AEGIS-AI",
