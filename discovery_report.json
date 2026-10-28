@@ -1,5 +1,6 @@
 {
-  "scan_time": "2026-10-26T09:25:08.733052+00:00",
+  "scan_time": "2026-10-28T19:23:10.216046+00:00",
+  "target": "127.0.0.1:3000",
   "discovered_assets": [
     {
       "host": "127.0.0.1",
@@ -39,7 +40,7 @@
     }
   ],
   "http_fingerprint": {
-    "url": "http://localhost:3000",
-    "error": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: / (Caused by NewConnectionError(\"HTTPConnection(host='localhost', port=3000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it\"))"
+    "url": "http://127.0.0.1:3000",
+    "error": "HTTPConnectionPool(host='127.0.0.1', port=3000): Max retries exceeded with url: / (Caused by NewConnectionError(\"HTTPConnection(host='127.0.0.1', port=3000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it\"))"
   }
 }

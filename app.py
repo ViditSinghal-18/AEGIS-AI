@@ -5,7 +5,7 @@ import sys
 import csv
 import io
 from flask import Flask, render_template, jsonify, send_file, request, Response
-from scanner_online import assess_website
+from scanner_online import assess_website, convert_to_prioritized_report
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -75,6 +75,23 @@ FLEET_INVENTORY = [
 def index():
     return render_template("index.html")
 
+@app.route("/slides")
+@app.route("/presentation")
+def presentation_slides():
+    slides_path = os.path.join(BASE_DIR, "presentation_slides.html")
+    if os.path.exists(slides_path):
+        with open(slides_path, "r", encoding="utf-8") as f:
+            return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+    return jsonify({"error": "presentation_slides.html not found"}), 404
+
+@app.route("/dashboard")
+def view_dashboard():
+    dash_path = os.path.join(BASE_DIR, "dashboard.html")
+    if os.path.exists(dash_path):
+        with open(dash_path, "r", encoding="utf-8") as f:
+            return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+    return jsonify({"error": "dashboard.html not found"}), 404
+
 @app.route("/api/inventory", methods=["GET"])
 def get_inventory():
     return jsonify(FLEET_INVENTORY)
@@ -90,7 +107,11 @@ def get_report():
 @app.route("/api/scan", methods=["POST"])
 def trigger_scan():
     req_data = request.get_json() or {}
-    target = req_data.get("target", "127.0.0.1").strip()
+    raw_target = req_data.get("target")
+    if raw_target is not None and not str(raw_target).strip():
+        return jsonify({"success": False, "error": "Target host or domain cannot be empty."}), 400
+
+    target = str(raw_target).strip() if raw_target else "127.0.0.1:3000"
     
     # Check if target is a public internet domain or external URL
     is_domain = (
@@ -105,11 +126,15 @@ def trigger_scan():
             audit_result = assess_website(target)
             safe_save_json(ONLINE_REPORT_FILE, audit_result)
 
+            unified_report = convert_to_prioritized_report(audit_result)
+            safe_save_json(REPORT_FILE, unified_report)
+
             return jsonify({
                 "success": True,
                 "mode": "online",
                 "message": f"Universal external security audit of '{target}' completed successfully.",
-                "data": audit_result
+                "data": audit_result,
+                "report": unified_report
             })
         except Exception as e:
             return jsonify({
@@ -124,7 +149,10 @@ def trigger_scan():
     for script in stages:
         script_path = os.path.join(BASE_DIR, script)
         try:
-            res = subprocess.run([sys.executable, script_path], capture_output=True, text=True, timeout=12)
+            cmd = [sys.executable, script_path]
+            if script == "discovery.py":
+                cmd.append(target)
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=12)
             if res.returncode != 0:
                 # In serverless environment, local raw socket/nmap scans aren't available; fall back to baseline
                 break
@@ -135,6 +163,8 @@ def trigger_scan():
     if os.path.exists(REPORT_FILE):
         with open(REPORT_FILE, "r", encoding="utf-8") as f:
             fresh_data = json.load(f)
+        if target:
+            fresh_data["target"] = target
     else:
         fresh_data = {"target": target, "status": "Ready", "prioritized_findings": []}
 
@@ -155,11 +185,14 @@ def trigger_scan_online():
     try:
         audit_result = assess_website(target)
         safe_save_json(ONLINE_REPORT_FILE, audit_result)
+        unified_report = convert_to_prioritized_report(audit_result)
+        safe_save_json(REPORT_FILE, unified_report)
 
         return jsonify({
             "success": True,
             "message": f"Successfully assessed {target}",
-            "data": audit_result
+            "data": audit_result,
+            "report": unified_report
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -351,7 +384,38 @@ def agent_chat():
     
     # Intelligent SecOps Knowledge Engine
     if not user_msg:
-        return jsonify({"reply": "Hello! I am **Aegis Copilot**, your autonomous Security Operations AI Agent. Ask me anything about our attack surface, CISA KEV mandates, CycloneDX SBOM, or request code patches!"})
+        return jsonify({"reply": "Hello! I am **Aegis Copilot**, your autonomous Security Operations AI Agent. Ask me anything about our attack surface, CISA KEV mandates, CycloneDX SBOM, website safety audits, or request code patches!"})
+
+    # Check if user message asks to audit or check a website / domain
+    import re
+    domain_match = re.search(r'([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?::\d+)?)', user_msg)
+    if domain_match and any(w in user_msg for w in ["check", "audit", "assess", "scan", "safe", "website", "http", "domain", "url", "security"]):
+        matched_domain = domain_match.group(1).strip()
+        try:
+            audit = assess_website(matched_domain)
+            safe_save_json(ONLINE_REPORT_FILE, audit)
+            grade = audit.get("grade", "N/A")
+            score = audit.get("score", 0)
+            status = audit.get("summary", {}).get("posture_status", "Audited")
+            tls = audit.get("ssl_telemetry", {})
+            tls_txt = f"{tls.get('tls_version', 'TLS')} Cipher Active" if tls.get("enabled") else "Plaintext HTTP / Inactive"
+            cdn = audit.get("server_fingerprint", {}).get("cloud_cdn_waf", "Direct Origin")
+            findings_count = audit.get("summary", {}).get("total_issues", len(audit.get("findings", [])))
+            
+            safety_badge = "✅ **SAFE & HARDENED**" if score >= 80 else ("⚠️ **MODERATE RISK**" if score >= 55 else "🚨 **CRITICAL EXPOSURE (UNSAFE)**")
+            
+            reply = (
+                f"### 🌐 Universal Website Security Assessment: `{matched_domain}`\n\n"
+                f"**Overall Safety Verdict:** {safety_badge} (Grade: **{grade}** · Score: **{score}/100**)\n\n"
+                f"* **Perimeter Posture:** {status}\n"
+                f"* **SSL/TLS Encryption:** {tls_txt}\n"
+                f"* **Edge CDN/WAF Defense:** {cdn}\n"
+                f"* **Identified Security Deductions:** {findings_count} perimeter findings\n\n"
+                f"You can view the full interactive audit checklist under the **'Universal Assessor'** tab!"
+            )
+            return jsonify({"reply": reply, "audit": audit})
+        except Exception:
+            pass
 
     if "cisa" in user_msg or "kev" in user_msg or "bod" in user_msg or "federal" in user_msg:
         reply = (

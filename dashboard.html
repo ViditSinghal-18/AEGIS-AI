@@ -52,11 +52,11 @@
     <div class="container">
         <header>
             <h1>AI Vulnerability Detection & Attack-Surface Assessment</h1>
-            <p class="sub-header">Target: <strong>127.0.0.1:3000</strong> | Scan Timestamp: <strong>2026-09-20T15:42:00.125358+00:00</strong></p>
+            <p class="sub-header">Target: <strong>127.0.0.1:3000</strong> | Scan Timestamp: <strong>2026-10-28T19:22:46.521654+00:00</strong></p>
         </header>
 
         <div class="context-banner">
-            <strong>Environmental Telemetry:</strong> Detected Framework: <code>Express (Node.js)</code> | Exposed Open Ports: <code>3000</code> | Target Instance: <code>OWASP Juice Shop (Containerized)</code>
+            <strong>Environmental Telemetry:</strong> Detected Framework: <code>Express (Node.js)</code> | Exposed Open Ports: <code></code> | Target Instance: <code>OWASP Juice Shop (Containerized)</code>
         </div>
 
         <div class="metrics-grid">
@@ -70,15 +70,15 @@
             </div>
             <div class="card">
                 <div style="color: var(--text-muted); font-size: 0.85rem;">High (P2)</div>
-                <div class="card-number" style="color: var(--high);">4</div>
+                <div class="card-number" style="color: var(--high);">0</div>
             </div>
             <div class="card">
                 <div style="color: var(--text-muted); font-size: 0.85rem;">Medium (P3)</div>
-                <div class="card-number" style="color: var(--medium);">0</div>
+                <div class="card-number" style="color: var(--medium);">3</div>
             </div>
             <div class="card">
                 <div style="color: var(--text-muted); font-size: 0.85rem;">Low (P4)</div>
-                <div class="card-number" style="color: var(--low);">0</div>
+                <div class="card-number" style="color: var(--low);">1</div>
             </div>
         </div>
 
@@ -100,44 +100,44 @@
             <td><strong>8.8</strong> / 10</td>
             <td><code>CVE-2024-29041</code></td>
             <td>Express.js Open Redirect in malformed URLs</td>
-            <td><span class="exposure-tag">Directly Exposed via Web Interface (Port 3000)</span></td>
-            <td class="action-cell">Update package dependency in package.json and apply WAF input validation rule.</td>
+            <td><span class="exposure-tag">Internal / Secondary Dependency (No Ingress)</span></td>
+            <td class="action-cell">Review application routing logic and sanitize redirect targets.</td>
         </tr>
         
         <tr>
-            <td><span class="badge badge-high">P2 - High</span></td>
-            <td><strong>6.7</strong> / 10</td>
-            <td><code>CVE-2024-10491</code></td>
-            <td>Express ressource injection</td>
-            <td><span class="exposure-tag">Directly Exposed via Web Interface (Port 3000)</span></td>
-            <td class="action-cell">Update package dependency in package.json and apply WAF input validation rule.</td>
-        </tr>
-        
-        <tr>
-            <td><span class="badge badge-high">P2 - High</span></td>
-            <td><strong>6.6</strong> / 10</td>
+            <td><span class="badge badge-medium">P3 - Medium</span></td>
+            <td><strong>5.3</strong> / 10</td>
             <td><code>CVE-2014-6393</code></td>
             <td>No Charset in Content-Type Header in express</td>
-            <td><span class="exposure-tag">Exposed Port 3000 Service</span></td>
-            <td class="action-cell">Update package dependency in package.json and apply WAF input validation rule.</td>
+            <td><span class="exposure-tag">Internal / Secondary Dependency (No Ingress)</span></td>
+            <td class="action-cell">Review application routing logic and sanitize redirect targets.</td>
         </tr>
         
         <tr>
-            <td><span class="badge badge-high">P2 - High</span></td>
-            <td><strong>6.1</strong> / 10</td>
+            <td><span class="badge badge-medium">P3 - Medium</span></td>
+            <td><strong>4.6</strong> / 10</td>
+            <td><code>CVE-2024-10491</code></td>
+            <td>Express ressource injection</td>
+            <td><span class="exposure-tag">Internal / Secondary Dependency (No Ingress)</span></td>
+            <td class="action-cell">Review application routing logic and sanitize redirect targets.</td>
+        </tr>
+        
+        <tr>
+            <td><span class="badge badge-medium">P3 - Medium</span></td>
+            <td><strong>4.0</strong> / 10</td>
             <td><code>CVE-2024-43796</code></td>
             <td>express vulnerable to XSS via response.redirect()</td>
-            <td><span class="exposure-tag">Directly Exposed via Web Interface (Port 3000)</span></td>
-            <td class="action-cell">Update package dependency in package.json and apply WAF input validation rule.</td>
+            <td><span class="exposure-tag">Internal / Secondary Dependency (No Ingress)</span></td>
+            <td class="action-cell">Review application routing logic and sanitize redirect targets.</td>
         </tr>
         
         <tr>
-            <td><span class="badge badge-high">P2 - High</span></td>
-            <td><strong>6.0</strong> / 10</td>
+            <td><span class="badge badge-low">P4 - Low</span></td>
+            <td><strong>3.9</strong> / 10</td>
             <td><code>CVE-2024-9266</code></td>
             <td>Express Open Redirect vulnerability</td>
-            <td><span class="exposure-tag">Directly Exposed via Web Interface (Port 3000)</span></td>
-            <td class="action-cell">Update package dependency in package.json and apply WAF input validation rule.</td>
+            <td><span class="exposure-tag">Internal / Secondary Dependency (No Ingress)</span></td>
+            <td class="action-cell">Monitor dependency updates during regular sprint maintenance.</td>
         </tr>
         
             </tbody>

@@ -9,7 +9,7 @@ OUTPUT_HTML = "dashboard.html"
 def load_report(filepath=INPUT_FILE):
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"Missing file: {filepath}. Run prioritize.py first.")
-    with open(filepath, "r") as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         return json.load(f)
 
 def get_badge_class(priority):

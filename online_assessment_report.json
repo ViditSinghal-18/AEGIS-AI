@@ -1,16 +1,16 @@
 {
-  "target": "example.com",
-  "normalized_url": "https://example.com",
-  "hostname": "example.com",
-  "assessment_time": "2026-09-20T11:22:32.667273+00:00",
-  "resolved_ip": "172.66.147.243",
+  "target": "google.com",
+  "normalized_url": "https://google.com",
+  "hostname": "google.com",
+  "assessment_time": "2026-10-28T19:31:51.698805+00:00",
+  "resolved_ip": "142.250.77.142",
   "ssl_telemetry": {
     "enabled": true,
     "tls_version": "TLSv1.3",
     "cipher_suite": "TLS_AES_256_GCM_SHA384",
     "cipher_bits": 256,
     "issuer": "Trusted / Hidden",
-    "subject": "example.com",
+    "subject": "google.com",
     "valid_to": "Active"
   },
   "headers_telemetry": {
@@ -25,8 +25,8 @@
         "value": null
       },
       "X-Frame-Options": {
-        "present": false,
-        "value": null
+        "present": true,
+        "value": "SAMEORIGIN"
       },
       "X-Content-Type-Options": {
         "present": false,
@@ -37,20 +37,21 @@
         "value": null
       },
       "Permissions-Policy": {
-        "present": false,
-        "value": null
+        "present": true,
+        "value": "unload=()"
       }
     },
     "redirect_chain": [
-      "https://example.com/"
+      "https://google.com/",
+      "https://www.google.com/"
     ]
   },
   "server_fingerprint": {
-    "server_banner": "cloudflare",
-    "framework": "Not Broadcasted",
-    "cloud_cdn_waf": "Cloudflare Edge Shield",
+    "server_banner": "gws",
+    "framework": "Google Web Server (GWS)",
+    "cloud_cdn_waf": "None / Direct Origin",
     "disclosed_technologies": [
-      "No direct framework leaks detected"
+      "Identified runtime: Google Web Server (GWS)"
     ]
   },
   "findings": [
@@ -73,15 +74,6 @@
       "remediation": "Define a robust CSP header to prevent Cross-Site Scripting (XSS) and unauthorized data injection."
     },
     {
-      "id": "HDR-X_FRAME_OPTIONS",
-      "title": "Missing Clickjacking Defense (X-Frame-Options)",
-      "severity": "MEDIUM",
-      "deduction": 10,
-      "category": "Web Security Headers",
-      "details": "The HTTP response does not include the standard 'X-Frame-Options' header.",
-      "remediation": "Set 'X-Frame-Options: DENY' or 'SAMEORIGIN' to block framing/clickjacking attacks."
-    },
-    {
       "id": "HDR-X_CONTENT_TYPE_OPTIONS",
       "title": "Missing MIME-Sniffing Protection (X-Content-Type-Options)",
       "severity": "LOW",
@@ -98,25 +90,26 @@
       "category": "Privacy & Leakage",
       "details": "The HTTP response does not include the standard 'Referrer-Policy' header.",
       "remediation": "Set 'Referrer-Policy: strict-origin-when-cross-origin' to prevent URL data leaks."
-    },
-    {
-      "id": "HDR-PERMISSIONS_POLICY",
-      "title": "Missing Permissions-Policy (Feature-Policy)",
-      "severity": "LOW",
-      "deduction": 5,
-      "category": "Browser Capabilities",
-      "details": "The HTTP response does not include the standard 'Permissions-Policy' header.",
-      "remediation": "Restrict browser features like camera, microphone, and geolocation via Permissions-Policy header."
     }
   ],
-  "score": 45,
-  "grade": "D",
+  "score": 60,
+  "grade": "C",
   "summary": {
     "critical": 0,
     "high": 2,
-    "medium": 1,
-    "low": 3,
-    "total_issues": 6,
-    "posture_status": "Critical Exposure"
+    "medium": 0,
+    "low": 2,
+    "total_issues": 4,
+    "posture_status": "Moderate Risk"
+  },
+  "geo_telemetry": {
+    "country": "United States",
+    "city": "Ashburn, Virginia",
+    "region": "North America",
+    "asn": "AS13335 (Cloudflare / Edge Anycast)",
+    "lat": 39.0438,
+    "lon": -77.4874,
+    "datacenter": "AWS us-east-1 / Cloudflare Edge IAD",
+    "round_trip_latency_ms": 32.4
   }
 }

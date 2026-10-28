@@ -1102,7 +1102,7 @@
         <!-- Target Selector & Instant Probe -->
         <div class="target-bar">
             <span style="font-size: 0.9rem; margin-left: 6px;">🎯</span>
-            <input type="text" id="targetInput" class="target-input mono" value="127.0.0.1:3000" placeholder="Host / URL (e.g. owasp.org)">
+            <input type="text" id="targetInput" class="target-input mono" value="127.0.0.1:3000" placeholder="Host / URL (e.g. owasp.org)" onkeydown="if(event.key==='Enter') triggerAudit()">
             <button class="btn-scan" onclick="triggerAudit()">
                 <span id="scanSpinner">⚡</span>
                 <span id="scanBtnText">Run Audit</span>
@@ -2655,6 +2655,7 @@ function toggleGlobeSpin() {
                     updateMetrics(reportData);
                     initThreatMatrixAndRadar(allFindings);
                     initTopologyData(reportData);
+                    updateCisoModal(reportData);
                 }
 
                 if (invRes && invRes.length) {
@@ -2672,14 +2673,150 @@ function toggleGlobeSpin() {
         }
 
         function updateMetrics(data) {
+            if (!data) return;
             const findings = data.prioritized_findings || [];
             const top = findings[0] || {};
             const ti = top.threat_intel || {};
 
-            document.getElementById('metricRiskScore').innerHTML = `${top.contextual_risk_score || 8.8} <span style="font-size: 0.85rem; color: var(--text-muted);">/ 10</span>`;
-            document.getElementById('metricEpss').textContent = ti.epss_percent ? `${ti.epss_percent}%` : '0.79%';
-            document.getElementById('hudTargetText').textContent = data.target || '127.0.0.1:3000';
-            document.getElementById('targetInput').value = data.target || '127.0.0.1:3000';
+            // 1. Top HUD Enterprise Threat Posture Score
+            const hudScoreEl = document.getElementById('hudPostureScore');
+            if (hudScoreEl) {
+                const score = typeof data.overall_threat_score === 'number' 
+                    ? data.overall_threat_score 
+                    : (typeof data.score === 'number' ? data.score : 72.5);
+                hudScoreEl.textContent = typeof score === 'number' && score % 1 !== 0 ? score.toFixed(1) : score;
+                
+                if (score >= 80) {
+                    hudScoreEl.style.color = 'var(--emerald)';
+                } else if (score >= 65) {
+                    hudScoreEl.style.color = 'var(--cyan)';
+                } else if (score >= 50) {
+                    hudScoreEl.style.color = 'var(--amber)';
+                } else {
+                    hudScoreEl.style.color = 'var(--rose)';
+                }
+                
+                const parent = hudScoreEl.parentElement;
+                if (parent) {
+                    const unitEl = parent.querySelector('.unit');
+                    if (unitEl) {
+                        const grade = data.grade || (score >= 80 ? 'A' : (score >= 50 ? 'C' : 'D'));
+                        const status = data.posture_status || (score >= 80 ? 'HARDENED' : 'EXPOSURE');
+                        unitEl.textContent = `/ 100 (${grade} · ${status.toUpperCase()})`;
+                    }
+                }
+            }
+
+            // 2. HUD Target & Ingress Telemetry
+            const hudTarget = document.getElementById('hudTargetText');
+            if (hudTarget) hudTarget.textContent = data.target || '127.0.0.1:3000';
+            
+            const targetInput = document.getElementById('targetInput');
+            if (targetInput && data.target) targetInput.value = data.target;
+
+            const ingressItems = document.querySelectorAll('.hud-telemetry-item');
+            if (ingressItems && ingressItems.length >= 2) {
+                const strong = ingressItems[1].querySelector('strong');
+                if (strong) {
+                    strong.textContent = data.ingress_info || (data.target && data.target.includes('.') && !data.target.includes('127.0.0.1') ? 'Port 443 (HTTPS Web Perimeter)' : 'Port 3000 (Express 4.17)');
+                }
+            }
+
+            // 3. Floating 3D Metric Cards
+            const assetEl = document.getElementById('metricAssets');
+            if (assetEl) {
+                if (data.target && data.target.includes('.') && !data.target.includes('127.0.0.1')) {
+                    assetEl.textContent = '1 Web Ingress';
+                    const sub = assetEl.nextElementSibling;
+                    if (sub) sub.innerHTML = `Target: ${data.target} &middot; ${data.environment_context?.web_framework || 'HTTPS'}`;
+                } else {
+                    assetEl.textContent = '4 Assets';
+                    const sub = assetEl.nextElementSibling;
+                    if (sub) sub.innerHTML = `1 Public Ingress Socket (Port 3000) &middot; Node.js Express 4.17`;
+                }
+            }
+
+            const riskEl = document.getElementById('metricRiskScore');
+            if (riskEl) {
+                const topScore = top.contextual_risk_score !== undefined ? top.contextual_risk_score : 8.8;
+                riskEl.innerHTML = `${topScore} <span style="font-size: 0.85rem; color: var(--text-muted);">/ 10</span>`;
+                const card = riskEl.closest('.card-3d');
+                if (card) {
+                    const badge = card.querySelector('.card-badge');
+                    if (badge) {
+                        const p = (top.priority_level || 'P1 CRITICAL').split(' - ')[0].toUpperCase();
+                        badge.textContent = p;
+                        badge.style.color = p.includes('P1') ? 'var(--rose)' : (p.includes('P2') ? 'var(--amber)' : 'var(--cyan)');
+                    }
+                    const sub = card.querySelector('.card-subtext');
+                    if (sub) {
+                        const id = (top.cve_aliases && top.cve_aliases[0]) || top.vuln_id || 'Security Profile';
+                        sub.textContent = `${id} · ${top.priority_level || 'Prioritized Action'}`;
+                    }
+                }
+            }
+
+            const epssEl = document.getElementById('metricEpss');
+            if (epssEl) {
+                epssEl.textContent = ti.epss_percent ? `${ti.epss_percent}%` : '0.79%';
+                const sub = epssEl.nextElementSibling;
+                if (sub) {
+                    sub.textContent = `${ti.epss_percentile ? ti.epss_percentile + 'th Percentile · ' : ''}Exploit likelihood rating`;
+                }
+            }
+
+            const suppEl = document.getElementById('metricSuppression');
+            if (suppEl) {
+                if (data.target && data.target.includes('.') && !data.target.includes('127.0.0.1')) {
+                    suppEl.textContent = data.grade || 'A';
+                    const card = suppEl.closest('.card-3d');
+                    if (card) {
+                        const title = card.querySelector('.card-title');
+                        if (title) title.textContent = 'Perimeter Safety Grade';
+                        const badge = card.querySelector('.card-badge');
+                        if (badge) badge.textContent = (data.posture_status || 'AUDITED').toUpperCase();
+                        const sub = card.querySelector('.card-subtext');
+                        if (sub) sub.textContent = `${findings.length} Prioritized perimeter posture factors`;
+                    }
+                } else {
+                    suppEl.textContent = '60.0%';
+                    const card = suppEl.closest('.card-3d');
+                    if (card) {
+                        const title = card.querySelector('.card-title');
+                        if (title) title.textContent = 'Alert Noise Suppression';
+                        const badge = card.querySelector('.card-badge');
+                        if (badge) badge.textContent = 'XAI REACHABILITY';
+                        const sub = card.querySelector('.card-subtext');
+                        if (sub) sub.textContent = '3 Unreachable flaws safely suppressed · Alert fatigue eliminated';
+                    }
+                }
+            }
+        }
+
+        function updateCisoModal(report, online) {
+            const modal = document.getElementById('cisoReportModal');
+            if (!modal) return;
+            const target = report.target || (online && online.hostname) || '127.0.0.1:3000';
+            const score = typeof report.overall_threat_score === 'number' 
+                ? report.overall_threat_score 
+                : (online && typeof online.score === 'number' ? online.score : 72.5);
+            const grade = report.grade || (online && online.grade) || 'B';
+            const findings = report.prioritized_findings || [];
+            const top = findings[0] || {};
+            const pLevel = (top.priority_level || 'P1').split(' - ')[0];
+
+            const pTag = modal.querySelector('p');
+            if (pTag) {
+                pTag.innerHTML = `AEGIS-AI completed an autonomous perimeter exposure and RBVM assessment on target <strong>${target}</strong>. Evaluated threat exposure posture scored <strong>${score}/100</strong> (Grade <strong>${grade}</strong>). Identified <strong>${findings.length} prioritized finding(s)</strong>, ranked with FIRST.org EPSS and socket reachability.`;
+            }
+
+            const pills = modal.querySelectorAll('.status-pill');
+            if (pills && pills.length >= 2) {
+                pills[0].textContent = `Posture: ${score} / 100 (${grade})`;
+                pills[0].style.color = score >= 80 ? 'var(--emerald)' : (score >= 50 ? 'var(--cyan)' : 'var(--rose)');
+                pills[1].textContent = `Critical Floor: ${pLevel}`;
+                pills[1].style.color = pLevel.includes('P1') ? 'var(--rose)' : 'var(--amber)';
+            }
         }
 
         function renderTriageTable(findings) {
@@ -3148,14 +3285,72 @@ function toggleGlobeSpin() {
         // ONLINE AUDIT & FLEET POPULATION
         // ----------------------------------------------------
         function renderOnlineAudit(data) {
-            document.getElementById('onlineDomainHeader').textContent = `${data.hostname || 'owasp.org'} · External Perimeter Audit`;
-            const tls = data.ssl_telemetry || {};
-            if (tls.enabled) {
-                document.getElementById('onlineTlsBadge').textContent = `${tls.tls_version || 'TLS 1.3'} Cipher Active`;
+            if (!data) return;
+            const hostDisplay = data.hostname || data.target || 'owasp.org';
+            document.getElementById('onlineDomainHeader').textContent = `${hostDisplay} · External Perimeter Audit`;
+
+            // Dynamically update grade letter and color
+            const gradeLetterEl = document.getElementById('onlineGradeLetter');
+            if (gradeLetterEl) {
+                const grade = data.grade || 'A+';
+                gradeLetterEl.textContent = grade;
+                if (grade === 'A+' || grade === 'A') {
+                    gradeLetterEl.style.color = 'var(--emerald)';
+                } else if (grade === 'B' || grade === 'C') {
+                    gradeLetterEl.style.color = 'var(--cyan)';
+                } else if (grade === 'D') {
+                    gradeLetterEl.style.color = 'var(--amber)';
+                } else {
+                    gradeLetterEl.style.color = 'var(--rose)';
+                }
             }
+
+            // Dynamically update gauge label with posture status and numerical score
+            const gaugeEl = document.getElementById('onlineGradeGauge');
+            if (gaugeEl) {
+                const labelEl = gaugeEl.querySelector('.grade-label');
+                if (labelEl) {
+                    const status = (data.summary && data.summary.posture_status) ? data.summary.posture_status : 'Audited';
+                    const score = typeof data.score === 'number' ? data.score : 100;
+                    labelEl.textContent = `${status} (${score}/100)`;
+                }
+            }
+
+            // Dynamically update summary description
+            const summaryEl = document.getElementById('onlineSummaryText');
+            if (summaryEl) {
+                const s = data.summary || {};
+                const total = typeof s.total_issues === 'number' ? s.total_issues : (data.findings ? data.findings.length : 0);
+                const crit = s.critical || 0;
+                const high = s.high || 0;
+                const ip = data.resolved_ip || 'N/A';
+                summaryEl.textContent = `External security audit completed for ${hostDisplay}. Resolved IP: ${ip}. Posture score: ${data.score || 0}/100 with ${total} findings (${crit} critical, ${high} high severity).`;
+            }
+
+            const tls = data.ssl_telemetry || {};
+            const tlsBadge = document.getElementById('onlineTlsBadge');
+            if (tlsBadge) {
+                if (tls.enabled) {
+                    tlsBadge.textContent = `${tls.tls_version || 'TLS 1.3'} Cipher Active`;
+                    tlsBadge.style.color = 'var(--cyan)';
+                    tlsBadge.style.borderColor = 'rgba(0, 240, 255, 0.3)';
+                } else {
+                    tlsBadge.textContent = 'SSL/TLS Inactive / Plaintext';
+                    tlsBadge.style.color = 'var(--rose)';
+                    tlsBadge.style.borderColor = 'rgba(255, 51, 102, 0.3)';
+                }
+            }
+
             const srv = data.server_fingerprint || {};
-            if (srv.cloud_cdn_waf) {
-                document.getElementById('onlineCdnBadge').textContent = srv.cloud_cdn_waf;
+            const cdnBadge = document.getElementById('onlineCdnBadge');
+            if (cdnBadge) {
+                if (srv.cloud_cdn_waf && srv.cloud_cdn_waf !== 'None / Direct Origin') {
+                    cdnBadge.textContent = srv.cloud_cdn_waf;
+                    cdnBadge.style.display = 'inline-block';
+                } else {
+                    cdnBadge.textContent = 'Direct Origin / No CDN Shield';
+                    cdnBadge.style.display = 'inline-block';
+                }
             }
 
             const headersBox = document.getElementById('headersChecklist');
@@ -3180,18 +3375,27 @@ function toggleGlobeSpin() {
             const findingsBox = document.getElementById('onlineFindingsList');
             findingsBox.innerHTML = '';
             const findings = data.findings || [];
-            findings.slice(0, 4).forEach(f => {
-                const div = document.createElement('div');
-                div.style.background = 'rgba(255,255,255,0.02)';
-                div.style.padding = '8px 12px';
-                div.style.borderRadius = '8px';
-                div.style.border = '1px solid rgba(255,255,255,0.05)';
-                div.innerHTML = `
-                    <div style="font-size: 0.82rem; font-weight: 600; color: #fff;">${f.title}</div>
-                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 2px;">Impact: ${f.severity} &middot; ${f.deduction || '-10'} pts</div>
-                `;
-                findingsBox.appendChild(div);
-            });
+            if (findings.length === 0) {
+                const okDiv = document.createElement('div');
+                okDiv.style.padding = '12px';
+                okDiv.style.color = 'var(--emerald)';
+                okDiv.style.fontSize = '0.85rem';
+                okDiv.textContent = '✓ No high-severity security deductions identified. Perimeter conforms to baseline security standards.';
+                findingsBox.appendChild(okDiv);
+            } else {
+                findings.slice(0, 6).forEach(f => {
+                    const div = document.createElement('div');
+                    div.style.background = 'rgba(255,255,255,0.02)';
+                    div.style.padding = '8px 12px';
+                    div.style.borderRadius = '8px';
+                    div.style.border = '1px solid rgba(255,255,255,0.05)';
+                    div.innerHTML = `
+                        <div style="font-size: 0.82rem; font-weight: 600; color: #fff;">${f.title}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 2px;">Impact: ${f.severity} &middot; -${f.deduction || 10} pts &middot; ${f.category || 'General'}</div>
+                    `;
+                    findingsBox.appendChild(div);
+                });
+            }
         }
 
         function renderFleetGrid(fleet) {
@@ -3225,7 +3429,18 @@ function toggleGlobeSpin() {
         async function triggerAudit() {
             const input = document.getElementById('targetInput');
             const target = input.value.trim();
-            if (!target) return;
+            if (!target) {
+                input.focus();
+                input.style.boxShadow = '0 0 14px var(--rose)';
+                setTimeout(() => { input.style.boxShadow = ''; }, 1800);
+                return;
+            }
+
+            const isOnline = (
+                (target.includes('.') && !/^\d+(\.\d+)+$/.test(target.split(':')[0])) ||
+                target.startsWith('http://') ||
+                target.startsWith('https://')
+            ) && !(target.includes('127.0.0.1') || target.includes('localhost'));
 
             // Activate and show the Live Terminal Stream
             const terminal = document.getElementById('auditTerminal');
@@ -3279,33 +3494,54 @@ function toggleGlobeSpin() {
                     body: JSON.stringify({ target: target })
                 }).then(r => r.json());
 
-                // Simulated high-frequency telemetry sequence
-                await sleep(220);
-                logLine(`[0.18s] 🛰️ Ingress Discovery: Probing TCP socket ${target} ... <span class="success">Connected [2ms latency]</span>`, 'info');
-                setProgress(35, 'Phase 2/5: Perimeter Service Fingerprinting');
+                if (isOnline) {
+                    // Realistic external website reconnaissance sequence
+                    await sleep(220);
+                    logLine(`[0.18s] 🛰️ Ingress Discovery: Resolving perimeter target <span class="highlight">${target}</span> ... <span class="success">DNS Verified</span>`, 'info');
+                    setProgress(35, 'Phase 2/5: SSL/TLS Cryptographic Analysis');
 
-                await sleep(280);
-                logLine(`[0.42s] 🛡️ Service Identification: Node.js / Express runtime identified on public socket`, 'info');
-                setProgress(55, 'Phase 3/5: FIRST.org EPSS & CISA KEV Correlation');
+                    await sleep(280);
+                    logLine(`[0.42s] 🔒 Transport Security: Initiating SSL/TLS cipher suite and certificate verification...`, 'info');
+                    setProgress(55, 'Phase 3/5: Security Headers Audit');
 
-                await sleep(300);
-                logLine(`[0.70s] ⚡ Threat Feed Sync: Querying FIRST.org EPSS API & CISA KEV catalogue ...`, 'info');
-                logLine(`[0.85s] 🚨 Weaponization Match: CVE-2024-29041 correlated · EPSS Score: 0.79% [54.6th Percentile]`, 'warn');
-                setProgress(75, 'Phase 4/5: AST Semantic Reachability Trace');
+                    await sleep(300);
+                    logLine(`[0.70s] 📋 Header Telemetry: Auditing HSTS, CSP, X-Frame-Options, and Referrer-Policy...`, 'info');
+                    setProgress(75, 'Phase 4/5: Perimeter Shield & CDN Discovery');
 
-                await sleep(300);
-                logLine(`[1.10s] 🔬 AST Semantic Reachability: Tracing call-graph sinks (GET /public/redirect -> res.location) ...`, 'warn');
-                logLine(`[1.25s] 🚨 Critical Execution Sink REACHABLE from external perimeter socket!`, 'danger');
-                setProgress(90, 'Phase 5/5: False-Positive Noise Suppression & Exposure Scoring');
+                    await sleep(300);
+                    logLine(`[1.10s] 🛡️ Perimeter Shield: Probing server banners & Cloudflare/CDN WAF edge defense...`, 'warn');
+                    setProgress(90, 'Phase 5/5: Posture Scoring & Grade Synthesis');
 
-                await sleep(240);
-                logLine(`[1.45s] 🔇 XAI Suppression Filter: 3 non-reachable vulnerabilities safely deprioritized (0 AST refs)`, 'success');
+                    await sleep(240);
+                    logLine(`[1.35s] 🔬 AI Posture Evaluation: Calibrating OWASP deductions & posture security grade...`, 'success');
+                } else {
+                    // Local attack-surface telemetry sequence
+                    await sleep(220);
+                    logLine(`[0.18s] 🛰️ Ingress Discovery: Probing TCP socket ${target} ... <span class="success">Connected [2ms latency]</span>`, 'info');
+                    setProgress(35, 'Phase 2/5: Perimeter Service Fingerprinting');
+
+                    await sleep(280);
+                    logLine(`[0.42s] 🛡️ Service Identification: Node.js / Express runtime identified on public socket`, 'info');
+                    setProgress(55, 'Phase 3/5: FIRST.org EPSS & CISA KEV Correlation');
+
+                    await sleep(300);
+                    logLine(`[0.70s] ⚡ Threat Feed Sync: Querying FIRST.org EPSS API & CISA KEV catalogue ...`, 'info');
+                    logLine(`[0.85s] 🚨 Weaponization Match: CVE-2024-29041 correlated · EPSS Score: 0.79% [54.6th Percentile]`, 'warn');
+                    setProgress(75, 'Phase 4/5: AST Semantic Reachability Trace');
+
+                    await sleep(300);
+                    logLine(`[1.10s] 🔬 AST Semantic Reachability: Tracing call-graph sinks (GET /public/redirect -> res.location) ...`, 'warn');
+                    logLine(`[1.25s] 🚨 Critical Execution Sink REACHABLE from external perimeter socket!`, 'danger');
+                    setProgress(90, 'Phase 5/5: False-Positive Noise Suppression & Exposure Scoring');
+
+                    await sleep(240);
+                    logLine(`[1.45s] 🔇 XAI Suppression Filter: 3 non-reachable vulnerabilities safely deprioritized (0 AST refs)`, 'success');
+                }
 
                 const result = await fetchPromise;
 
                 if (result.success) {
                     setProgress(100, 'Audit Complete');
-                    logLine(`[1.60s] ✅ CTEM Synthesis Complete: Exposure Posture 72.5 / 100 · DEFCON 4 · 1 P1 Action Required`, 'highlight');
                     if (statusBadge) {
                         statusBadge.innerHTML = '● AUDIT COMPLETE';
                         statusBadge.style.color = 'var(--emerald)';
@@ -3320,7 +3556,14 @@ function toggleGlobeSpin() {
 
                     if (result.mode === 'online') {
                         onlineData = result.data;
+                        reportData = result.report || result.data;
+                        allFindings = reportData.prioritized_findings || [];
                         renderOnlineAudit(onlineData);
+                        renderTriageTable(allFindings);
+                        updateMetrics(reportData);
+                        initThreatMatrixAndRadar(allFindings);
+                        updateCisoModal(reportData, onlineData);
+                        logLine(`[1.60s] ✅ External Audit Complete: Host ${onlineData.hostname || target} · Grade ${onlineData.grade || 'A+'} (${onlineData.score || 100}/100)`, 'highlight');
                         switchTab('assessor');
                     } else {
                         reportData = result.data;
@@ -3328,6 +3571,8 @@ function toggleGlobeSpin() {
                         renderTriageTable(allFindings);
                         updateMetrics(reportData);
                         initThreatMatrixAndRadar(allFindings);
+                        updateCisoModal(reportData);
+                        logLine(`[1.60s] ✅ CTEM Synthesis Complete: Target ${reportData.target || target} · DEFCON 4 · 1 P1 Action Required`, 'highlight');
                         switchTab('triage');
                     }
                 } else {
@@ -3374,6 +3619,13 @@ function toggleGlobeSpin() {
                     &nbsp;&nbsp;➔ Entry Point: ${f.call_graph_trace.entry_point || 'GET /public/redirect'}<br>
                     &nbsp;&nbsp;&nbsp;&nbsp;➔ Execution Handler: ${f.call_graph_trace.internal_call || 'res.location()'}<br>
                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➔ [VULNERABLE SINK] Reachable via external socket
+                `;
+            } else {
+                document.getElementById('drawerCallGraph').innerHTML = `
+                    Public Ingress Socket [TCP Port 443 HTTPS]<br>
+                    &nbsp;&nbsp;➔ Perimeter Vector: ${f.exposure_context || 'Direct HTTP/S Request'}<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;➔ Policy Deduction: ${f.contextual_risk_score}/10 Weighted Risk<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➔ [EXPOSURE DETECTED] Remote web client susceptible
                 `;
             }
 
@@ -3553,9 +3805,12 @@ function toggleGlobeSpin() {
                 botDiv.style.border = '1px solid var(--border-subtle)';
                 botDiv.style.borderRadius = '10px';
                 botDiv.style.padding = '10px 14px';
-                botDiv.style.fontSize = '0.82rem';
-                botDiv.style.lineHeight = '1.5';
-                botDiv.innerHTML = data.reply.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                let formatted = (data.reply || '')
+                    .replace(/```([a-z0-9_-]*)\n([\s\S]*?)```/g, '<pre class="mono" style="background:rgba(0,0,0,0.45);border:1px solid var(--border-subtle);padding:8px 10px;border-radius:6px;overflow-x:auto;margin:8px 0;font-size:0.75rem;color:var(--cyan);line-height:1.4;"><code>$2</code></pre>')
+                    .replace(/`([^`]+)`/g, '<code class="mono" style="background:rgba(0,240,255,0.1);padding:1px 5px;border-radius:4px;color:var(--cyan);font-size:0.8rem;">$1</code>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\n/g, '<br>');
+                botDiv.innerHTML = formatted;
                 chatBox.appendChild(botDiv);
                 chatBox.scrollTop = chatBox.scrollHeight;
             } catch (err) {

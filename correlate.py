@@ -9,7 +9,7 @@ OUTPUT_FILE = "vulnerabilities.json"
 def load_discovery_report(filepath=DISCOVERY_FILE):
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"'{filepath}' not found. Run discovery.py first.")
-    with open(filepath, "r") as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         return json.load(f)
 
 def query_osv_for_package(package_name, ecosystem="npm"):
@@ -99,13 +99,13 @@ def main():
 
     correlation_output = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "target": "127.0.0.1:3000",
+        "target": discovery_data.get("target", "127.0.0.1:3000"),
         "fingerprinted_technologies": detected_components,
         "total_vulnerabilities_found": len(all_correlated_vulns),
         "vulnerabilities": all_correlated_vulns
     }
 
-    with open(OUTPUT_FILE, "w") as f:
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(correlation_output, f, indent=2)
 
     print(f"\n[+] Vulnerability correlation complete! Saved to {OUTPUT_FILE}")
