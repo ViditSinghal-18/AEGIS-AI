@@ -1,87 +1,59 @@
 {
-  "target": "google.com",
-  "normalized_url": "https://google.com",
-  "hostname": "google.com",
-  "assessment_time": "2026-10-28T19:31:51.698805+00:00",
-  "resolved_ip": "142.250.77.142",
+  "target": "www.reddit.com",
+  "normalized_url": "https://www.reddit.com",
+  "hostname": "www.reddit.com",
+  "assessment_time": "2026-10-29T15:51:05.796343+00:00",
+  "resolved_ip": "151.101.1.140",
   "ssl_telemetry": {
     "enabled": true,
     "tls_version": "TLSv1.3",
-    "cipher_suite": "TLS_AES_256_GCM_SHA384",
-    "cipher_bits": 256,
+    "cipher_suite": "TLS_AES_128_GCM_SHA256",
+    "cipher_bits": 128,
     "issuer": "Trusted / Hidden",
-    "subject": "google.com",
+    "subject": "www.reddit.com",
     "valid_to": "Active"
   },
   "headers_telemetry": {
     "status_code": 200,
     "evaluated_headers": {
       "Strict-Transport-Security": {
-        "present": false,
-        "value": null
+        "present": true,
+        "value": "max-age=31536000; includeSubdomains"
       },
       "Content-Security-Policy": {
-        "present": false,
-        "value": null
+        "present": true,
+        "value": "default-src 'none'; script-src 'nonce-2f554f9b-e922-4489-9bcc-4f92696331f3'; style-src 'unsafe-inline'; img-src https://www.redditstatic.com; form-action 'self';"
       },
       "X-Frame-Options": {
         "present": true,
         "value": "SAMEORIGIN"
       },
       "X-Content-Type-Options": {
-        "present": false,
-        "value": null
+        "present": true,
+        "value": "nosniff"
       },
       "Referrer-Policy": {
         "present": false,
         "value": null
       },
       "Permissions-Policy": {
-        "present": true,
-        "value": "unload=()"
+        "present": false,
+        "value": null
       }
     },
     "redirect_chain": [
-      "https://google.com/",
-      "https://www.google.com/"
+      "https://www.reddit.com/"
     ]
   },
   "server_fingerprint": {
-    "server_banner": "gws",
-    "framework": "Google Web Server (GWS)",
+    "server_banner": "snooserv",
+    "framework": "Standard Web Architecture",
     "cloud_cdn_waf": "None / Direct Origin",
     "disclosed_technologies": [
-      "Identified runtime: Google Web Server (GWS)"
+      "Identified runtime: Standard Web Architecture"
     ]
   },
   "findings": [
-    {
-      "id": "HDR-STRICT_TRANSPORT_SECURITY",
-      "title": "Missing HSTS (HTTP Strict Transport Security)",
-      "severity": "HIGH",
-      "deduction": 15,
-      "category": "Web Security Headers",
-      "details": "The HTTP response does not include the standard 'Strict-Transport-Security' header.",
-      "remediation": "Add 'Strict-Transport-Security: max-age=31536000; includeSubDomains; preload' in web server config."
-    },
-    {
-      "id": "HDR-CONTENT_SECURITY_POLICY",
-      "title": "Missing Content-Security-Policy (CSP)",
-      "severity": "HIGH",
-      "deduction": 15,
-      "category": "Client-Side Protection",
-      "details": "The HTTP response does not include the standard 'Content-Security-Policy' header.",
-      "remediation": "Define a robust CSP header to prevent Cross-Site Scripting (XSS) and unauthorized data injection."
-    },
-    {
-      "id": "HDR-X_CONTENT_TYPE_OPTIONS",
-      "title": "Missing MIME-Sniffing Protection (X-Content-Type-Options)",
-      "severity": "LOW",
-      "deduction": 5,
-      "category": "Web Security Headers",
-      "details": "The HTTP response does not include the standard 'X-Content-Type-Options' header.",
-      "remediation": "Add 'X-Content-Type-Options: nosniff' header."
-    },
     {
       "id": "HDR-REFERRER_POLICY",
       "title": "Missing Referrer-Policy",
@@ -90,17 +62,26 @@
       "category": "Privacy & Leakage",
       "details": "The HTTP response does not include the standard 'Referrer-Policy' header.",
       "remediation": "Set 'Referrer-Policy: strict-origin-when-cross-origin' to prevent URL data leaks."
+    },
+    {
+      "id": "HDR-PERMISSIONS_POLICY",
+      "title": "Missing Permissions-Policy (Feature-Policy)",
+      "severity": "LOW",
+      "deduction": 5,
+      "category": "Browser Capabilities",
+      "details": "The HTTP response does not include the standard 'Permissions-Policy' header.",
+      "remediation": "Restrict browser features like camera, microphone, and geolocation via Permissions-Policy header."
     }
   ],
-  "score": 60,
-  "grade": "C",
+  "score": 90,
+  "grade": "A+",
   "summary": {
     "critical": 0,
-    "high": 2,
+    "high": 0,
     "medium": 0,
     "low": 2,
-    "total_issues": 4,
-    "posture_status": "Moderate Risk"
+    "total_issues": 2,
+    "posture_status": "Hardened"
   },
   "geo_telemetry": {
     "country": "United States",

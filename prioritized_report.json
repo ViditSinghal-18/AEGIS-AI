@@ -1,11 +1,11 @@
 {
-  "evaluation_timestamp": "2026-10-28T19:31:51.698805+00:00",
-  "target": "google.com",
-  "overall_threat_score": 60,
-  "grade": "C",
-  "posture_status": "Moderate Risk",
-  "resolved_ip": "142.250.77.142",
-  "ingress_info": "Port 443 (HTTPS / Google Web Server (GWS))",
+  "evaluation_timestamp": "2026-10-29T15:51:05.796343+00:00",
+  "target": "www.reddit.com",
+  "overall_threat_score": 90,
+  "grade": "A+",
+  "posture_status": "Hardened",
+  "resolved_ip": "151.101.1.140",
+  "ingress_info": "Port 443 (HTTPS / Standard Web Architecture)",
   "scoring_methodology": {
     "framework": "Explainable Risk-Based Vulnerability Management (RBVM)",
     "epss_authority": "FIRST.org (Forum of Incident Response and Security Teams)",
@@ -13,100 +13,31 @@
     "scoring_formula": "Risk = (0.35 * CVSS) + (0.30 * Reachability) + (0.25 * EPSS_Percentile) + (0.10 * Criticality)"
   },
   "environment_context": {
-    "web_framework": "Google Web Server (GWS)",
+    "web_framework": "Standard Web Architecture",
     "scanned_ports": [
       443,
       80
     ]
   },
-  "total_analyzed": 4,
+  "total_analyzed": 2,
   "priority_breakdown": {
-    "critical_p1": 1,
-    "high_p2": 1,
+    "critical_p1": 0,
+    "high_p2": 0,
     "medium_p3": 0,
     "low_p4": 2
   },
   "prioritized_findings": [
     {
-      "vuln_id": "HDR-CONTENT_SECURITY_POLICY",
-      "cve_aliases": [
-        "CWE-693 (Missing Protection)",
-        "OWASP-A05 (Security Misconfiguration)"
-      ],
-      "component": "google.com (Google Web Server (GWS))",
-      "summary": "Missing Content-Security-Policy (CSP): The HTTP response does not include the standard 'Content-Security-Policy' header.",
-      "contextual_risk_score": 8.4,
-      "priority_level": "P1 - Critical",
-      "exposure_context": "Public Perimeter (google.com:443) [Directly Reachable]",
-      "recommended_remediation": "Define a robust CSP header to prevent Cross-Site Scripting (XSS) and unauthorized data injection.",
-      "cvss_base_score": 8.4,
-      "environmental_reachability_score": 9.8,
-      "epss_percentile_score": 6.8,
-      "threat_intel": {
-        "epss_score": 0.018,
-        "epss_percent": 1.8,
-        "epss_percentile": 68.0,
-        "epss_date": "2026-10-28",
-        "epss_source": "FIRST.org Live API v1.0 & OWASP Top 10",
-        "epss_citation": "https://www.first.org/epss",
-        "mitre_attack": "T1190 (Exploit Public-Facing Application)",
-        "cisa_kev_status": "OWASP Top 10 A05:2021 Security Misconfiguration",
-        "cisa_due_date": "N/A - Configuration Remediation",
-        "cisa_ransomware": "Threat Exposure Mitigation"
-      },
-      "xai_formula": {
-        "cvss_component": 2.94,
-        "reachability_component": 2.94,
-        "epss_component": 1.7,
-        "criticality_component": 0.85,
-        "formula_string": "(0.35*8.4) + (0.30*9.8) + (0.25*6.8) + (0.10*8.5) = 8.4"
-      }
-    },
-    {
-      "vuln_id": "HDR-STRICT_TRANSPORT_SECURITY",
+      "vuln_id": "HDR-REFERRER_POLICY",
       "cve_aliases": [
         "OWASP-A05 (Configuration Weakness)"
       ],
-      "component": "google.com (Google Web Server (GWS))",
-      "summary": "Missing HSTS (HTTP Strict Transport Security): The HTTP response does not include the standard 'Strict-Transport-Security' header.",
-      "contextual_risk_score": 7.9,
-      "priority_level": "P2 - High",
-      "exposure_context": "Public Perimeter (google.com:443) [Directly Reachable]",
-      "recommended_remediation": "Add 'Strict-Transport-Security: max-age=31536000; includeSubDomains; preload' in web server config.",
-      "cvss_base_score": 7.8,
-      "environmental_reachability_score": 9.8,
-      "epss_percentile_score": 5.8,
-      "threat_intel": {
-        "epss_score": 0.011,
-        "epss_percent": 1.1,
-        "epss_percentile": 58.0,
-        "epss_date": "2026-10-28",
-        "epss_source": "FIRST.org Live API v1.0 & OWASP Top 10",
-        "epss_citation": "https://www.first.org/epss",
-        "mitre_attack": "T1566 (Phishing/Ingress Vector)",
-        "cisa_kev_status": "OWASP Top 10 A05:2021 Security Misconfiguration",
-        "cisa_due_date": "N/A - Configuration Remediation",
-        "cisa_ransomware": "Threat Exposure Mitigation"
-      },
-      "xai_formula": {
-        "cvss_component": 2.73,
-        "reachability_component": 2.94,
-        "epss_component": 1.45,
-        "criticality_component": 0.8,
-        "formula_string": "(0.35*7.8) + (0.30*9.8) + (0.25*5.8) + (0.10*8.0) = 7.9"
-      }
-    },
-    {
-      "vuln_id": "HDR-X_CONTENT_TYPE_OPTIONS",
-      "cve_aliases": [
-        "CWE-79 (MIME Sniffing Risk)"
-      ],
-      "component": "google.com (Google Web Server (GWS))",
-      "summary": "Missing MIME-Sniffing Protection (X-Content-Type-Options): The HTTP response does not include the standard 'X-Content-Type-Options' header.",
+      "component": "www.reddit.com (Standard Web Architecture)",
+      "summary": "Missing Referrer-Policy: The HTTP response does not include the standard 'Referrer-Policy' header.",
       "contextual_risk_score": 5.4,
       "priority_level": "P4 - Low",
-      "exposure_context": "Public Perimeter (google.com:443) [Directly Reachable]",
-      "recommended_remediation": "Add 'X-Content-Type-Options: nosniff' header.",
+      "exposure_context": "Public Perimeter (www.reddit.com:443) [Directly Reachable]",
+      "recommended_remediation": "Set 'Referrer-Policy: strict-origin-when-cross-origin' to prevent URL data leaks.",
       "cvss_base_score": 4.2,
       "environmental_reachability_score": 9.8,
       "epss_percentile_score": 1.8,
@@ -114,7 +45,7 @@
         "epss_score": 0.001,
         "epss_percent": 0.1,
         "epss_percentile": 18.0,
-        "epss_date": "2026-10-28",
+        "epss_date": "2026-10-29",
         "epss_source": "FIRST.org Live API v1.0 & OWASP Top 10",
         "epss_citation": "https://www.first.org/epss",
         "mitre_attack": "T1566 (Phishing/Ingress Vector)",
@@ -131,16 +62,16 @@
       }
     },
     {
-      "vuln_id": "HDR-REFERRER_POLICY",
+      "vuln_id": "HDR-PERMISSIONS_POLICY",
       "cve_aliases": [
         "OWASP-A05 (Configuration Weakness)"
       ],
-      "component": "google.com (Google Web Server (GWS))",
-      "summary": "Missing Referrer-Policy: The HTTP response does not include the standard 'Referrer-Policy' header.",
+      "component": "www.reddit.com (Standard Web Architecture)",
+      "summary": "Missing Permissions-Policy (Feature-Policy): The HTTP response does not include the standard 'Permissions-Policy' header.",
       "contextual_risk_score": 5.4,
       "priority_level": "P4 - Low",
-      "exposure_context": "Public Perimeter (google.com:443) [Directly Reachable]",
-      "recommended_remediation": "Set 'Referrer-Policy: strict-origin-when-cross-origin' to prevent URL data leaks.",
+      "exposure_context": "Public Perimeter (www.reddit.com:443) [Directly Reachable]",
+      "recommended_remediation": "Restrict browser features like camera, microphone, and geolocation via Permissions-Policy header.",
       "cvss_base_score": 4.2,
       "environmental_reachability_score": 9.8,
       "epss_percentile_score": 1.8,
@@ -148,7 +79,7 @@
         "epss_score": 0.001,
         "epss_percent": 0.1,
         "epss_percentile": 18.0,
-        "epss_date": "2026-10-28",
+        "epss_date": "2026-10-29",
         "epss_source": "FIRST.org Live API v1.0 & OWASP Top 10",
         "epss_citation": "https://www.first.org/epss",
         "mitre_attack": "T1566 (Phishing/Ingress Vector)",
@@ -165,5 +96,5 @@
       }
     }
   ],
-  "ciso_briefing": "AEGIS-AI completed external perimeter evaluation on target 'google.com'. Evaluated threat exposure posture scored 60/100 (Moderate Risk, Grade C). Identified 4 prioritized exposure factors on public web socket (Port 443/80)."
+  "ciso_briefing": "AEGIS-AI completed external perimeter evaluation on target 'www.reddit.com'. Evaluated threat exposure posture scored 90/100 (Hardened, Grade A+). Identified 2 prioritized exposure factors on public web socket (Port 443/80)."
 }
