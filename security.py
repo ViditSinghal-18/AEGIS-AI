@@ -21,6 +21,8 @@ from config import (
     normalize_host,
 )
 
+is_target_allowlisted = is_target_allowed_for_active_scan
+
 # RFC 1123 compliant hostname regex (max 253 chars total, labels 1-63 chars)
 _HOSTNAME_RE = re.compile(
     r"^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*$"

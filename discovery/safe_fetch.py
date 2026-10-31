@@ -130,6 +130,23 @@ def is_ip_allowed_for_public_fetch(ip_str: str) -> bool:
     return True
 
 
+is_public_ip = is_ip_allowed_for_public_fetch
+
+
+def is_safe_url(url: str) -> bool:
+    """Validate that a URL uses http/https and targets a valid public hostname/IP."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme.lower() not in {"http", "https"}:
+            return False
+        if not parsed.hostname:
+            return False
+        resolve_and_validate_hostname(parsed.hostname)
+        return True
+    except Exception:
+        return False
+
+
 def resolve_and_validate_hostname(hostname: str) -> list[str]:
     """
     Resolve a hostname via DNS and verify that ALL returned IP addresses are public.

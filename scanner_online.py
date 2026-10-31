@@ -98,14 +98,14 @@ def assess_website(target_input):
     # Geo-IP & Infrastructure Telemetry (Live lookup with resilient fallback)
     if is_private or "127.0.0.1" in target or "localhost" in target:
         geo = {
-            "country": "Internal System",
+            "country": "Private Network",
             "city": "Local Loopback",
             "region": "Intranet / LAN",
-            "asn": "AS0 (Internal Host / Docker)",
-            "lat": 28.6139,
-            "lon": 77.2090,
+            "asn": "AS0 (Internal)",
+            "lat": 0.0,
+            "lon": 0.0,
             "datacenter": "Localhost Sandbox Container",
-            "round_trip_latency_ms": 0.8
+            "round_trip_latency_ms": 0.5
         }
     else:
         geo = None
@@ -121,49 +121,25 @@ def assess_website(target_input):
                             "city": d.get("city", "Edge Location"),
                             "region": d.get("regionName", "Global"),
                             "asn": d.get("as", "Autonomous System"),
-                            "lat": float(d.get("lat", 37.7749)),
-                            "lon": float(d.get("lon", -122.4194)),
+                            "lat": float(d.get("lat", 0.0)),
+                            "lon": float(d.get("lon", 0.0)),
                             "datacenter": d.get("org", "Cloud Infrastructure"),
-                            "round_trip_latency_ms": 28.5
+                            "round_trip_latency_ms": 25.0
                         }
             except Exception:
                 pass
 
         if not geo:
-            # Intelligent fallback based on known CDN / domain profiles
-            if "owasp.org" in target:
-                geo = {
-                    "country": "United States",
-                    "city": "San Francisco, CA",
-                    "region": "North America",
-                    "asn": "AS13335 (Cloudflare Network)",
-                    "lat": 37.7749,
-                    "lon": -122.4194,
-                    "datacenter": "Cloudflare Global Anycast SFO",
-                    "round_trip_latency_ms": 48.6
-                }
-            elif "github.com" in target:
-                geo = {
-                    "country": "United States",
-                    "city": "Seattle, Washington",
-                    "region": "North America",
-                    "asn": "AS36459 (GitHub / Microsoft)",
-                    "lat": 47.6062,
-                    "lon": -122.3321,
-                    "datacenter": "Azure US-West SEA",
-                    "round_trip_latency_ms": 41.2
-                }
-            else:
-                geo = {
-                    "country": "United States",
-                    "city": "Ashburn, Virginia",
-                    "region": "North America",
-                    "asn": "AS13335 (Cloudflare / Edge Anycast)",
-                    "lat": 39.0438,
-                    "lon": -77.4874,
-                    "datacenter": "AWS us-east-1 / Edge Origin",
-                    "round_trip_latency_ms": 32.4
-                }
+            geo = {
+                "country": "Unavailable",
+                "city": "Unavailable",
+                "region": "Unavailable",
+                "asn": "AS Unavailable",
+                "lat": None,
+                "lon": None,
+                "datacenter": "Not available (Geo-IP lookup failed or rate-limited)",
+                "round_trip_latency_ms": 0.0
+            }
     results["geo_telemetry"] = geo
 
     # 1b. Passive DNS Intelligence via Cloudflare DoH (SPF, DMARC, MX)
@@ -718,22 +694,16 @@ def convert_to_prioritized_report(online_res):
 
     threat_actors = [
         {
-            "actor": "FIN7 (Carbanak / Sangria Tempest)",
-            "origin": "Eastern Europe",
-            "motivation": "Financial Extortion & Web Skimming",
-            "primary_target": "Public Web Gateways, E-Commerce, Financial Portals",
-            "technique_alignment": "T1190 (Exploit Public-Facing App), T1059.007 (JavaScript)",
-            "campaign_status": "Active 2024-2026",
-            "relevance": f"Automates mass exploitation against public endpoints on '{hostname}' lacking strict CSP or HSTS headers."
+            "technique_id": "T1190",
+            "name": "Exploit Public-Facing Application",
+            "tactic": "Initial Access",
+            "relevance": f"Perimeter web ingress on '{hostname}' exposed to automated opportunistic scanners."
         },
         {
-            "actor": "Volt Typhoon (Vanguard Panda)",
-            "origin": "State-Sponsored",
-            "motivation": "Pre-positioning & Edge Device Ingress",
-            "primary_target": "Cloud Edge Networks, Firewalls, Unauthenticated Web Sockets",
-            "technique_alignment": "T1190, Living-off-the-Land (LotL)",
-            "campaign_status": "Active Threat Directive",
-            "relevance": "Targets web services disclosing software version banners to identify unpatched public CVEs."
+            "technique_id": "T1592",
+            "name": "Gather Victim Host Information",
+            "tactic": "Reconnaissance",
+            "relevance": "Public HTTP banners disclose technology stack and missing defensive headers."
         }
     ]
 
