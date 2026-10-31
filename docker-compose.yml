@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  aegis-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aegis-ai:latest
+    container_name: aegis-ai
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - AEGIS_HOST=0.0.0.0
+      - AEGIS_PORT=5000
+      - AEGIS_DEBUG=false
+      - AEGIS_RATE_LIMIT=120
+      # Pass through LLM provider credentials if defined on host
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      - OLLAMA_HOST=${OLLAMA_HOST:-}
+    volumes:
+      - ./data:/app/data
+      - ./targets.allowlist:/app/targets.allowlist:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/report"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

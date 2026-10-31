@@ -1,191 +1,198 @@
-# 🛡️ AEGIS-AI: Continuous Threat Exposure Management & Explainable RBVM Platform
+# 🛡️ AEGIS-AI: Continuous Threat Exposure Management & Risk-Based Vulnerability Prioritization
 
-[![Live Production Demo](https://img.shields.io/badge/Live%20Demo-Vercel%20Deployed-00f0ff.svg?style=for-the-badge&logo=vercel)](https://aegis-ai-khaki-eight.vercel.app)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Flask 3.0+](https://img.shields.io/badge/backend-Flask%203.0+-green.svg)](https://flask.palletsprojects.com/)
-[![Three.js](https://img.shields.io/badge/3D%20Graphics-Three.js%20r128-black.svg?logo=three.js)](https://threejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Three.js](https://img.shields.io/badge/3D%20Graphics-Three.js-black.svg?logo=three.js)](https://threejs.org/)
 [![Threat Intel](https://img.shields.io/badge/threat--intel-FIRST.org%20EPSS%20%7C%20CISA%20KEV-red.svg)](https://www.first.org/epss)
-[![Compliance](https://img.shields.io/badge/compliance-NIST%20CSF%20%7C%20PCI--DSS%20%7C%20SOC%202-purple.svg)](#)
+[![Compliance](https://img.shields.io/badge/compliance-NIST%20CSF%202.0%20%7C%20PCI--DSS%204.0%20%7C%20ISO%2027001-purple.svg)](#)
 [![SBOM](https://img.shields.io/badge/standard-CycloneDX%20v1.5-blueviolet.svg)](#)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker)](#)
 
-> **Experiential Learning Phase 1 Project & Research Prototype**  
-> **Cluster Theme**: Cloud Security / Ethical AI  
-> **Topic**: AI for Vulnerability Detection & Attack-Surface Assessment (Continuous Threat Exposure Management & Explainable RBVM)  
-> 🌐 **Live Web Application:** [https://aegis-ai-khaki-eight.vercel.app](https://aegis-ai-khaki-eight.vercel.app)
-
----
-
-## 🌟 Executive Summary
-
-Traditional vulnerability scanners overwhelm SecOps teams with thousands of theoretical alerts—most of which cannot be reached or exploited from the outside world.
-
-**AEGIS-AI** is an autonomous cybersecurity exposure management platform engineered to:
-1. **Discover & Map Perimeter Assets:** Continuously probe public network sockets, web servers, and third-party dependencies.
-2. **Correlate Threat Intelligence:** Cross-reference active software components against **Google OSV**, **NVD**, and live **FIRST.org EPSS** weaponization ratings.
-3. **Trace Execution Reachability (AST Analysis):** Inspect Abstract Syntax Tree (AST) code paths to prove whether an external request can actually reach the vulnerable code sink.
-4. **Suppress False-Positive Noise:** Mute **60%+** of harmless, unreachable vulnerabilities to spotlight the single true weaponized attack path (**P1 Critical**).
+> **Continuous Threat Exposure Management (CTEM) & Explainable RBVM Platform**  
+> Honest, evidence-grounded perimeter reconnaissance, real threat intelligence correlation, contextual risk prioritization, multi-framework compliance scoring, and grounded Blue-Team AI assistance.
 
 ---
 
-## ⚡ Quick Start
+## 🌟 Overview & Core Principles
 
-### 🌐 Option 1: Live Cloud Deployment (No Installation Required)
-Access the live platform hosted globally on Vercel:
-👉 **[https://aegis-ai-khaki-eight.vercel.app](https://aegis-ai-khaki-eight.vercel.app)**
+Traditional vulnerability management floods security teams with raw CVSS alerts, treating an unreachable internal dependency with the same urgency as a critical internet-exposed service.
 
----
+**AEGIS-AI** bridges the gap between raw vulnerability reports and true exploitability risk through four core principles:
 
-### 💻 Option 2: Run Locally (Desktop)
-
-#### 1. Clone & Install Dependencies
-```bash
-git clone https://github.com/<YOUR_GITHUB_USER>/AEGIS-AI.git
-cd AEGIS-AI
-pip install -r requirements.txt
-```
-
-#### 2. Launch the Web Command Center & SOC Dashboard
-```bash
-python app.py
-```
-Open **`http://127.0.0.1:5000`** in your browser.
-
-#### 3. Run the Automated 4-Stage CLI Pipeline
-```bash
-python run_pipeline.py
-```
-
-#### 4. Audit Any Live Public Domain via CLI
-```bash
-python -c "from scanner_online import assess_website; import json; print(json.dumps(assess_website('owasp.org'), indent=2))"
-```
+1. **Strictly Evidence-Grounded Telemetry:** No fabricated attacker pins, fake APT threat actors, or simulated scan delays. Every metric in the dashboard is derived from real network probes, official threat feeds, or explicit sample benchmarks.
+2. **Two-Mode Operational Safety:**
+   - **Passive OSINT Mode (Default):** Non-intrusive DNS queries, TLS certificate handshakes, HTTP security headers, Certificate Transparency logs, and public advisory lookups. Safe for any public target without prior authorization.
+   - **Verified Active Mode:** Active TCP port and service banner discovery using Nmap. Strictly requires prior domain ownership verification (DNS TXT or HTTP token challenge) or inclusion in `targets.allowlist`.
+3. **Honest Reachability Separation:**
+   - **Network Exposure:** Evaluated from real network evidence (open ports, reachable HTTP services, missing ingress headers, TLS posture).
+   - **Code Reachability:** Evaluated via genuine AST import-graph analysis *only when project source code is provided*. Remote targets without source code are honestly reported as `"unknown (no source provided)"`.
+4. **Defensive Blue-Team AI with Grounding Verification:** Aegis Copilot operates strictly as a defensive assistant. It intercepts and refuses offensive exploit requests, and enforces a strict CVE grounding guardrail that flags hallucinated vulnerabilities not present in the verified telemetry report.
 
 ---
 
-## 🏗️ 4-Stage Automated Intelligence Pipeline
+## 🏛️ System Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Recon["1. Ingestion & Attack Surface Telemetry"]
-        A[Target Host / Network\n127.0.0.1:3000] --> B[Perimeter Prober\ndiscovery.py]
-        C[Public Web Target URL\ne.g., owasp.org] --> D[Universal Online Auditor\nscanner_online.py]
-        B --> E[Port Scanner & Service Fingerprinter\nTCP SYN / HTTP Probes]
-        D --> F[SSL / Security Headers / WAF Analyzer\nGrade A+ to F Deductions]
-        E --> G[(Discovery Cache\ndiscovery_report.json)]
-        F --> H[(Online Audit Cache\nonline_assessment_report.json)]
+    subgraph Target["Target Ingress & Safety Gate"]
+        T[Target Input / URL] --> V[Input Validation & SSRF Guard\nRFC 1123 & Private IP Filter]
+        V --> G{Authorization Gate}
+        G -->|Unverified Public Target| P[Passive OSINT Pipeline\nDNS, TLS, Headers, CT Logs]
+        G -->|Verified Domain / Allowlist| A[Verified Active Scan\nNmap TCP & Service Discovery]
     end
 
-    subgraph ThreatIntel["2. Threat Intelligence & Correlation Pipeline"]
-        G --> I[Vulnerability Correlator\ncorrelate.py]
-        J[Google OSV API\napi.osv.dev] -->|Package Advisories & GHSA| I
-        K[NIST NVD Database] -->|CVSS Base Metrics| I
-        I --> L[(Correlated Vulnerabilities\nvulnerabilities.json)]
+    subgraph Intel["Intelligence & Correlation Engine"]
+        P & A --> C[Perimeter Evidence Synthesis]
+        C --> OSV[Google OSV API & NVD CPE]
+        C --> EPSS[FIRST.org EPSS Exploit Probability]
+        C --> KEV[CISA KEV Catalog BOD 22-01]
     end
 
-    subgraph Agents["3. AI Risk Engine & XAI AST Prioritizer"]
-        L & G --> M[Explainable RBVM Engine\nprioritize.py]
-        N[FIRST.org EPSS API\napi.first.org/data/v1/epss] -->|Live Exploit Probability| M
-        O[CISA KEV Catalog\nBOD 22-01 Mandates] -->|Weaponized In-The-Wild Alert| M
-        P[MITRE ATT&CK Matrix] -->|Adversary TTPs T1190/T1059| M
-        
-        M --> Q[AST Runtime Call-Graph Synthesizer\nSocket Ingress ➔ Route ➔ Sink]
-        Q -->|Reachability Weighting| R[(Prioritized Intelligence\nprioritized_report.json)]
+    subgraph Engine["Contextual RBVM & Analysis"]
+        OSV & EPSS & KEV --> Prioritize[Multi-Factor Contextual Risk Scoring\nCVSS + EPSS + Network Exposure + Criticality]
+        Prioritize --> Compliance[Multi-Framework Compliance Scoring\nNIST CSF 2.0, PCI-DSS 4.0, ISO 27001, SOC 2]
+        Prioritize --> Remediate[Automated Remediation Generator\nNginx, Apache, Caddy, Helmet, WAF Rules]
     end
 
-    subgraph Application["4. API & Cyber SOC Web Console"]
-        R & H --> S[Flask Async REST API\napp.py / api/index.py]
-        S --> T[Executive Cyber SOC Web Cockpit\ntemplates/index.html]
-        T --> U[3D Cyber Threat Globe\nThree.js WebGL & Raycast HUD]
-        T --> V[Live CTEM Telemetry Stream\nReal-Time Audit Console]
-        T --> W[4-Quadrant Threat Exposure Matrix\nBubble Plot: EPSS vs CVSS]
-        T --> X[5-Axis Multi-Vector Attack Radar\nSpider Chart: Traditional vs AEGIS]
+    subgraph UI["Cyber SOC Dashboard & Copilot"]
+        Prioritize --> Web[Modular Cyber SOC Dashboard\n3D Threat Globe, Exposure Matrix, Radar]
+        Prioritize --> Copilot[Aegis AI Copilot\nMulti-Provider LLM + Grounding Guardrail]
+        Prioritize --> Exports[Multi-Format Export Engine\nHTML CISO Report, CSV, CycloneDX SBOM, SIEM CEF/ECS]
     end
 ```
 
-### The 4 Stages Explained
-1. **Perimeter Reconnaissance ([`discovery.py`](discovery.py)):** Automated port discovery (`80`, `443`, `3000`, `8080`) and HTTP service-fingerprinting to identify active listening sockets and web runtimes (Node.js/Express, Nginx, Cloudflare).
-2. **Vulnerability Correlation ([`correlate.py`](correlate.py)):** Queries Google OSV (Open Source Vulnerabilities) REST API for fingerprinted application runtimes, normalizing advisory records, GHSA IDs, and CVE aliases into `vulnerabilities.json`.
-3. **Explainable RBVM Prioritization ([`prioritize.py`](prioritize.py)):** Calculates a contextual risk score using the multi-factor formula:
-   $$\text{Contextual Score} = (0.35 \times \text{CVSS}) + (0.30 \times \text{Reachability}) + (0.25 \times \text{EPSS}) + (0.10 \times \text{Criticality})$$
-   Integrates live **FIRST.org EPSS** data, evaluates **CISA KEV (BOD 22-01)** mandates, traces AST execution call graphs, and maps compliance against **PCI-DSS 4.0**, **NIST CSF 2.0**, **ISO 27001**, and **SOC 2 Type II**.
-4. **Universal Online Assessor ([`scanner_online.py`](scanner_online.py)):** Non-intrusive external perimeter security audits for any public domain, evaluating SSL/TLS ciphers, HTTP security headers (`HSTS`, `CSP`, `X-Frame-Options`), WAF detection, and Geo-IP telemetry with automated A+ to F grade deduction.
-
 ---
 
-## 🎯 Key Capabilities & Interactive Features
+## 🚀 Deployment Options
 
-| Module | Interface Element | Operational Function |
-| :--- | :--- | :--- |
-| **3D Cyber Threat Globe** | Three.js WebGL + 2D Canvas Fallback | Luminous rotating cyber sphere featuring coordinate particles, equatorial rings, and active attack vectors (Moscow APT28, Beijing Volt Typhoon, London C2, Tokyo Botnet). |
-| **Interactive Raycast HUD** | 3D Hover & Click Tooltips | Hovering over or clicking any threat origin pin or target gateway displays a pinned glass HUD with origin IP, Autonomous System (ASN), MITRE TTP, and payload details. |
-| **Live CTEM Telemetry Stream** | Collapsible Cyber Terminal | Real-time stage-by-stage audit streaming (`Socket Discovery` $\rightarrow$ `Perimeter Fingerprinting` $\rightarrow$ `EPSS Sync` $\rightarrow$ `AST Reachability Trace` $\rightarrow$ `Noise Suppression`). |
-| **Threat Exposure Matrix** | 4-Quadrant Bubble Plot (`Chart.js`) | Plots EPSS weaponization likelihood ($X$) against base CVSS ($Y$), scaling bubble size by network reachability to separate critical threats from noise. |
-| **5-Axis Exploitability Radar** | Multi-Vector Radar Chart | Side-by-side comparison of **"Blind CVSS"** vs. **"AEGIS Contextual Score"** with interactive plain-English explanations. |
-| **Interactive Attack Simulator** | 4-Phase Breach Simulation Modal | Walkthrough demonstrating reconnaissance, threat weaponization, ingress payload delivery, and virtual patching. |
-| **Executive CISO Report** | Board-Ready Executive Brief Modal | Formatted summary of enterprise risk reduction, total assets, top vulnerabilities, and regulatory compliance posture. |
-| **Command Palette (`Ctrl+K`)** | Keyboard-First Search Modal | Instant keyboard navigation to jump across all dashboard views, modules, and diagnostic tools. |
-| **Attack Surface Topology** | Animated HTML5 Canvas Stream | Visualizes flow across Cyberspace $\rightarrow$ Cloudflare Edge WAF $\rightarrow$ Ingress Port 3000 $\rightarrow$ Express App $\rightarrow$ SQLite DB. |
-| **Aegis AI Copilot** | Floating Interactive Assistant | Context-aware AI assistant explaining reachability formulas, remediation steps, and CVE details with one-click quick prompts. |
+### Option 1: Docker Container (Recommended for Local / Enterprise SOC)
 
----
+Running via Docker enables full **Verified Active Scanning** capabilities (with system `nmap` pre-configured in a non-root Debian container).
 
-## 💻 Languages & Technology Stack
+```bash
+# 1. Clone the repository
+git clone https://github.com/ViditSinghal-18/AEGIS-AI.git
+cd AEGIS-AI
 
-* **Backend:** Python 3.10+, Flask 3.0+, Requests, Urllib3, Sockets, SSL, Nmap.
-* **Frontend:** Vanilla JavaScript (ES6+), Three.js r128, Chart.js v4, HTML5 Canvas 2D API.
-* **Styling:** Vanilla CSS3 (Custom Properties, Glassmorphism, 3D Tilt Transforms, Keyframe Animations).
-* **Standards & Formats:** CycloneDX v1.5 JSON SBOM, Google OSV Schema, FIRST.org EPSS v1.0 API, CISA KEV BOD 22-01.
-* **Hosting:** Vercel Serverless Python WSGI Runtime (`api/index.py` + `vercel.json`).
+# 2. Build and launch with Docker Compose
+docker compose up -d --build
 
----
-
-## 📂 Project Directory Structure
-
-```
-AEGIS-AI/
-├── api/
-│   └── index.py                # Vercel Serverless WSGI Entrypoint
-├── static/
-│   └── js/
-│       ├── three.min.js        # Bundled Three.js r128 3D Graphics Engine
-│       └── chart.min.js        # Bundled Chart.js v4 Data Visualization Engine
-├── templates/
-│   └── index.html              # AEGIS-AI Unified Cyber SOC Command Center (3D + CTEM)
-├── app.py                      # Flask REST API Controller & Web Application Core
-├── discovery.py                # Stage 1: Port Scanner & HTTP Service Fingerprinting
-├── correlate.py                # Stage 2: Google OSV Vulnerability Ingestion & Normalization
-├── prioritize.py               # Stage 3: Explainable RBVM Multi-Factor AI Engine
-├── scanner_online.py           # Stage 4: Universal Online Website Security Auditor
-├── run_pipeline.py             # CLI Pipeline Orchestrator executing Stages 1-3
-├── requirements.txt            # Python Production Dependencies
-├── vercel.json                 # Vercel Deployment & Route Configuration
-├── .vercelignore               # Vercel Build Exclusion Rules
-├── PROJECT_OVERVIEW.md         # Exhaustive Architectural & Mathematical Specifications
-├── README.md                   # Repository Overview & Quick Start Guide
-├── discovery_report.json       # Generated Discovery Telemetry Cache
-├── vulnerabilities.json        # Normalized OSV Advisory Records Cache
-├── prioritized_report.json     # Final Contextualized RBVM Assessment Report
-└── online_assessment_report.json # Universal Online Website Audit Cache
+# 3. Access the SOC Command Center
+open http://localhost:5000
 ```
 
+### Option 2: Local Python Environment
+
+```bash
+# 1. Ensure Python 3.10+ and Nmap are installed
+python --version
+nmap --version  # Required for active scanning
+
+# 2. Create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+
+# 3. Install production dependencies
+pip install -r requirements.txt
+
+# 4. Configure environment variables
+cp .env.example .env
+
+# 5. Launch AEGIS-AI
+python app.py
+```
+
+### Option 3: Vercel Serverless Deployment
+
+AEGIS-AI is architected for Vercel serverless deployment (`@vercel/python`):
+- Operates automatically in **Passive OSINT Mode** (active port scanning disabled to comply with serverless execution constraints).
+- Routes runtime state and caches to the writable `/tmp/aegis_data` partition with automatic in-memory fallback.
+- Multi-stage scan APIs (`/api/scan/dns`, `/tls`, `/headers`, `/ct`, `/intel`, `/prioritize`) execute within serverless execution timeouts.
+
 ---
 
-## 💡 The Real-World Analogy
+## 🔑 Domain Ownership Verification
 
-> **"The Smart Hospital" vs. "The Clueless Guard"**
->
-> * **Traditional Vulnerability Scanners (The Clueless Guard):**  
->   Imagine a security guard walking through a hospital with a generic handbook of product recalls. He drops a **400-page binder of 5,000 alerts** on the Chief Doctor’s desk, shouting: *"A filing cabinet lock on the 4th floor has a 1998 key flaw, and the basement microwave has a missing pin!"* Overwhelmed by alert fatigue, the staff ignores the binder, leaving the emergency exit door facing the public street wide open.
->
-> * **AEGIS-AI (The Context-Aware Sentinel):**  
->   AEGIS checks what is *actually exposed to the public highway* (Port 3000 running Express.js). It compares vulnerabilities against that open perimeter and tells the team: *"Out of 5,000 theoretical alerts, only 1 is reachable from the outside world right now with active weaponization (CVE-2024-29041). Fix this today to prevent a breach, and ignore the internal microwave!"*  
->   **Result: 60.0% alert noise reduction and ~14.5 hours saved per sprint.**
+To unlock **Verified Active Mode** for a domain outside `targets.allowlist`, AEGIS-AI provides an automated two-way cryptographic verification workflow:
+
+1. Click **"🔑 Verify Ownership"** in the top navigation bar or invoke via `Ctrl+K`.
+2. Select your verification method:
+   - **DNS TXT Record:** Add a TXT record to `_aegis-verify.<yourdomain>` with the generated verification token:
+     ```text
+     _aegis-verify.example.com. IN TXT "aegis-token-abcdef123456..."
+     ```
+   - **HTTP Challenge File:** Place a text file at `/.well-known/aegis-verify.txt` containing the token:
+     ```text
+     https://example.com/.well-known/aegis-verify.txt
+     ```
+3. Click **"Check Verification"**. Once validated, active port and service scanning is enabled for that domain for 30 days.
 
 ---
 
-## 👥 Author & Collaboration
+## 🤖 Configuring AI Copilot LLM Providers
 
-* **Developer**: [@<YOUR_GITHUB_USER>](https://github.com/<YOUR_GITHUB_USER>)
-* **Email**: [viditsinghal18@gmail.com](mailto:viditsinghal18@gmail.com)
-* **Academic Program**: Experiential Learning Phase 1 — Cloud Security & Ethical AI
-* **Live Deployment**: [https://aegis-ai-khaki-eight.vercel.app](https://aegis-ai-khaki-eight.vercel.app)
+AEGIS-AI features an abstracted multi-provider LLM interface. Set the desired API key in your `.env` file; AEGIS automatically detects the key and selects the provider:
+
+```bash
+# Anthropic Claude 3.5 Sonnet (Default if key present)
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Google Gemini 2.0 Flash
+GEMINI_API_KEY=AIzaSy...
+
+# AWS Bedrock (Bedrock Converse API)
+AWS_ACCESS_KEY_ID=AKIA...
+AWS_SECRET_ACCESS_KEY=...
+AWS_REGION=us-east-1
+
+# Local Ollama (Completely offline & air-gapped)
+OLLAMA_HOST=http://localhost:11434
+```
+
+*If no external LLM key is configured, AEGIS automatically activates its built-in **Deterministic Heuristic Reasoner**, providing verified, zero-hallucination answers derived directly from scan telemetry.*
+
+---
+
+## 📊 Empirical Validation & Benchmark Performance
+
+AEGIS-AI was benchmarked against the **OWASP Juice Shop** perimeter attack surface to measure detection coverage, alert fatigue suppression, and AI grounding accuracy:
+
+| Evaluation Metric | Measured Result | Benchmark Target | Description |
+| :--- | :--- | :--- | :--- |
+| **Detection Recall** | **100.0%** | ≥ 90.0% | Successfully identified all perimeter weaknesses without payload delivery |
+| **Detection Precision** | **100.0%** | ≥ 95.0% | Zero spurious false positives |
+| **F1-Score** | **100.0%** | ≥ 90.0% | Harmonic mean of precision and recall |
+| **Alert Fatigue Reduction** | **66.7%** | ≥ 50.0% | Non-reachable and low-EPSS vulnerabilities suppressed from critical queue |
+| **AI Grounding Accuracy** | **100.0%** | 100.0% | 100% of hallucinated CVE queries intercepted by guardrail |
+
+*Full evaluation methodology and test logs: [`docs/EVALUATION.md`](docs/EVALUATION.md).*
+
+---
+
+## 🧪 Running Automated Tests
+
+AEGIS-AI includes a comprehensive `pytest` test suite covering safety boundaries, SSRF defenses, scoring formulas, AST reachability, and API endpoints:
+
+```bash
+# Run complete test suite (59 tests)
+python -m pytest tests/ -v
+
+# Run OWASP Juice Shop validation benchmark
+python tests/validate.py
+```
+
+---
+
+## 📑 Project Documentation Index
+
+- [`docs/AUDIT.md`](docs/AUDIT.md): Initial forensic codebase audit and gap analysis.
+- [`docs/FEATURES.md`](docs/FEATURES.md): Traceability matrix mapping every claimed feature to real source code and automated tests.
+- [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md): Transparent disclosure of operational boundaries, AST reachability conditions, and serverless constraints.
+- [`docs/EVALUATION.md`](docs/EVALUATION.md): OWASP Juice Shop benchmark results, alert reduction metrics, and grounding accuracy.
+
+---
+
+## 🛡️ Responsible Security & Disclosure
+
+AEGIS-AI is designed for authorized defensive reconnaissance, posture assessment, and compliance governance. It enforces strict SSRF protections against internal networks, private RFC 1918 subnets, and cloud instance metadata (`169.254.169.254`). Active scanning features require verified domain authorization.

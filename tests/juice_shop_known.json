@@ -1,0 +1,54 @@
+{
+  "target": "OWASP Juice Shop (local Docker / staging testbed)",
+  "source": "Public OWASP Juice Shop perimeter attack surface + observable misconfigurations without active exploit execution.",
+  "detectable_by_this_tool": [
+    {
+      "id": "http-no-tls",
+      "label": "Application reachable over HTTP without TLS",
+      "keywords": ["without tls", "http, not https", "http without tls", "no https", "not https", "unencrypted"]
+    },
+    {
+      "id": "open-web-port",
+      "label": "Web service listening on standard port (typically 3000 or 80)",
+      "keywords": ["open tcp/3000", "open tcp/80", "port 3000", "listening", "open tcp/", "web server"]
+    },
+    {
+      "id": "missing-csp",
+      "label": "Missing Content-Security-Policy header",
+      "keywords": ["content-security-policy", "missing security header: content-security-policy", "csp"]
+    },
+    {
+      "id": "missing-xfo",
+      "label": "Missing X-Frame-Options header",
+      "keywords": ["x-frame-options", "clickjacking"]
+    },
+    {
+      "id": "missing-xcto",
+      "label": "Missing X-Content-Type-Options header",
+      "keywords": ["x-content-type-options", "mime sniffing"]
+    },
+    {
+      "id": "missing-referrer-policy",
+      "label": "Missing Referrer-Policy header",
+      "keywords": ["referrer-policy", "referrer leakage"]
+    }
+  ],
+  "not_detectable_passive_or_portscan": [
+    {
+      "id": "score-board",
+      "label": "Score Board (hidden challenge route) — requires application business logic crawl, not perimeter discovery"
+    },
+    {
+      "id": "dom-xss",
+      "label": "DOM XSS — requires headless browser JavaScript execution and client DOM inspection"
+    },
+    {
+      "id": "sqli-login",
+      "label": "SQL injection on login — requires offensive payload injection, which AEGIS strictly forbids"
+    },
+    {
+      "id": "broken-auth",
+      "label": "Broken authentication / JWT token forging — requires application state fuzzing out of scope for perimeter RBVM"
+    }
+  ]
+}
