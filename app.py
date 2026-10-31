@@ -59,6 +59,7 @@ from correlation import (
     send_webhook_alert,
     enrich_findings,
 )
+from ai import query_copilot, compare_rankings
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -716,29 +717,43 @@ def agent_chat():
     """
     AEGIS AI Security Copilot backend agent.
     Provides real-time explainable triage, vulnerability explanations, patch generation, and demo Q&A.
+    Powered by configured LLM provider (Anthropic, Gemini, Bedrock, Ollama) with grounding checks,
+    or our verified offline deterministic rule-based reasoner.
     """
     req_data = request.get_json() or {}
-    user_msg = req_data.get("message", "").strip().lower()
-    
+    user_msg = req_data.get("message", "").strip()
+
+    if not user_msg:
+        return jsonify({
+            "reply": "Hello! I am **Aegis Copilot**, your autonomous Security Operations AI Agent. Ask me anything about our attack surface, CISA KEV mandates, CycloneDX SBOM, website safety audits, or request code patches!",
+            "provider": "system",
+            "model": "AEGIS Assistant",
+            "grounded": True
+        })
+
     # Load current telemetry context
     current_data = {}
-    if os.path.exists(REPORT_FILE):
-        try:
-            with open(REPORT_FILE, "r", encoding="utf-8") as f:
-                current_data = json.load(f)
-        except Exception:
-            pass
+    target = req_data.get("target")
+    try:
+        current_data = read_json("prioritized_report.json", target=target)
+    except Exception:
+        if os.path.exists(REPORT_FILE):
+            try:
+                with open(REPORT_FILE, "r", encoding="utf-8") as f:
+                    current_data = json.load(f)
+            except Exception:
+                pass
+        elif os.path.exists(SAMPLE_REPORT_FILE):
+            try:
+                with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
+                    current_data = json.load(f)
+            except Exception:
+                pass
 
-    findings = current_data.get("prioritized_findings", [])
-    
-    # Intelligent SecOps Knowledge Engine
-    if not user_msg:
-        return jsonify({"reply": "Hello! I am **Aegis Copilot**, your autonomous Security Operations AI Agent. Ask me anything about our attack surface, CISA KEV mandates, CycloneDX SBOM, website safety audits, or request code patches!"})
-
-    # Check if user message asks to audit or check a website / domain
+    # Quick website scan if the message is specifically asking to audit a domain
     import re
     domain_match = re.search(r'([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?::\d+)?)', user_msg)
-    if domain_match and any(w in user_msg for w in ["check", "audit", "assess", "scan", "safe", "website", "http", "domain", "url", "security"]):
+    if domain_match and any(w in user_msg.lower() for w in ["check", "audit", "assess", "scan", "safe"]):
         matched_domain = domain_match.group(1).strip()
         try:
             audit = assess_website(matched_domain)
@@ -750,7 +765,6 @@ def agent_chat():
             tls_txt = f"{tls.get('tls_version', 'TLS')} Cipher Active" if tls.get("enabled") else "Plaintext HTTP / Inactive"
             cdn = audit.get("server_fingerprint", {}).get("cloud_cdn_waf", "Direct Origin")
             findings_count = audit.get("summary", {}).get("total_issues", len(audit.get("findings", [])))
-            
             safety_badge = "✅ **SAFE & HARDENED**" if score >= 80 else ("⚠️ **MODERATE RISK**" if score >= 55 else "🚨 **CRITICAL EXPOSURE (UNSAFE)**")
             
             reply = (
@@ -762,130 +776,34 @@ def agent_chat():
                 f"* **Identified Security Deductions:** {findings_count} perimeter findings\n\n"
                 f"You can view the full interactive audit checklist under the **'Universal Assessor'** tab!"
             )
-            return jsonify({"reply": reply, "audit": audit})
+            return jsonify({
+                "reply": reply,
+                "provider": "assessor",
+                "model": "AEGIS Real-Time Evaluator",
+                "grounded": True,
+                "audit": audit
+            })
         except Exception:
             pass
 
-    if "cisa" in user_msg or "kev" in user_msg or "bod" in user_msg or "federal" in user_msg:
-        reply = (
-            "### 🚨 CISA KEV Federal Directive Integration (BOD 22-01)\n\n"
-            "AEGIS-AI synchronizes directly with the **US Cybersecurity & Infrastructure Security Agency (CISA) Known Exploited Vulnerabilities Catalog**:\n\n"
-            "* **What is CISA KEV?** Established under Binding Operational Directive 22-01, it is the authoritative list of CVEs actively weaponized by adversaries in the wild.\n"
-            "* **Enforced Triage Rule:** Any vulnerability listed in CISA KEV bypasses standard scoring and is assigned an automatic **P1 Critical priority floor** with a strict federal remediation deadline.\n"
-            "* **Active Findings on Target:** `CVE-2024-29041` is actively flagged in federal threat bulletins for chaining in initial-access phishing campaigns."
-        )
-    elif "sbom" in user_msg or "cyclonedx" in user_msg or "dependency" in user_msg or "supply chain" in user_msg:
-        reply = (
-            "### 📦 CycloneDX v1.5 Software Bill of Materials (SBOM)\n\n"
-            "AEGIS-AI includes an automated **Supply-Chain Dependency Graph** compliant with **Executive Order 14028**:\n\n"
-            "* **Direct Root:** `express@4.17.1` (Package URL: `pkg:npm/express@4.17.1`)\n"
-            "* **Transitive Tree:** Deconstructs nested dependencies (`body-parser@1.19.0`, `qs@6.7.0`, `send@0.17.1`, `serve-static@1.14.1`).\n"
-            "* **Ghost Dependency Detection:** Detects vulnerabilities hidden 2+ levels deep in the tree (`CVE-2024-9266` in `qs`).\n"
-            "* **Export:** One-click standardized CycloneDX JSON download available at `/api/sbom`."
-        )
-    elif "compliance" in user_msg or "nist" in user_msg or "pci" in user_msg or "iso" in user_msg or "soc" in user_msg:
-        reply = (
-            "### 📋 Multi-Framework Compliance Audit Breakdown\n\n"
-            "AEGIS-AI automatically maps discovered exposures to 4 major regulatory frameworks:\n\n"
-            "* **PCI-DSS 4.0 (50.0% - Grade C+):** Failing *Req 6.2.4* (unpatched flaw on Port 3000) and *Req 6.4.1* (no WAF reverse proxy).\n"
-            "* **NIST CSF 2.0 (75.0% - Grade B):** Passing *DE.CM-01* (Attack surface telemetry) but failing *PR.AC-05* (Network perimeter boundary).\n"
-            "* **ISO 27001:2022 (50.0% - Grade C):** Failing *Control A.8.8* (Technical vulnerability management).\n"
-            "* **SOC 2 Type II (75.0% - Grade B-):** Failing *CC6.6* (Perimeter access controls)."
-        )
-    elif "apt" in user_msg or "actor" in user_msg or "threat group" in user_msg or "fin7" in user_msg or "volt" in user_msg:
-        reply = (
-            "### 🕵️ Threat Actor Attribution (APT Campaign Intelligence)\n\n"
-            "Based on the exposed Express port and MITRE technique `T1190 (Exploit Public-Facing App)`, AEGIS-AI correlates 3 active threat groups:\n\n"
-            "1. **FIN7 (Carbanak):** High-volume automated scanners targeting Express/Node route handlers for credential harvesting.\n"
-            "2. **Volt Typhoon:** State-sponsored group targeting public cloud gateways to pre-position and pivot into internal VPC management networks.\n"
-            "3. **Lazarus Group:** Notorious for targeting open-source supply chains and unpinned npm dependencies."
-        )
+    # Process query through LLM / Rule-based Copilot
+    res = query_copilot(user_msg, current_data)
+    return jsonify(res)
 
-    elif "epss" in user_msg or "first.org" in user_msg or "exploitability" in user_msg or "wild" in user_msg:
-        reply = (
-            "### 📊 FIRST.org EPSS Integration (Industry Standard Exploit Prediction)\n\n"
-            "Rather than relying purely on subjective LLM claims, **AEGIS-AI connects directly to the official FIRST.org EPSS API** (`https://api.first.org/data/v1/epss`):\n\n"
-            "* **What is EPSS?** Maintained by FIRST (Forum of Incident Response and Security Teams), the **Exploit Prediction Scoring System** outputs a daily calibrated probability (0.0% to 100%) that a vulnerability will be actively exploited in the wild within 30 days.\n"
-            "* **The CVSS Flaw:** CVSS only rates theoretical severity in a lab vacuum. In reality, less than 5% of all CVEs ever get weaponized. Prioritizing by CVSS alone creates massive alert fatigue.\n"
-            "* **Our Formula Blend:**\n"
-            "  $$\\text{Contextual Score} = (0.35 \\times \\text{CVSS}) + (0.30 \\times \\text{Reachability}) + (0.25 \\times \\text{EPSS Percentile}) + (0.10 \\times \\text{Criticality})$$\n"
-            "* **Live Metrics for Our Juice Shop Scan:**\n"
-            "  - `CVE-2024-29041`: **54.6th percentile** in global weaponization landscape.\n"
-            "  - `CVE-2014-6393`: **65.1st percentile**, but downgraded because it is unreachable on the perimeter boundary."
-        )
-    elif "why" in user_msg and ("priorit" in user_msg or "score" in user_msg or "elevat" in user_msg):
-        reply = (
-            "### 🧠 Explainable AI (XAI) Prioritization Logic\n\n"
-            "Traditional scanners assign flat CVSS severity scores regardless of where code lives. "
-            "**AEGIS-AI** uses an **Explainable Risk Formula grounded in 3 published signals**:\n\n"
-            "1. **CVSS Base Severity (35%):** Captures theoretical software vulnerability impact.\n"
-            "2. **Runtime Network Reachability (30%):** Our live Nmap discovery confirmed **Port 3000 is open to external traffic** running Express. Flaws reachable via unauthenticated HTTP routes are elevated, while non-routable internal flaws are suppressed.\n"
-            "3. **FIRST.org EPSS Probability (25%):** Fetched directly from the official `api.first.org/data/v1/epss` endpoint, providing empirical real-world exploitation likelihood.\n"
-            "4. **Asset Criticality (10%):** Weights mission-critical customer-facing web services over dev sandboxes.\n\n"
-            "*(Result: Mathematically verifiable **60% alert fatigue reduction** without subjective black-box guessing.)*"
-        )
-    elif "patch" in user_msg or "fix" in user_msg or "remediat" in user_msg or "helmet" in user_msg or "nginx" in user_msg:
-        reply = (
-            "### 🛠️ Immediate DevSecOps Patch Recommendation\n\n"
-            "To remediate the exposed Express vulnerabilities on Port 3000:\n\n"
-            "**1. Upgrade Express Runtime:**\n"
-            "```bash\n"
-            "npm install express@latest --save\n"
-            "npm audit fix --force\n"
-            "```\n\n"
-            "**2. Enforce Helmet Perimeter Security Middleware:**\n"
-            "```javascript\n"
-            "const helmet = require('helmet');\n"
-            "app.use(helmet());\n"
-            "app.disable('x-powered-by'); // Blocks framework fingerprinting\n"
-            "```\n\n"
-            "**3. Nginx Reverse-Proxy Drop-In:**\n"
-            "```nginx\n"
-            "proxy_hide_header X-Powered-By;\n"
-            "add_header X-Content-Type-Options nosniff;\n"
-            "add_header X-Frame-Options DENY;\n"
-            "```"
-        )
-    elif "analogy" in user_msg or "hospital" in user_msg or "explain" in user_msg and "simple" in user_msg:
-        reply = (
-            "### 🏥 The Smart Hospital Analogy (For Tomorrow's Judges)\n\n"
-            "A traditional scanner is like a security guard handing doctors a **400-page list of 5,000 product recalls**, shouting about a faulty microwave in the basement breakroom (**Alert Fatigue**).\n\n"
-            "**AEGIS-AI** is the smart sentinel with thermal sensors: it first checks what doors are *actually unlocked to the public highway* (Port 3000 on the internet), checks the global burglar database (**FIRST.org EPSS**), maps flaws to those exact doors, and tells the team:\n\n"
-            "> *'Only 2 of your 50 flaws are reachable by external hackers right now. Fix those 2 immediately, and ignore the basement microwave.'*"
-        )
-    elif "cve-2024-10491" in user_msg or "10491" in user_msg:
-        reply = (
-            "### 🚨 Analysis of CVE-2024-10491\n\n"
-            "* **Vulnerability:** Express Resource Injection & URL Parsing Disruption\n"
-            "* **Contextual Score:** **6.7 (P2 - High)**\n"
-            "* **FIRST.org EPSS Score:** **0.44% Probability (37.7th Percentile globally)**\n"
-            "* **CVSS Severity:** Moderate (5.8)\n"
-            "* **Environmental Reachability:** 9.5/10 (Directly exposed on open Port 3000)\n"
-            "* **MITRE ATT&CK:** `T1190 - Exploit Public-Facing Application`\n"
-            "* **Why it's dangerous:** Attackers can pass crafted query parameters into Express route handlers to trigger internal state desynchronization or unintended external redirects."
-        )
-    elif "drift" in user_msg or "ctem" in user_msg or "change" in user_msg:
-        reply = (
-            "### ⏳ Continuous Threat Exposure Management (CTEM) Drift\n\n"
-            "Between yesterday's baseline scan and today's audit cycle:\n\n"
-            "* **Overall Posture:** Improved from **54.0 ➔ 72.5 (+18.5 pts)**\n"
-            "* **Patched:** `CVE-2024-29041` (Express Open Redirect)\n"
-            "* **Alert Suppression Rate:** **60.0%** of false-positive noise filtered out\n"
-            "* **Active Monitoring:** Port 3000 is tracked continuously against new NVD and FIRST.org EPSS releases."
-        )
-    else:
-        top_cve = findings[0].get('cve_aliases', ['CVE-2024-29041'])[0] if findings else 'CVE-2024-29041'
-        reply = (
-            f"### 🛡️ AEGIS-AI Telemetry Summary\n\n"
-            f"Currently monitoring target **{current_data.get('target', '127.0.0.1:3000')}** with **{len(findings)} correlated vulnerabilities**.\n\n"
-            f"* **Reachable Threat Level:** P2 High (Express flaw on Port 3000)\n"
-            f"* **EPSS Source:** Official FIRST.org Live API v1.0\n"
-            f"* **Top Action Item:** `{top_cve}` (Blended Score: {findings[0].get('contextual_risk_score', 7.1) if findings else 7.1}/10)\n"
-            f"* **Recommended Step:** Apply Express dependency bump and disable `x-powered-by` header.\n\n"
-            "Type **'epss'** to inspect FIRST.org integration, **'why'** to see XAI scoring logic, **'patch'** for code fixes, or **'analogy'** for tomorrow's presentation pitch!"
-        )
-
-    return jsonify({"reply": reply})
+@app.route("/api/ai/compare-rankings", methods=["GET", "POST"])
+def api_ai_compare_rankings():
+    """Compares deterministic mathematical ranking against AI re-ranking with Spearman rho."""
+    target = request.args.get("target")
+    data = None
+    try:
+        data = read_json("prioritized_report.json", target=target)
+    except Exception:
+        if os.path.exists(REPORT_FILE):
+            with open(REPORT_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+    findings = (data or {}).get("findings", (data or {}).get("prioritized_findings", []))
+    res = compare_rankings(findings)
+    return jsonify(res)
 
 if __name__ == "__main__":
     from config import DEBUG, HOST, PORT
