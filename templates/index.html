@@ -66,6 +66,9 @@
             <button class="btn-hud" id="btnExportSbom" title="CycloneDX v1.5 SBOM">
                 📦 SBOM
             </button>
+            <button class="btn-hud" onclick="AegisCopilot.toggleCopilot()" title="Toggle Aegis Copilot">
+                🤖 Copilot
+            </button>
             <button class="btn-hud" onclick="document.getElementById('auditTerminal').classList.toggle('active')" title="Toggle Live Console">
                 💻 Terminal
             </button>
@@ -277,28 +280,44 @@
             </div>
         </div>
 
-        <!-- AEGIS COPILOT INTERACTIVE CHAT DRAWER -->
-        <div id="copilotDrawer" class="copilot-drawer">
-            <div class="copilot-header">
+    </main>
+
+    <!-- FLOATING LAUNCHER FAB (shown when copilot dock is closed) -->
+    <button class="copilot-fab" id="copilotFab" onclick="AegisCopilot.toggleCopilot()" aria-label="Open Aegis Copilot">
+        <span style="font-size: 1.2rem;">🤖</span>
+        <span>Aegis Copilot</span>
+    </button>
+
+    <!-- AEGIS COPILOT INTERACTIVE CHAT DOCK -->
+    <div id="copilotDrawer" class="copilot-drawer">
+        <div class="copilot-header">
+            <div class="copilot-header-info">
+                <span class="copilot-header-icon">🤖</span>
                 <div>
-                    <strong style="color: #00f0ff;">Aegis Copilot</strong>
-                    <div style="font-size: 0.7rem; color: #64748b;">Grounded Defensive SOC Assistant</div>
+                    <div class="copilot-header-title">
+                        Aegis Copilot
+                        <span class="copilot-status-dot" title="SOC Guardrail Active"></span>
+                    </div>
+                    <div class="copilot-header-sub">Grounded Defensive SOC Assistant</div>
                 </div>
-                <button class="btn btn-secondary btn-sm" onclick="document.getElementById('copilotDrawer').classList.toggle('minimized')">_</button>
             </div>
-            <div class="copilot-messages" id="copilotMessages"></div>
-            <div class="copilot-chips" style="display:flex;gap:6px;padding:6px 10px;overflow-x:auto;">
-                <button class="chip" onclick="AegisCopilot.sendMessage('Summarize top findings')">Summary</button>
-                <button class="chip" onclick="AegisCopilot.sendMessage('What is our NIST compliance readiness?')">Compliance</button>
-                <button class="chip" onclick="AegisCopilot.sendMessage('Provide Nginx virtual patch')">Patch Config</button>
-            </div>
-            <div class="copilot-input-bar">
-                <input type="text" id="copilotInput" placeholder="Ask Aegis Copilot..." aria-label="Copilot input prompt">
-                <button class="btn btn-primary btn-sm" id="btnCopilotSend">Send</button>
+            <div class="copilot-header-actions">
+                <button class="copilot-control-btn" onclick="AegisCopilot.minimizeCopilot()" title="Minimize" aria-label="Minimize Copilot">_</button>
+                <button class="copilot-control-btn" onclick="AegisCopilot.toggleCopilot()" title="Close" aria-label="Close Copilot">&times;</button>
             </div>
         </div>
-
-    </main>
+        <div class="copilot-messages" id="copilotMessages"></div>
+        <div class="copilot-chips">
+            <button class="chip" onclick="AegisCopilot.sendMessage('Summarize top findings')">🛡️ Summary</button>
+            <button class="chip" onclick="AegisCopilot.sendMessage('What is our NIST compliance readiness?')">📋 Compliance</button>
+            <button class="chip" onclick="AegisCopilot.sendMessage('Provide Nginx virtual patch')">🛠️ Patch Config</button>
+            <button class="chip" onclick="AegisCopilot.sendMessage('Explain risk scoring formula')">📐 Scoring Formula</button>
+        </div>
+        <div class="copilot-input-bar">
+            <input type="text" id="copilotInput" placeholder="Ask Aegis Copilot..." aria-label="Copilot input prompt">
+            <button id="btnCopilotSend">Send</button>
+        </div>
+    </div>
 
     <!-- DOMAIN OWNERSHIP VERIFICATION MODAL -->
     <div id="verificationModal" class="modal-backdrop" style="display: none;">

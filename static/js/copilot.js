@@ -23,12 +23,51 @@ window.AegisCopilot = (function () {
                 }
             };
         }
+
+        // Add welcome message if container is empty
+        const container = document.getElementById('copilotMessages');
+        if (container && container.children.length === 0) {
+            appendChatMessage(
+                'ai',
+                `👋 Greetings! I am **Aegis Copilot**, your autonomous defensive SOC assistant. Monitoring target \`${target || 'active asset'}\`.\n\nAsk me to summarize findings, verify compliance posture, provide Nginx virtual patches, or explain specific CVE risks.`,
+                'rule-based',
+                'SOC Telemetry Engine'
+            );
+        }
+    }
+
+    function toggleCopilot() {
+        const drawer = document.getElementById('copilotDrawer');
+        const fab = document.getElementById('copilotFab');
+        if (drawer) {
+            if (drawer.style.display === 'none') {
+                drawer.style.display = 'flex';
+                if (fab) fab.style.display = 'none';
+            } else {
+                drawer.style.display = 'none';
+                if (fab) fab.style.display = 'flex';
+            }
+        }
+    }
+
+    function minimizeCopilot() {
+        const drawer = document.getElementById('copilotDrawer');
+        if (drawer) {
+            drawer.classList.toggle('minimized');
+        }
     }
 
     async function sendMessage(customText = null) {
         const inputEl = document.getElementById('copilotInput');
         const text = customText || (inputEl ? inputEl.value.trim() : '');
         if (!text) return;
+
+        // Ensure drawer is open and not minimized if user clicked a chip
+        const drawer = document.getElementById('copilotDrawer');
+        if (drawer) {
+            drawer.style.display = 'flex';
+            drawer.classList.remove('minimized');
+        }
 
         if (inputEl) inputEl.value = '';
         appendChatMessage('user', text);
@@ -68,10 +107,11 @@ window.AegisCopilot = (function () {
         msgDiv.id = msgId;
         msgDiv.className = `copilot-msg msg-${role}`;
         msgDiv.style.cssText = `
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             display: flex;
             flex-direction: column;
             align-items: ${role === 'user' ? 'flex-end' : 'flex-start'};
+            width: 100%;
         `;
 
         let providerBadge = '';
@@ -105,10 +145,11 @@ window.AegisCopilot = (function () {
                 border-left: 3px solid ${role === 'user' ? '#00f0ff' : '#38bdf8'};
                 color: #f1f5f9;
                 padding: 10px 14px;
-                border-radius: 6px;
-                font-size: 0.84rem;
+                border-radius: 8px;
+                font-size: 0.82rem;
                 max-width: 90%;
                 line-height: 1.5;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.4);
             ">
                 ${parsedContent}
             </div>
@@ -121,6 +162,8 @@ window.AegisCopilot = (function () {
 
     return {
         initCopilot,
-        sendMessage
+        sendMessage,
+        toggleCopilot,
+        minimizeCopilot
     };
 })();
