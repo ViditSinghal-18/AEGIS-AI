@@ -1,7 +1,9 @@
 import json
 import os
-import requests
 from datetime import datetime, timezone
+
+from config import OSV_QUERY_API
+from discovery.safe_fetch import safe_fetch, SafeFetchError
 
 DISCOVERY_FILE = "discovery_report.json"
 OUTPUT_FILE = "vulnerabilities.json"
@@ -14,9 +16,9 @@ def load_discovery_report(filepath=DISCOVERY_FILE):
 
 def query_osv_for_package(package_name, ecosystem="npm"):
     """
-    Queries Google OSV API for vulnerabilities affecting a package.
+    Queries Google OSV API for vulnerabilities affecting a package via safe_fetch.
     """
-    url = "https://api.osv.dev/v1/query"
+    url = OSV_QUERY_API
     payload = {
         "package": {
             "name": package_name.lower(),
@@ -25,14 +27,20 @@ def query_osv_for_package(package_name, ecosystem="npm"):
     }
     
     try:
-        response = requests.post(url, json=payload, timeout=10)
+        response = safe_fetch(
+            url,
+            method="POST",
+            data=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+            timeout=8.0
+        )
         if response.status_code == 200:
             data = response.json()
             return data.get("vulns", [])
         else:
             print(f"[!] OSV query failed with status code {response.status_code}")
             return []
-    except requests.RequestException as e:
+    except (SafeFetchError, Exception) as e:
         print(f"[!] Error querying OSV database: {e}")
         return []
 

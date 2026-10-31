@@ -5,7 +5,31 @@ import sys
 import csv
 import io
 from flask import Flask, render_template, jsonify, send_file, request, Response
+
+from config import (
+    CORS_ORIGIN,
+    DATA_DIR,
+    DEBUG,
+    HOST,
+    IS_VERCEL,
+    PORT,
+    SAMPLE_DATA_DIR,
+)
 from scanner_online import assess_website, convert_to_prioritized_report
+from security import (
+    ValidationError,
+    check_rate_limits,
+    determine_scan_mode,
+    sanitize_for_prompt,
+    validate_target_input,
+    verify_api_token,
+)
+from verification.verify import (
+    check_verification,
+    is_domain_verified,
+    load_verified_targets,
+    start_verification,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -16,16 +40,33 @@ app = Flask(
     static_url_path="/static"
 )
 
-REPORT_FILE = os.path.join(BASE_DIR, "prioritized_report.json")
-DISCOVERY_FILE = os.path.join(BASE_DIR, "discovery_report.json")
-ONLINE_REPORT_FILE = os.path.join(BASE_DIR, "online_assessment_report.json")
+REPORT_FILE = str(DATA_DIR / "prioritized_report.json")
+DISCOVERY_FILE = str(DATA_DIR / "discovery_report.json")
+ONLINE_REPORT_FILE = str(DATA_DIR / "online_assessment_report.json")
+SAMPLE_REPORT_FILE = str(SAMPLE_DATA_DIR / "sample_prioritized_report.json")
 
 def safe_save_json(filepath, data):
+    """Safely write JSON to disk, ensuring parent directory exists."""
     try:
+        os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
     except OSError:
         pass
+
+@app.after_request
+def apply_security_headers(response):
+    """Enforce defense-in-depth HTTP headers and restricted CORS."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if CORS_ORIGIN == "*":
+        response.headers["Access-Control-Allow-Origin"] = "*"
+    else:
+        response.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Aegis-Token"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response
 
 # In-memory fleet inventory for multi-asset monitoring
 FLEET_INVENTORY = [
@@ -98,51 +139,134 @@ def get_inventory():
 
 @app.route("/api/report", methods=["GET"])
 def get_report():
-    if not os.path.exists(REPORT_FILE):
-        return jsonify({"error": "No scan report available. Run an assessment first."}), 404
-    with open(REPORT_FILE, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return jsonify(data)
+    if os.path.exists(REPORT_FILE):
+        with open(REPORT_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return jsonify(data)
+    elif os.path.exists(SAMPLE_REPORT_FILE):
+        with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data["sample_data"] = True
+        return jsonify(data)
+    return jsonify({"error": "No scan report available. Run an assessment first."}), 404
+
+# ==============================================================================
+# Domain Ownership Verification Endpoints
+# ==============================================================================
+
+@app.route("/api/verify/start", methods=["POST"])
+def api_verify_start():
+    if not request.is_json:
+        return jsonify({"success": False, "error": "Request body must be JSON."}), 415
+
+    data = request.get_json() or {}
+    raw_domain = data.get("domain", "")
+    try:
+        domain = validate_target_input(raw_domain)
+    except ValidationError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+    instructions = start_verification(domain)
+    return jsonify({"success": True, "instructions": instructions})
+
+@app.route("/api/verify/check", methods=["POST"])
+def api_verify_check():
+    if not request.is_json:
+        return jsonify({"success": False, "error": "Request body must be JSON."}), 415
+
+    data = request.get_json() or {}
+    raw_domain = data.get("domain", "")
+    try:
+        domain = validate_target_input(raw_domain)
+    except ValidationError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+    verified, message = check_verification(domain)
+    return jsonify({"success": True, "verified": verified, "message": message, "domain": domain})
+
+@app.route("/api/verify/list", methods=["GET"])
+def api_verify_list():
+    verified_map = load_verified_targets()
+    return jsonify({"verified_targets": verified_map})
+
+@app.route("/api/mode", methods=["GET", "POST"])
+def api_get_mode():
+    raw_target = request.args.get("target") or (request.get_json() or {}).get("target", "")
+    try:
+        norm = validate_target_input(raw_target) if raw_target else "localhost"
+    except ValidationError:
+        norm = "localhost"
+
+    mode, can_active, rationale = determine_scan_mode(norm, requested_active=False)
+    return jsonify({
+        "target": norm,
+        "mode": mode,
+        "can_active": can_active,
+        "rationale": rationale
+    })
+
+# ==============================================================================
+# Security-Guarded Scan Dispatchers
+# ==============================================================================
 
 @app.route("/api/scan", methods=["POST"])
 def trigger_scan():
+    # 1. API Token Check
+    if not verify_api_token(request.headers):
+        return jsonify({"success": False, "error": "Unauthorized: Invalid or missing API token."}), 401
+
+    if not request.is_json:
+        return jsonify({"success": False, "error": "Request payload must be application/json."}), 415
+
     req_data = request.get_json() or {}
-    raw_target = req_data.get("target")
-    if raw_target is not None and not str(raw_target).strip():
-        return jsonify({"success": False, "error": "Target host or domain cannot be empty."}), 400
+    raw_target = req_data.get("target") if "target" in req_data else "127.0.0.1"
 
-    target = str(raw_target).strip() if raw_target else "127.0.0.1:3000"
-    
-    # Check if target is a public internet domain or external URL
-    is_domain = (
-        ("." in target and not target.replace(".", "").isdigit()) or
-        target.startswith("http://") or
-        target.startswith("https://")
-    ) and not ("127.0.0.1" in target or "localhost" in target)
+    # 2. Input Validation
+    try:
+        target = validate_target_input(raw_target)
+    except ValidationError as ve:
+        return jsonify({"success": False, "error": str(ve)}), 400
 
-    if is_domain:
-        # Route to universal online website security assessor
+    # 3. Rate Limiting
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr).split(",")[0].strip()
+    allowed, retry_after, rate_err = check_rate_limits(client_ip, target)
+    if not allowed:
+        resp = jsonify({"success": False, "error": rate_err, "retry_after": retry_after})
+        resp.headers["Retry-After"] = str(retry_after)
+        return resp, 429
+
+    # 4. Authoritative Server-Side Mode Gate
+    requested_active = bool(req_data.get("active", False))
+    mode_name, can_active, mode_rationale = determine_scan_mode(target, requested_active=requested_active)
+
+    # If target is a public internet domain OR active scan is not authorized, run Passive OSINT
+    if not can_active or not requested_active:
         try:
             audit_result = assess_website(target)
+            audit_result["operational_mode"] = mode_name
+            audit_result["mode_rationale"] = mode_rationale
             safe_save_json(ONLINE_REPORT_FILE, audit_result)
 
             unified_report = convert_to_prioritized_report(audit_result)
+            unified_report["operational_mode"] = mode_name
             safe_save_json(REPORT_FILE, unified_report)
 
             return jsonify({
                 "success": True,
-                "mode": "online",
-                "message": f"Universal external security audit of '{target}' completed successfully.",
+                "mode": mode_name,
+                "can_active": can_active,
+                "rationale": mode_rationale,
+                "message": f"Passive OSINT security audit of '{target}' completed successfully.",
                 "data": audit_result,
                 "report": unified_report
             })
         except Exception as e:
             return jsonify({
                 "success": False,
-                "error": f"Online assessment error: {str(e)}"
+                "error": f"Passive audit error: {str(e)}"
             }), 500
 
-    # Otherwise execute local deep pipeline for local target
+    # Otherwise execute Authorized Active Scan on allowlisted / verified host
     stages = ["discovery.py", "correlate.py", "prioritize.py"]
     logs = []
     
@@ -154,7 +278,6 @@ def trigger_scan():
                 cmd.append(target)
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=12)
             if res.returncode != 0:
-                # In serverless environment, local raw socket/nmap scans aren't available; fall back to baseline
                 break
             logs.append(f"Successfully finished {script}")
         except Exception:
@@ -165,18 +288,71 @@ def trigger_scan():
             fresh_data = json.load(f)
         if target:
             fresh_data["target"] = target
+        fresh_data["operational_mode"] = mode_name
     else:
-        fresh_data = {"target": target, "status": "Ready", "prioritized_findings": []}
+        fresh_data = {
+            "target": target,
+            "status": "Ready",
+            "operational_mode": mode_name,
+            "prioritized_findings": []
+        }
 
     return jsonify({
         "success": True, 
-        "mode": "local",
-        "message": "Full local attack-surface pipeline executed successfully.", 
+        "mode": mode_name,
+        "can_active": can_active,
+        "rationale": mode_rationale,
+        "message": "Authorized active port scanning pipeline completed.", 
         "data": fresh_data
     })
 
 @app.route("/api/scan-online", methods=["POST"])
 def trigger_scan_online():
+    # 1. API Token Check
+    if not verify_api_token(request.headers):
+        return jsonify({"success": False, "error": "Unauthorized: Invalid or missing API token."}), 401
+
+    if not request.is_json:
+        return jsonify({"success": False, "error": "Request payload must be application/json."}), 415
+
+    req_data = request.get_json() or {}
+    raw_target = req_data.get("target")
+
+    try:
+        target = validate_target_input(raw_target)
+    except ValidationError as ve:
+        return jsonify({"success": False, "error": str(ve)}), 400
+
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr).split(",")[0].strip()
+    allowed, retry_after, rate_err = check_rate_limits(client_ip, target)
+    if not allowed:
+        resp = jsonify({"success": False, "error": rate_err, "retry_after": retry_after})
+        resp.headers["Retry-After"] = str(retry_after)
+        return resp, 429
+
+    mode_name, can_active, mode_rationale = determine_scan_mode(target, requested_active=False)
+
+    try:
+        audit_result = assess_website(target)
+        audit_result["operational_mode"] = mode_name
+        audit_result["mode_rationale"] = mode_rationale
+        safe_save_json(ONLINE_REPORT_FILE, audit_result)
+
+        unified_report = convert_to_prioritized_report(audit_result)
+        unified_report["operational_mode"] = mode_name
+        safe_save_json(REPORT_FILE, unified_report)
+
+        return jsonify({
+            "success": True,
+            "mode": mode_name,
+            "can_active": can_active,
+            "rationale": mode_rationale,
+            "message": f"Successfully assessed {target}",
+            "data": audit_result,
+            "report": unified_report
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
     req_data = request.get_json() or {}
     target = req_data.get("target", "").strip()
     if not target:
