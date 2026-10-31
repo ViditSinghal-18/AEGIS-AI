@@ -1,0 +1,115 @@
+{
+  "target": "google.com",
+  "normalized_url": "https://google.com",
+  "hostname": "google.com",
+  "assessment_time": "2026-10-28T19:31:51.698805+00:00",
+  "resolved_ip": "142.250.77.142",
+  "ssl_telemetry": {
+    "enabled": true,
+    "tls_version": "TLSv1.3",
+    "cipher_suite": "TLS_AES_256_GCM_SHA384",
+    "cipher_bits": 256,
+    "issuer": "Trusted / Hidden",
+    "subject": "google.com",
+    "valid_to": "Active"
+  },
+  "headers_telemetry": {
+    "status_code": 200,
+    "evaluated_headers": {
+      "Strict-Transport-Security": {
+        "present": false,
+        "value": null
+      },
+      "Content-Security-Policy": {
+        "present": false,
+        "value": null
+      },
+      "X-Frame-Options": {
+        "present": true,
+        "value": "SAMEORIGIN"
+      },
+      "X-Content-Type-Options": {
+        "present": false,
+        "value": null
+      },
+      "Referrer-Policy": {
+        "present": false,
+        "value": null
+      },
+      "Permissions-Policy": {
+        "present": true,
+        "value": "unload=()"
+      }
+    },
+    "redirect_chain": [
+      "https://google.com/",
+      "https://www.google.com/"
+    ]
+  },
+  "server_fingerprint": {
+    "server_banner": "gws",
+    "framework": "Google Web Server (GWS)",
+    "cloud_cdn_waf": "None / Direct Origin",
+    "disclosed_technologies": [
+      "Identified runtime: Google Web Server (GWS)"
+    ]
+  },
+  "findings": [
+    {
+      "id": "HDR-STRICT_TRANSPORT_SECURITY",
+      "title": "Missing HSTS (HTTP Strict Transport Security)",
+      "severity": "HIGH",
+      "deduction": 15,
+      "category": "Web Security Headers",
+      "details": "The HTTP response does not include the standard 'Strict-Transport-Security' header.",
+      "remediation": "Add 'Strict-Transport-Security: max-age=31536000; includeSubDomains; preload' in web server config."
+    },
+    {
+      "id": "HDR-CONTENT_SECURITY_POLICY",
+      "title": "Missing Content-Security-Policy (CSP)",
+      "severity": "HIGH",
+      "deduction": 15,
+      "category": "Client-Side Protection",
+      "details": "The HTTP response does not include the standard 'Content-Security-Policy' header.",
+      "remediation": "Define a robust CSP header to prevent Cross-Site Scripting (XSS) and unauthorized data injection."
+    },
+    {
+      "id": "HDR-X_CONTENT_TYPE_OPTIONS",
+      "title": "Missing MIME-Sniffing Protection (X-Content-Type-Options)",
+      "severity": "LOW",
+      "deduction": 5,
+      "category": "Web Security Headers",
+      "details": "The HTTP response does not include the standard 'X-Content-Type-Options' header.",
+      "remediation": "Add 'X-Content-Type-Options: nosniff' header."
+    },
+    {
+      "id": "HDR-REFERRER_POLICY",
+      "title": "Missing Referrer-Policy",
+      "severity": "LOW",
+      "deduction": 5,
+      "category": "Privacy & Leakage",
+      "details": "The HTTP response does not include the standard 'Referrer-Policy' header.",
+      "remediation": "Set 'Referrer-Policy: strict-origin-when-cross-origin' to prevent URL data leaks."
+    }
+  ],
+  "score": 60,
+  "grade": "C",
+  "summary": {
+    "critical": 0,
+    "high": 2,
+    "medium": 0,
+    "low": 2,
+    "total_issues": 4,
+    "posture_status": "Moderate Risk"
+  },
+  "geo_telemetry": {
+    "country": "United States",
+    "city": "Ashburn, Virginia",
+    "region": "North America",
+    "asn": "AS13335 (Cloudflare / Edge Anycast)",
+    "lat": 39.0438,
+    "lon": -77.4874,
+    "datacenter": "AWS us-east-1 / Cloudflare Edge IAD",
+    "round_trip_latency_ms": 32.4
+  }
+}

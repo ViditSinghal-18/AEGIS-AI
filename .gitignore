@@ -12,8 +12,9 @@ ENV/
 # Environment variables & secrets
 .env
 .env.*
+!.env.example
 
-# Logs
+# Logs & scratch
 *.log
 scratch/
 
@@ -23,8 +24,20 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Backups
+# Backups & deployments
 *.bak
 *_backup.html
 .vercel
-.env*
+
+# Generated runtime scan reports and caches (do not commit runtime telemetry)
+discovery_report.json
+prioritized_report.json
+online_assessment_report.json
+vulnerabilities.json
+explanation.json
+dashboard.html
+data/verified_targets.json
+data/history/
+data/*
+!data/sample/
+!data/sample/**

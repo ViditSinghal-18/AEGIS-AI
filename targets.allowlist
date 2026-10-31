@@ -1,0 +1,12 @@
+# ==============================================================================
+# AEGIS-AI Authorized Target Allowlist for Active Port Scanning
+# Active port scans (Nmap / socket sweeps) are restricted to targets listed here
+# OR targets that complete cryptographic domain ownership verification.
+#
+# Passive OSINT scans (HTTP headers, TLS certs, DNS records, CT logs) are safe
+# and permitted for any public domain without allowlisting.
+# ==============================================================================
+
+localhost
+127.0.0.1
+::1

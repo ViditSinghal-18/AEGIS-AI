@@ -39,7 +39,7 @@ Access the live platform hosted globally on Vercel:
 
 #### 1. Clone & Install Dependencies
 ```bash
-git clone https://github.com/Viditsinghal18-collab/AEGIS-AI.git
+git clone https://github.com/<YOUR_GITHUB_USER>/AEGIS-AI.git
 cd AEGIS-AI
 pip install -r requirements.txt
 ```
@@ -185,7 +185,7 @@ AEGIS-AI/
 
 ## 👥 Author & Collaboration
 
-* **Developer**: [@Viditsinghal18-collab](https://github.com/Viditsinghal18-collab)
+* **Developer**: [@<YOUR_GITHUB_USER>](https://github.com/<YOUR_GITHUB_USER>)
 * **Email**: [viditsinghal18@gmail.com](mailto:viditsinghal18@gmail.com)
 * **Academic Program**: Experiential Learning Phase 1 — Cloud Security & Ethical AI
 * **Live Deployment**: [https://aegis-ai-khaki-eight.vercel.app](https://aegis-ai-khaki-eight.vercel.app)

@@ -539,5 +539,6 @@ def agent_chat():
     return jsonify({"reply": reply})
 
 if __name__ == "__main__":
-    print("[+] Starting AEGIS-AI Enterprise Security Operations Portal on http://127.0.0.1:5000")
-    app.run(debug=True, port=5000)
+    from config import DEBUG, HOST, PORT
+    print(f"[+] Starting AEGIS-AI Enterprise Security Operations Portal on http://{HOST}:{PORT}")
+    app.run(host=HOST, port=PORT, debug=DEBUG)

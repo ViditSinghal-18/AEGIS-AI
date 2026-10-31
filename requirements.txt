@@ -1,12 +1,23 @@
-# Core Web Application & REST API
-Flask>=3.0.0
+# ==============================================================================
+# AEGIS-AI Production Dependencies
+# Python 3.10+
+# ==============================================================================
 
-# Network Reconnaissance & Port Auditing
+# Core Web Application & REST API
+Flask>=3.0.0,<3.2.0
+
+# Environment Configuration & Secret Management
+python-dotenv>=1.0.0,<2.0.0
+
+# HTTP Transport, Telemetry & Threat Intelligence
+requests>=2.31.0,<3.0.0
+urllib3>=2.0.7,<3.0.0
+
+# Optional Active Network Reconnaissance (Local / Docker only; not run on Vercel)
 python-nmap>=0.7.1
 
-# HTTP Telemetry & Live Threat Intelligence
-requests>=2.31.0
-urllib3>=2.0.0
-
-# Automated Presentation Deck Generation
+# Presentation Generation
 python-pptx>=0.6.21
+
+# Testing & Quality Assurance
+pytest>=7.4.0
