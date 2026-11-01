@@ -1,8 +1,13 @@
 """
-AEGIS-AI: Real-world Exploitability & Threat Intelligence Enrichment.
-Enriches discovered CVEs using:
-- CISA KEV (Known Exploited Vulnerabilities - BOD 22-01)
-- FIRST.org EPSS (Exploit Prediction Scoring System v3)
+Real-world exploitability enrichment via CISA KEV and FIRST EPSS.
+
+Security terms explained for 3rd semester students:
+- CISA KEV (Known Exploited Vulnerabilities): A catalog published by the US Cybersecurity &
+  Infrastructure Security Agency listing vulnerabilities actively weaponized and exploited
+  by real-world threat actors in the wild.
+- EPSS (Exploit Prediction Scoring System): A data-driven model by FIRST.org that outputs a
+  probability score between 0.0 and 1.0 (0% to 100%) predicting whether a CVE will be exploited
+  in the next 30 days based on dark web activity, honeypot signals, and threat intel.
 """
 
 from __future__ import annotations
@@ -10,172 +15,215 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
-import config
-from discovery.safe_fetch import safe_fetch
+import requests
 
-CACHE_DIR = config.DATA_DIR / "cache"
+from config import DATA_DIR
+from schemas import CveRecord
+
+CISA_KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+EPSS_API_URL = "https://api.first.org/data/v1/epss"
+CACHE_DIR = DATA_DIR / "cache"
 KEV_CACHE_FILE = CACHE_DIR / "kev_catalog.json"
 EPSS_CACHE_DIR = CACHE_DIR / "epss"
-KEV_CACHE_TTL = 86400 * 7  # 7 days
-EPSS_CACHE_TTL = 86400 * 3  # 3 days
 
-# Baseline offline KEV catalog fallback (well-known CVEs)
-BASELINE_KEV = {
-    "CVE-2021-44228",  # Log4Shell
-    "CVE-2022-22965",  # Spring4Shell
-    "CVE-2023-38606",  # WebKit
-    "CVE-2024-29041",  # Express open redirect in phishing
-    "CVE-2024-3400",   # PAN-OS
-    "CVE-2023-22515",  # Confluence
-    "CVE-2021-26855",  # Exchange ProxyLogon
-}
+KEV_CACHE_TTL_SECONDS = 86400  # 24 hours
+EPSS_CACHE_TTL_SECONDS = 86400  # 24 hours
 
 
-def load_cisa_kev_catalog() -> Set[str]:
-    """Fetch and cache CISA KEV catalog of actively weaponized CVEs."""
+def _load_cisa_kev_catalog() -> set[str]:
+    """
+    Fetch and cache the CISA KEV catalog for 24 hours.
+    Returns a set of CVE IDs (e.g. {'CVE-2021-44228', 'CVE-2023-38606'}).
+    """
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     now = time.time()
 
+    # Check if cached catalog is still fresh (< 24 hours)
     if KEV_CACHE_FILE.exists():
         try:
             mtime = KEV_CACHE_FILE.stat().st_mtime
-            if now - mtime < KEV_CACHE_TTL:
+            if now - mtime < KEV_CACHE_TTL_SECONDS:
                 data = json.loads(KEV_CACHE_FILE.read_text(encoding="utf-8"))
-                return set(data.get("cve_ids", []))
-        except Exception:
+                return set(data.get("cve_ids") or [])
+        except (json.JSONDecodeError, OSError):
             pass
 
+    # Fetch from CISA with strict timeout and context manager
     try:
-        resp = safe_fetch(config.CISA_KEV_FEED, timeout=8.0)
-        if resp.status_code == 200:
-            payload = resp.json()
-            vulns = payload.get("vulnerabilities", [])
-            cve_ids = [v.get("cveID") for v in vulns if v.get("cveID")]
-            if cve_ids:
-                KEV_CACHE_FILE.write_text(
-                    json.dumps({"updated_at": now, "count": len(cve_ids), "cve_ids": cve_ids}),
-                    encoding="utf-8"
-                )
-                return set(cve_ids)
-    except Exception:
-        pass
-
-    # Fallback to cached or baseline
-    if KEV_CACHE_FILE.exists():
-        try:
-            data = json.loads(KEV_CACHE_FILE.read_text(encoding="utf-8"))
-            return set(data.get("cve_ids", []))
-        except Exception:
-            pass
-
-    return set(BASELINE_KEV)
+        with requests.get(CISA_KEV_URL, timeout=15) as response:
+            response.raise_for_status()
+            payload = response.json()
+            vulnerabilities = payload.get("vulnerabilities") or []
+            cve_ids = [v.get("cveID") for v in vulnerabilities if v.get("cveID")]
+            
+            # Save cache
+            KEV_CACHE_FILE.write_text(
+                json.dumps({"updated_at": now, "count": len(cve_ids), "cve_ids": cve_ids}),
+                encoding="utf-8",
+            )
+            return set(cve_ids)
+    except (requests.RequestException, json.JSONDecodeError, OSError, ValueError) as exc:
+        # Graceful fallback: return empty set or stale cache if network unavailable
+        if KEV_CACHE_FILE.exists():
+            try:
+                data = json.loads(KEV_CACHE_FILE.read_text(encoding="utf-8"))
+                return set(data.get("cve_ids") or [])
+            except (json.JSONDecodeError, OSError):
+                pass
+        return set()
 
 
-def fetch_epss_scores(cve_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+def _get_epss_scores(cve_ids: list[str]) -> dict[str, float]:
     """
-    Fetch EPSS probabilities and percentiles from FIRST.org API with disk caching.
-    Returns: {cve_id: {"epss": float, "percentile": float, "date": str}}
+    Query the FIRST EPSS API for a batch of CVEs.
+    Returns a mapping of {cve_id: epss_score}.
     """
-    cleaned = [c for c in cve_ids if c and c.startswith("CVE-")]
-    if not cleaned:
+    if not cve_ids:
         return {}
 
     EPSS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    results: Dict[str, Dict[str, Any]] = {}
-    missing_cves: List[str] = []
+    results: dict[str, float] = {}
+    missing_cves: list[str] = []
     now = time.time()
 
-    for cve in cleaned:
-        cache_path = EPSS_CACHE_DIR / f"{cve}.json"
-        if cache_path.exists():
+    # Check local cache first with TTL validation
+    for cve_id in cve_ids:
+        cache_file = EPSS_CACHE_DIR / f"{cve_id}.json"
+        if cache_file.exists():
             try:
-                if now - cache_path.stat().st_mtime < EPSS_CACHE_TTL:
-                    cached_data = json.loads(cache_path.read_text(encoding="utf-8"))
-                    results[cve] = cached_data
-                    continue
-            except Exception:
-                pass
-        missing_cves.append(cve)
+                mtime = cache_file.stat().st_mtime
+                if now - mtime < EPSS_CACHE_TTL_SECONDS:
+                    cached = json.loads(cache_file.read_text(encoding="utf-8"))
+                    cached_at = cached.get("cached_at")
+                    if cached_at and (now - cached_at > EPSS_CACHE_TTL_SECONDS):
+                        cache_file.unlink(missing_ok=True)
+                    else:
+                        results[cve_id] = float(cached["epss"])
+                        continue
+                else:
+                    cache_file.unlink(missing_ok=True)
+            except (json.JSONDecodeError, KeyError, ValueError, OSError):
+                cache_file.unlink(missing_ok=True)
+        missing_cves.append(cve_id)
 
-    if missing_cves:
+    if not missing_cves:
+        return results
+
+    # Query EPSS API for uncached CVEs in comma-separated chunks
+    chunk_size = 50
+    for i in range(0, len(missing_cves), chunk_size):
+        chunk = missing_cves[i : i + chunk_size]
+        query_param = ",".join(chunk)
         try:
-            # Batch in chunks of 30
-            for i in range(0, len(missing_cves), 30):
-                chunk = missing_cves[i:i+30]
-                query_str = ",".join(chunk)
-                url = f"{config.FIRST_EPSS_API}?cve={query_str}"
-                resp = safe_fetch(url, timeout=6.0)
-                if resp.status_code == 200:
-                    payload = resp.json()
-                    for row in payload.get("data", []):
-                        cid = row.get("cve")
-                        epss_val = float(row.get("epss", 0.005))
-                        perc_val = float(row.get("percentile", 0.40))
-                        entry = {
-                            "cve": cid,
-                            "epss": epss_val,
-                            "percentile": perc_val,
-                            "date": row.get("date", time.strftime("%Y-%m-%d")),
-                            "source": "FIRST.org Live API"
-                        }
-                        results[cid] = entry
+            with requests.get(
+                EPSS_API_URL,
+                params={"cve": query_param},
+                timeout=15,
+            ) as response:
+                response.raise_for_status()
+                data = response.json().get("data") or []
+                for item in data:
+                    cid = item.get("cve")
+                    score_str = item.get("epss")
+                    if cid and score_str is not None:
+                        score = float(score_str)
+                        results[cid] = score
+                        # Cache on disk
+                        cache_file = EPSS_CACHE_DIR / f"{cid}.json"
                         try:
-                            (EPSS_CACHE_DIR / f"{cid}.json").write_text(
-                                json.dumps(entry, indent=2), encoding="utf-8"
+                            cache_file.write_text(
+                                json.dumps({"cve": cid, "epss": score, "cached_at": now}),
+                                encoding="utf-8",
                             )
-                        except Exception:
+                        except OSError:
                             pass
-        except Exception:
+        except (requests.RequestException, json.JSONDecodeError, OSError, ValueError):
+            # Network or API failure: fail gracefully, leave scores as None
             pass
-
-    # Provide safe fallback for any remaining CVEs
-    for cve in cleaned:
-        if cve not in results:
-            results[cve] = {
-                "cve": cve,
-                "epss": 0.005,
-                "percentile": 0.40,
-                "date": time.strftime("%Y-%m-%d"),
-                "source": "EPSS Baseline Default"
-            }
 
     return results
 
 
-def enrich_findings(findings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def enrich_cves(cves: list[CveRecord], notes: list[str] | None = None) -> list[CveRecord]:
     """
-    Enrich raw security findings with CISA KEV and EPSS data.
+    Enrich a list of CveRecords in-place with CISA KEV exploit status and EPSS scores.
     """
-    kev_set = load_cisa_kev_catalog()
-    all_cves = []
+    if not cves:
+        return cves
+
+    cve_ids = [c.cve_id for c in cves if c.cve_id]
+    if not cve_ids:
+        return cves
+
+    # 1. Enrich with CISA KEV
+    try:
+        kev_set = _load_cisa_kev_catalog()
+        for record in cves:
+            if record.cve_id in kev_set:
+                record.kev = True
+    except (requests.RequestException, OSError, ValueError) as exc:
+        if notes is not None:
+            notes.append(f"CISA KEV check skipped: {exc.__class__.__name__}")
+
+    # 2. Enrich with EPSS scores
+    try:
+        epss_map = _get_epss_scores(cve_ids)
+        for record in cves:
+            if record.cve_id in epss_map:
+                record.epss = epss_map[record.cve_id]
+    except (requests.RequestException, OSError, ValueError) as exc:
+        if notes is not None:
+            notes.append(f"EPSS score check skipped: {exc.__class__.__name__}")
+
+    return cves
+
+
+def enrich_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Enrich an array of finding dictionaries with CISA KEV and EPSS intelligence."""
+    if not findings:
+        return findings
+
+    cve_ids: list[str] = []
     for f in findings:
         for cve in f.get("related_cves", []):
-            if cve.startswith("CVE-"):
-                all_cves.append(cve)
+            if cve and cve not in cve_ids:
+                cve_ids.append(cve)
 
-    epss_map = fetch_epss_scores(list(set(all_cves)))
+    kev_catalog: set[str] = set()
+    try:
+        kev_catalog = _load_cisa_kev_catalog()
+    except Exception:
+        pass
 
-    enriched = []
+    epss_scores: dict[str, float] = {}
+    if cve_ids:
+        try:
+            epss_scores = _get_epss_scores(cve_ids)
+        except Exception:
+            pass
+
     for f in findings:
-        item = dict(f)
-        cves = [c for c in item.get("related_cves", []) if c.startswith("CVE-")]
-        item_kev = any(c in kev_set for c in cves)
-        item["in_cisa_kev"] = item_kev
-        item["cisa_kev_status"] = "KNOWN EXPLOITED (CISA KEV)" if item_kev else "Not Listed in CISA KEV"
+        f_cves = f.get("related_cves", [])
+        is_kev = any(c in kev_catalog for c in f_cves)
+        max_epss = max([epss_scores.get(c, 0.0) for c in f_cves], default=0.0)
+        f["kev"] = is_kev
+        f["in_cisa_kev"] = is_kev
+        f["epss"] = max_epss
+        f["epss_score"] = max_epss
+        f["epss_probability"] = max_epss
+        if is_kev:
+            f["cisa_kev_status"] = "Actively Exploited In Wild"
+        if max_epss > 0:
+            f["epss_percentile"] = f"{round(max_epss * 100, 1)}%"
+        else:
+            f["epss_percentile"] = "0.0%"
+    return findings
 
-        # Pick highest EPSS score among CVEs
-        max_epss = 0.005
-        max_perc = 0.40
-        for c in cves:
-            if c in epss_map:
-                if epss_map[c]["epss"] > max_epss:
-                    max_epss = epss_map[c]["epss"]
-                    max_perc = epss_map[c]["percentile"]
 
-        item["epss_probability"] = round(max_epss, 5)
-        item["epss_percentile"] = round(max_perc, 4)
-        enriched.append(item)
+load_cisa_kev_catalog = _load_cisa_kev_catalog
+fetch_epss_scores = _get_epss_scores
 
-    return enriched
+
+

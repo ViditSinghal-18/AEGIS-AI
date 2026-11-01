@@ -66,6 +66,9 @@
             <button class="btn-hud" id="btnExportSbom" title="CycloneDX v1.5 SBOM">
                 📦 SBOM
             </button>
+            <button class="btn-hud" onclick="window.open('/attack-graph', '_blank')" title="View Interactive Cyber Attack Surface Topology Network Graph">
+                🕸️ Attack Graph
+            </button>
             <button class="btn-hud" onclick="AegisCopilot.toggleCopilot()" title="Toggle Aegis Copilot">
                 🤖 Copilot
             </button>
@@ -335,6 +338,8 @@
         <div class="modal-box" style="max-width: 500px;">
             <input type="text" id="paletteSearchInput" placeholder="Type a command or jump to section..." style="width: 100%; background: #030712; border: 1px solid #00f0ff; color: #fff; padding: 12px; border-radius: 4px; font-size: 0.9rem;">
             <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 6px;" id="paletteResults">
+                <div class="palette-item" onclick="AegisApp.toggleCommandPalette();window.open('/attack-graph', '_blank');">🕸️ Open Attack Surface Topology Graph</div>
+                <div class="palette-item" onclick="AegisApp.toggleCommandPalette();fetch('/api/ai/model-routing').then(r=>r.json()).then(d=>alert('Model Routing Analysis:\n• Zero-Cost Template Tier: ' + d.savings_summary.template_zero_cost_pct + '%\n• Estimated Token Reduction: ' + d.savings_summary.estimated_token_reduction_pct + '%\n• Architecture: ' + d.savings_summary.model_routing_pattern));">⚡ Inspect Model Routing Architecture</div>
                 <div class="palette-item" onclick="document.getElementById('auditTerminal').classList.add('active');AegisApp.toggleCommandPalette();">💻 Open Telemetry Terminal</div>
                 <div class="palette-item" onclick="AegisApp.toggleCommandPalette();document.getElementById('btnExportHtml').click();">📑 Generate CISO Executive Report</div>
                 <div class="palette-item" onclick="AegisApp.toggleCommandPalette();document.getElementById('btnExportCsv').click();">📥 Download Vulnerability CSV</div>

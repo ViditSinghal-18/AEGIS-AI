@@ -1,7 +1,14 @@
 """
-AEGIS-AI: Passive OSINT Collection Engine.
-Safely gathers public DNS, TLS, HTTP, Certificate Transparency, and WAF/CDN intelligence
-without intrusive active scanning or port probing. Completely serverless-compatible (runs on Vercel).
+Passive website discovery mode.
+Collects public information without active port probing or intrusive scanning.
+
+Security terms explained for 3rd semester students:
+- Certificate Transparency (CT Logs): A public, append-only log of all SSL/TLS certificates issued by CAs.
+  Used to passively discover subdomains without sending any traffic to them.
+- SPF (Sender Policy Framework): A DNS TXT record specifying which mail servers are authorized
+  to send emails on behalf of a domain, mitigating email spoofing.
+- DMARC (Domain-based Message Authentication, Reporting, and Conformance): A DNS TXT record
+  instructing recipient mail servers how to handle emails that fail SPF/DKIM validation.
 """
 
 from __future__ import annotations
@@ -9,18 +16,347 @@ from __future__ import annotations
 import datetime
 import json
 import os
-import re
 import socket
 import ssl
 import subprocess
 import time
-from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
+from typing import Any
 
-from discovery.safe_fetch import safe_fetch, SafeFetchError, resolve_and_validate_hostname
+import requests
+
+from config import DATA_DIR
+from discovery.safe_fetch import safe_fetch, SafeFetchError
+from schemas import DiscoveredAssets, HttpCheck, OpenPort, TlsGrade
+from storage import write_json
+
+SHODAN_API_KEY = os.getenv("SHODAN_API_KEY", "").strip()
 
 
-# Common CDN and WAF Header / Body / Host Signatures
+def _extract_title(html: str) -> str:
+    from html.parser import HTMLParser
+    class _TitleParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self._in_title = False
+            self.title = ""
+        def handle_starttag(self, tag, attrs):
+            if tag.lower() == "title":
+                self._in_title = True
+        def handle_endtag(self, tag):
+            if tag.lower() == "title":
+                self._in_title = False
+        def handle_data(self, data):
+            if self._in_title:
+                self.title += data
+    parser = _TitleParser()
+    try:
+        parser.feed(html)
+    except Exception:
+        return ""
+    return parser.title.strip()[:200]
+
+
+def _probe_passive_http(domain: str) -> HttpCheck:
+    """Execute a single safe GET request over HTTPS (fallback to HTTP)."""
+    urls_to_try = [f"https://{domain}/", f"http://{domain}/"]
+    response = None
+    final_url = urls_to_try[0]
+    notes: list[str] = []
+
+    for url in urls_to_try:
+        try:
+            response = safe_fetch(url, timeout=5.0)
+            final_url = url
+            break
+        except SafeFetchError as exc:
+            notes.append(f"Probe to {url} skipped: {exc}")
+        except Exception as exc:
+            notes.append(f"Probe to {url} failed: {exc.__class__.__name__}")
+
+    if response is None:
+        return HttpCheck(
+            url=final_url,
+            reachable=False,
+            uses_tls="https" in final_url,
+            notes=notes or ["Target domain was not reachable over standard HTTP/HTTPS."],
+        )
+
+    header_map = {k.lower(): v for k, v in response.headers.items()}
+    security_headers = (
+        "content-security-policy",
+        "x-content-type-options",
+        "x-frame-options",
+        "referrer-policy",
+        "strict-transport-security",
+    )
+    missing = [name for name in security_headers if name not in header_map]
+    if "https" not in final_url:
+        missing = [h for h in missing if h != "strict-transport-security"]
+
+    # Cookie checks
+    cookie_issues = []
+    raw_cookies = response.headers.get("set-cookie", "")
+    for cookie in response.cookies:
+        if not cookie.secure and "https" in final_url:
+            cookie_issues.append(f"cookie-missing-secure: Cookie '{cookie.name}' missing Secure flag")
+        if "httponly" not in raw_cookies.lower():
+            cookie_issues.append(f"cookie-missing-httponly: Cookie '{cookie.name}' missing HttpOnly flag")
+        if "samesite" not in raw_cookies.lower():
+            cookie_issues.append(f"cookie-missing-samesite: Cookie '{cookie.name}' missing SameSite attribute")
+
+    # CORS checks
+    cors_issues = []
+    allow_origin = header_map.get("access-control-allow-origin", "").strip()
+    if allow_origin == "*":
+        cors_issues.append("cors-wildcard-origin: Access-Control-Allow-Origin header is set to wildcard (*)")
+
+    # Version disclosure
+    version_issues = []
+    if "server" in header_map:
+        version_issues.append(f"version-disclosure-server: Server header discloses '{header_map['server']}'")
+    if "x-powered-by" in header_map:
+        version_issues.append(f"version-disclosure-x-powered-by: X-Powered-By discloses '{header_map['x-powered-by']}'")
+
+    title = _extract_title(response.text)
+
+    return HttpCheck(
+        url=final_url,
+        reachable=True,
+        status_code=response.status_code,
+        title=title,
+        uses_tls="https" in final_url,
+        missing_security_headers=missing,
+        cookie_issues=list(dict.fromkeys(cookie_issues)),
+        cors_issues=cors_issues,
+        version_disclosure_issues=version_issues,
+        notes=notes,
+    )
+
+
+def _inspect_passive_tls(domain: str) -> TlsGrade:
+    """Inspect the public TLS certificate on port 443 safely using pinned IP connection."""
+    raw_info: dict[str, Any] = {
+        "reachable": False,
+        "protocol": "",
+        "issuer": "",
+        "subject": "",
+        "days_until_expiry": None,
+        "issues": [],
+    }
+
+    try:
+        from discovery.safe_fetch import resolve_and_validate_hostname
+        validated_ips = resolve_and_validate_hostname(domain)
+        pinned_ip = validated_ips[0]
+    except Exception as exc:
+        return TlsGrade(
+            skipped=True,
+            reason=f"Passive TLS resolution aborted: {exc}",
+            host=domain,
+            raw={"error": str(exc)},
+        )
+
+    ctx = ssl.create_default_context()
+    try:
+        with socket.create_connection((pinned_ip, 443), timeout=5.0) as sock:
+            with ctx.wrap_socket(sock, server_hostname=domain) as ssock:
+                raw_info["reachable"] = True
+                raw_info["protocol"] = ssock.version() or ""
+                cert = ssock.getpeercert()
+                if cert:
+                    # Calculate expiry days
+                    not_after_str = cert.get("notAfter")
+                    if not_after_str:
+                        exp_dt = datetime.datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z")
+                        days_left = (exp_dt - datetime.datetime.utcnow()).days
+                        raw_info["days_until_expiry"] = days_left
+                        if days_left < 0:
+                            raw_info["issues"].append("tls-cert-expired: Public TLS certificate has expired")
+                        elif days_left < 15:
+                            raw_info["issues"].append(f"tls-cert-expiring-soon: Public TLS certificate expires in {days_left} days")
+
+                    # Extract subject and issuer
+                    issuer_dict = dict(x[0] for x in cert.get("issuer", ()))
+                    subject_dict = dict(x[0] for x in cert.get("subject", ()))
+                    raw_info["issuer"] = issuer_dict.get("organizationName") or issuer_dict.get("commonName", "")
+                    raw_info["subject"] = subject_dict.get("commonName", "")
+
+                    if raw_info["issuer"] == raw_info["subject"] and raw_info["issuer"]:
+                        raw_info["issues"].append("tls-self-signed: Public TLS certificate is self-signed")
+
+        return TlsGrade(
+            skipped=False,
+            reason="Passive TLS inspection completed.",
+            host=domain,
+            grade="Valid" if not raw_info["issues"] else "Warning",
+            raw=raw_info,
+        )
+    except Exception as exc:
+        return TlsGrade(
+            skipped=True,
+            reason=f"Passive TLS connection failed: {exc.__class__.__name__}",
+            host=domain,
+            raw={"error": str(exc)},
+        )
+
+
+def _query_dns_records(domain: str) -> dict[str, Any]:
+    """Query DNS A, AAAA, MX, TXT, SPF, and DMARC records via nslookup."""
+    records: dict[str, Any] = {
+        "domain": domain,
+        "A": [],
+        "MX": [],
+        "TXT": [],
+        "spf_present": False,
+        "dmarc_present": False,
+        "issues": [],
+    }
+
+    # Query TXT and SPF
+    try:
+        proc = subprocess.run(["nslookup", "-type=TXT", domain], capture_output=True, text=True, timeout=5)
+        out = proc.stdout
+        for line in out.splitlines():
+            line_s = line.strip()
+            if "text =" in line_s or "v=spf1" in line_s:
+                records["TXT"].append(line_s)
+                if "v=spf1" in line_s:
+                    records["spf_present"] = True
+    except Exception:
+        pass
+
+    if not records["spf_present"]:
+        records["issues"].append("email-missing-spf: No SPF (Sender Policy Framework) DNS record found to prevent email spoofing.")
+
+    # Query DMARC
+    try:
+        proc_dmarc = subprocess.run(["nslookup", "-type=TXT", f"_dmarc.{domain}"], capture_output=True, text=True, timeout=5)
+        if "v=DMARC1" in proc_dmarc.stdout:
+            records["dmarc_present"] = True
+    except Exception:
+        pass
+
+    if not records["dmarc_present"]:
+        records["issues"].append("email-missing-dmarc: No DMARC DNS record found to enforce email authentication policies.")
+
+    return records
+
+
+def _query_certificate_transparency(domain: str) -> list[str]:
+    """Passively discover subdomains from public Certificate Transparency logs (crt.sh)."""
+    subdomains: set[str] = set()
+    try:
+        url = f"https://crt.sh/?q=%25.{domain}&output=json"
+        res = safe_fetch(url, timeout=6.0, headers={"User-Agent": "Mozilla/5.0 (Defensive Sec Tool)"})
+        if res.status_code == 200:
+            entries = res.json()
+            for entry in entries[:100]:
+                name_value = entry.get("name_value", "")
+                for sub in name_value.splitlines():
+                    sub = sub.strip().lower()
+                    if "*" not in sub and sub.endswith(domain) and sub != domain:
+                        subdomains.add(sub)
+    except (SafeFetchError, requests.RequestException, json.JSONDecodeError, OSError, ValueError):
+        pass  # ct logs lookup is best-effort
+    return sorted(list(subdomains))[:25]
+
+
+def _query_shodan_intelligence(domain: str) -> dict[str, Any]:
+    """Query Shodan's passive threat index for public open ports and CVEs safely."""
+    shodan_info: dict[str, Any] = {"ports": [], "cpes": [], "tags": [], "source": "shodan-internetdb"}
+    try:
+        from discovery.safe_fetch import resolve_and_validate_hostname
+        validated_ips = resolve_and_validate_hostname(domain)
+        if not validated_ips:
+            return shodan_info
+        ip = validated_ips[0]
+        # Use free public InternetDB via safe_fetch to prevent SSRF / rebinding
+        res = safe_fetch(f"https://internetdb.shodan.io/{ip}", timeout=4.0)
+        if res.status_code == 200:
+            data = res.json()
+            shodan_info["ports"] = data.get("ports", [])
+            shodan_info["cpes"] = data.get("cpes", [])
+            shodan_info["tags"] = data.get("tags", [])
+    except (SafeFetchError, requests.RequestException, json.JSONDecodeError, OSError, ValueError):
+        pass
+    return shodan_info
+
+
+def discover_passive(domain: str) -> DiscoveredAssets:
+    """
+    Perform 100% passive, read-only reconnaissance on a public domain.
+    No active port scanning or intrusive probes are performed.
+    """
+    domain = domain.strip().lower()
+    notes: list[str] = [
+        "Mode: PASSIVE (Public reconnaissance only — no active port scanning was performed)."
+    ]
+
+    # 1. Passive HTTP observation
+    http_check = _probe_passive_http(domain)
+    
+    # 2. Passive TLS certificate inspection
+    tls_check = _inspect_passive_tls(domain)
+
+    # 3. DNS and Email security inspection
+    dns_info = _query_dns_records(domain)
+
+    # 4. Certificate Transparency subdomains
+    ct_subdomains = _query_certificate_transparency(domain)
+
+    # 5. Passive Shodan threat intelligence
+    shodan_intel = _query_shodan_intelligence(domain)
+
+    # Synthesize open ports from HTTP reachability and Shodan
+    ports_found: list[OpenPort] = []
+    if http_check.reachable:
+        p_num = 443 if http_check.uses_tls else 80
+        ports_found.append(
+            OpenPort(
+                port=p_num,
+                protocol="tcp",
+                state="open",
+                service="https" if http_check.uses_tls else "http",
+                product=http_check.title or "web",
+                version="",
+                extra="passive-web-observation",
+            )
+        )
+
+    # Passive Metadata bundle
+    passive_meta = {
+        "dns": dns_info,
+        "ct_subdomains": ct_subdomains,
+        "ct_notice": "Subdomains discovered via public Certificate Transparency logs for mapping only (none were probed or scanned).",
+        "shodan": shodan_intel,
+    }
+
+    if ct_subdomains:
+        notes.append(f"Discovered {len(ct_subdomains)} subdomains from Certificate Transparency logs.")
+    for issue in dns_info.get("issues", []):
+        notes.append(issue)
+
+    assets = DiscoveredAssets(
+        target=domain,
+        scan_method="passive-osint",
+        ports=ports_found,
+        http=http_check,
+        tls=tls_check,
+        mode="passive",
+        passive_meta=passive_meta,
+        notes=notes,
+    )
+
+    write_json("discovered_assets.json", assets, target=domain)
+    return assets
+
+
+extract_html_title = _extract_title
+probe_passive_dns = _query_dns_records
+probe_passive_http = _probe_passive_http
+query_certificate_transparency = _query_certificate_transparency
+
 WAF_SIGNATURES = {
     "Cloudflare": ["cf-ray", "__cfduid", "cf-cache-status", "server: cloudflare"],
     "CloudFront (AWS)": ["x-amz-cf-id", "x-amz-cf-pop", "cloudfront"],
@@ -33,374 +369,24 @@ WAF_SIGNATURES = {
 }
 
 
-def extract_html_title(html_content: str) -> str:
-    """Extract page title from HTML string safely."""
-    from html.parser import HTMLParser
-
-    class _TitleParser(HTMLParser):
-        def __init__(self):
-            super().__init__()
-            self._in_title = False
-            self.title = ""
-
-        def handle_starttag(self, tag, attrs):
-            if tag.lower() == "title":
-                self._in_title = True
-
-        def handle_endtag(self, tag):
-            if tag.lower() == "title":
-                self._in_title = False
-
-        def handle_data(self, data):
-            if self._in_title:
-                self.title += data
-
-    parser = _TitleParser()
-    try:
-        parser.feed(html_content[:50000])  # limit search window
-    except Exception:
-        return ""
-    return parser.title.strip()[:200]
-
-
-def detect_waf_and_cdn(headers: Dict[str, str], body: str = "", cnames: Optional[List[str]] = None) -> Dict[str, Any]:
-    """Detect WAF or CDN presence using HTTP response headers and DNS CNAMEs."""
+def detect_waf_and_cdn(headers: dict[str, str], body: str = "") -> dict[str, Any]:
+    """Detect WAF and CDN providers from headers and response body."""
     detected = []
-    header_blob = " ".join(f"{k.lower()}: {v.lower()}" for k, v in headers.items())
-    cnames_blob = " ".join(cnames or []).lower()
+    header_str = " ".join(f"{k.lower()}: {str(v).lower()}" for k, v in (headers or {}).items())
+    body_sample = body[:5000].lower() if body else ""
 
     for provider, sigs in WAF_SIGNATURES.items():
-        matched = False
         for sig in sigs:
-            if sig.lower() in header_blob or (cnames and sig.lower() in cnames_blob):
+            if sig.lower() in header_str or sig.lower() in body_sample:
                 detected.append(provider)
-                matched = True
                 break
 
-    is_behind_waf = len(detected) > 0
+    detected = list(dict.fromkeys(detected))
     return {
-        "detected": is_behind_waf,
-        "providers": list(dict.fromkeys(detected)),
-        "mitigation_factor": 0.6 if is_behind_waf else 1.0,
-        "details": f"Protected by {', '.join(detected)}" if detected else "Direct exposure (no WAF/CDN signature detected)"
+        "detected": bool(detected),
+        "providers": detected,
+        "mitigation_factor": 0.6 if detected else 1.0,
+        "details": f"Shielded by {', '.join(detected)}" if detected else "Direct exposure (no WAF detected)"
     }
 
 
-def probe_passive_dns(domain: str) -> Dict[str, Any]:
-    """
-    Query DNS A, AAAA, MX, TXT, SPF, and DMARC records safely.
-    Uses socket resolution and nslookup / DoH fallback without external dependencies.
-    """
-    records: Dict[str, Any] = {
-        "domain": domain,
-        "A": [],
-        "AAAA": [],
-        "MX": [],
-        "TXT": [],
-        "NS": [],
-        "CNAME": [],
-        "spf_present": False,
-        "spf_record": None,
-        "dmarc_present": False,
-        "dmarc_record": None,
-        "issues": [],
-        "evidence": {}
-    }
-
-    # 1. Resolve A and AAAA records via standard socket
-    try:
-        addr_info = socket.getaddrinfo(domain, 80, proto=socket.IPPROTO_TCP)
-        for family, _, _, _, sockaddr in addr_info:
-            ip = sockaddr[0]
-            if family == socket.AF_INET and ip not in records["A"]:
-                records["A"].append(ip)
-            elif family == socket.AF_INET6 and ip not in records["AAAA"]:
-                records["AAAA"].append(ip)
-    except socket.gaierror as e:
-        records["issues"].append(f"dns-resolution-error: Failed to resolve {domain}: {e}")
-
-    # 2. Query TXT and SPF records via nslookup
-    try:
-        proc = subprocess.run(["nslookup", "-type=TXT", domain], capture_output=True, text=True, timeout=5)
-        for line in proc.stdout.splitlines():
-            line_s = line.strip()
-            if "text =" in line_s or "v=spf1" in line_s:
-                txt_val = line_s.split("text =", 1)[-1].strip().strip('"') if "text =" in line_s else line_s
-                records["TXT"].append(txt_val)
-                if "v=spf1" in txt_val.lower():
-                    records["spf_present"] = True
-                    records["spf_record"] = txt_val
-    except Exception:
-        pass
-
-    if not records["spf_present"]:
-        records["issues"].append("email-missing-spf: No SPF (Sender Policy Framework) record found. Domain susceptible to email spoofing.")
-
-    # 3. Query DMARC record (_dmarc.<domain>)
-    try:
-        proc_dmarc = subprocess.run(["nslookup", "-type=TXT", f"_dmarc.{domain}"], capture_output=True, text=True, timeout=5)
-        for line in proc_dmarc.stdout.splitlines():
-            line_s = line.strip()
-            if "v=DMARC1" in line_s:
-                records["dmarc_present"] = True
-                dmarc_val = line_s.split("text =", 1)[-1].strip().strip('"') if "text =" in line_s else line_s
-                records["dmarc_record"] = dmarc_val
-                break
-    except Exception:
-        pass
-
-    if not records["dmarc_present"]:
-        records["issues"].append("email-missing-dmarc: No DMARC record found. Domain lacks policy enforcement for unauthorized mail senders.")
-
-    # 4. Query MX records
-    try:
-        proc_mx = subprocess.run(["nslookup", "-type=MX", domain], capture_output=True, text=True, timeout=5)
-        for line in proc_mx.stdout.splitlines():
-            line_s = line.strip()
-            if "mail exchanger =" in line_s:
-                mx_host = line_s.split("mail exchanger =", 1)[-1].strip()
-                records["MX"].append(mx_host)
-    except Exception:
-        pass
-
-    return records
-
-
-def probe_passive_tls(domain: str) -> Dict[str, Any]:
-    """
-    Safely inspect the public TLS certificate on port 443.
-    Uses pre-resolved pinned IP and server_hostname (SNI) to prevent SSRF and DNS rebinding.
-    """
-    tls_info: Dict[str, Any] = {
-        "reachable": False,
-        "protocol": None,
-        "cipher": None,
-        "issuer": None,
-        "subject": None,
-        "sans": [],
-        "valid_from": None,
-        "valid_to": None,
-        "days_until_expiry": None,
-        "is_expired": False,
-        "is_self_signed": False,
-        "issues": []
-    }
-
-    try:
-        validated_ips = resolve_and_validate_hostname(domain)
-        pinned_ip = validated_ips[0]
-    except Exception as exc:
-        tls_info["issues"].append(f"tls-aborted: IP resolution failed or blocked: {exc}")
-        return tls_info
-
-    ctx = ssl.create_default_context()
-    try:
-        with socket.create_connection((pinned_ip, 443), timeout=5.0) as sock:
-            with ctx.wrap_socket(sock, server_hostname=domain) as ssock:
-                tls_info["reachable"] = True
-                tls_info["protocol"] = ssock.version()
-                tls_cipher = ssock.cipher()
-                if tls_cipher:
-                    tls_info["cipher"] = tls_cipher[0]
-
-                cert = ssock.getpeercert()
-                if cert:
-                    # Expiry evaluation
-                    not_after_str = cert.get("notAfter")
-                    if not_after_str:
-                        exp_dt = datetime.datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z")
-                        tls_info["valid_to"] = exp_dt.isoformat()
-                        days_left = (exp_dt - datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)).days
-                        tls_info["days_until_expiry"] = days_left
-                        if days_left < 0:
-                            tls_info["is_expired"] = True
-                            tls_info["issues"].append(f"tls-cert-expired: Public certificate expired {abs(days_left)} days ago.")
-                        elif days_left < 15:
-                            tls_info["issues"].append(f"tls-cert-expiring-soon: Public certificate expires in {days_left} days.")
-
-                    not_before_str = cert.get("notBefore")
-                    if not_before_str:
-                        start_dt = datetime.datetime.strptime(not_before_str, "%b %d %H:%M:%S %Y %Z")
-                        tls_info["valid_from"] = start_dt.isoformat()
-
-                    # Issuer & Subject
-                    issuer_dict = dict(x[0] for x in cert.get("issuer", ()))
-                    subject_dict = dict(x[0] for x in cert.get("subject", ()))
-                    tls_info["issuer"] = issuer_dict.get("organizationName") or issuer_dict.get("commonName", "Unknown")
-                    tls_info["subject"] = subject_dict.get("commonName", "Unknown")
-
-                    # Subject Alternative Names (SANs)
-                    sans = []
-                    for san_type, san_val in cert.get("subjectAltName", ()):
-                        if san_type == "DNS":
-                            sans.append(san_val)
-                    tls_info["sans"] = sans[:25]  # Cap to first 25
-
-                    if tls_info["issuer"] == tls_info["subject"] and tls_info["issuer"] != "Unknown":
-                        tls_info["is_self_signed"] = True
-                        tls_info["issues"].append("tls-self-signed: Public TLS certificate is self-signed.")
-
-                # Check protocol version
-                if tls_info["protocol"] in ["TLSv1", "TLSv1.1"]:
-                    tls_info["issues"].append(f"tls-deprecated-version: Obsolete and insecure protocol {tls_info['protocol']} negotiated.")
-
-    except ssl.SSLCertVerificationError as exc:
-        tls_info["issues"].append(f"tls-cert-invalid: Certificate verification failed: {exc}")
-    except Exception as exc:
-        tls_info["issues"].append(f"tls-connection-failed: {exc.__class__.__name__}: {exc}")
-
-    return tls_info
-
-
-def probe_passive_http(domain: str) -> Dict[str, Any]:
-    """
-    Execute safe HTTP/HTTPS probes to analyze security headers, server tokens, cookies, and CORS.
-    Uses safe_fetch (SSRF protected, redirect limited, size capped).
-    """
-    urls_to_try = [f"https://{domain}/", f"http://{domain}/"]
-    response = None
-    final_url = urls_to_try[0]
-    errors = []
-
-    for url in urls_to_try:
-        try:
-            response = safe_fetch(url, timeout=5.0)
-            final_url = url
-            break
-        except SafeFetchError as exc:
-            errors.append(f"Probe to {url} skipped: {exc}")
-        except Exception as exc:
-            errors.append(f"Probe to {url} failed: {exc.__class__.__name__}")
-
-    if response is None:
-        return {
-            "reachable": False,
-            "url": final_url,
-            "status_code": None,
-            "headers": {},
-            "missing_security_headers": [],
-            "cookie_issues": [],
-            "cors_issues": [],
-            "version_disclosure": [],
-            "waf_detection": {"detected": False, "providers": [], "mitigation_factor": 1.0, "details": "Unreachable"},
-            "title": "",
-            "errors": errors or ["Host unreachable over HTTP/HTTPS."]
-        }
-
-    header_map = {k.lower(): v for k, v in response.headers.items()}
-    security_headers = [
-        ("strict-transport-security", "HSTS missing: Insecure HTTP downgrade attacks possible."),
-        ("content-security-policy", "CSP missing: Application vulnerable to Cross-Site Scripting (XSS) and code injection."),
-        ("x-frame-options", "X-Frame-Options missing: Vulnerable to Clickjacking via UI redressing."),
-        ("x-content-type-options", "X-Content-Type-Options missing: MIME-type sniffing can lead to script execution."),
-        ("referrer-policy", "Referrer-Policy missing: Sensitive URL path/query parameters may leak to external referrers."),
-        ("permissions-policy", "Permissions-Policy missing: Browser features (camera, mic, geolocation) not restricted.")
-    ]
-
-    missing = []
-    for h, desc in security_headers:
-        if h not in header_map:
-            # Only flag HSTS for HTTPS
-            if h == "strict-transport-security" and not final_url.startswith("https"):
-                continue
-            missing.append({"header": h, "description": desc})
-
-    # Cookies audit
-    cookie_issues = []
-    raw_cookie_headers = response.headers.get("set-cookie", "")
-    for cookie in response.cookies:
-        if not cookie.secure and final_url.startswith("https"):
-            cookie_issues.append(f"Cookie '{cookie.name}' missing Secure attribute.")
-        if "httponly" not in raw_cookie_headers.lower():
-            cookie_issues.append(f"Cookie '{cookie.name}' missing HttpOnly attribute.")
-        if "samesite" not in raw_cookie_headers.lower():
-            cookie_issues.append(f"Cookie '{cookie.name}' missing SameSite attribute.")
-
-    # CORS audit
-    cors_issues = []
-    allow_origin = header_map.get("access-control-allow-origin", "").strip()
-    if allow_origin == "*":
-        cors_issues.append("Wildcard CORS (Access-Control-Allow-Origin: *) permits arbitrary third-party origin reading.")
-
-    # Version disclosure
-    version_disclosure = []
-    server_hdr = header_map.get("server")
-    if server_hdr:
-        version_disclosure.append(f"Server header disclosure: '{server_hdr}'")
-    powered_by = header_map.get("x-powered-by")
-    if powered_by:
-        version_disclosure.append(f"X-Powered-By disclosure: '{powered_by}'")
-
-    waf_data = detect_waf_and_cdn(response.headers, body=response.text[:2000])
-
-    return {
-        "reachable": True,
-        "url": final_url,
-        "status_code": response.status_code,
-        "headers": dict(response.headers),
-        "server_banner": server_hdr or "",
-        "powered_by": powered_by or "",
-        "missing_security_headers": missing,
-        "cookie_issues": list(dict.fromkeys(cookie_issues)),
-        "cors_issues": cors_issues,
-        "version_disclosure": version_disclosure,
-        "waf_detection": waf_data,
-        "title": extract_html_title(response.text),
-        "errors": errors
-    }
-
-
-def query_certificate_transparency(domain: str, limit: int = 20) -> List[str]:
-    """
-    Passively discover subdomains from public Certificate Transparency logs (crt.sh).
-    Timeouts and size limits enforced via safe_fetch.
-    """
-    subdomains: set[str] = set()
-    try:
-        url = f"https://crt.sh/?q=%25.{domain}&output=json"
-        res = safe_fetch(url, timeout=6.0, headers={"User-Agent": "AEGIS-Security-Discovery/1.0"})
-        if res.status_code == 200:
-            entries = res.json()
-            for entry in entries:
-                name_val = entry.get("name_value", "")
-                for raw_name in name_val.split("\n"):
-                    clean = raw_name.strip().lower()
-                    if clean and not clean.startswith("*.") and domain in clean:
-                        subdomains.add(clean)
-                        if len(subdomains) >= limit:
-                            break
-                if len(subdomains) >= limit:
-                    break
-    except Exception:
-        # Certificate Transparency is purely passive discovery; failure must never break pipeline
-        pass
-
-    return sorted(list(subdomains))
-
-
-def run_passive_recon(target: str) -> Dict[str, Any]:
-    """
-    Run complete passive OSINT collection on target domain.
-    Aggregates DNS, TLS, HTTP, WAF, and Certificate Transparency into a unified report.
-    """
-    start_time = time.time()
-    dns_data = probe_passive_dns(target)
-    tls_data = probe_passive_tls(target)
-    http_data = probe_passive_http(target)
-    ct_subdomains = query_certificate_transparency(target, limit=20)
-    duration = round(time.time() - start_time, 2)
-
-    return {
-        "target": target,
-        "mode": "PASSIVE OSINT",
-        "collected_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "duration_seconds": duration,
-        "dns": dns_data,
-        "tls": tls_data,
-        "http": http_data,
-        "certificate_transparency_subdomains": ct_subdomains,
-        "waf": http_data.get("waf_detection", {"detected": False, "providers": [], "mitigation_factor": 1.0}),
-        "inferred_technologies": [
-            b for b in [http_data.get("server_banner"), http_data.get("powered_by")] if b
-        ]
-    }

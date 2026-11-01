@@ -75,10 +75,14 @@ CISA_KEV_FEED = os.getenv(
 OSV_QUERY_API = os.getenv("OSV_QUERY_API", "https://api.osv.dev/v1/query")
 
 # AI Copilot Backend (Optional LLM configuration)
+AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "amazon.nova-micro-v1:0")
+DECIDER_URL = os.getenv("DECIDER_URL", "http://127.0.0.1:8088")
+DECIDER_THRESHOLD = float(os.getenv("DECIDER_THRESHOLD", "0.7"))
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "auto").lower()  # auto, gemini, anthropic, openai, offline
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "auto").lower()  # auto, bedrock, gemini, anthropic, openai, offline
 
 # CORS
 CORS_ORIGIN = os.getenv("CORS_ORIGIN", "*")
@@ -127,6 +131,8 @@ def normalize_host(raw: str) -> str:
 
     return host
 
+_normalize_host = normalize_host
+
 
 def load_allowlist() -> set[str]:
     """Read targets.allowlist and return normalized allowed targets."""
@@ -142,6 +148,11 @@ def load_allowlist() -> set[str]:
             if norm:
                 allowed.add(norm)
     return allowed
+
+
+def get_target_allowlist() -> set[str]:
+    """Alias for load_allowlist()."""
+    return load_allowlist()
 
 
 def is_target_allowed_for_active_scan(target: str) -> bool:
@@ -172,3 +183,26 @@ def is_target_allowed_for_active_scan(target: str) -> bool:
         pass
 
     return False
+
+
+def is_target_allowed(target: str) -> bool:
+    """Alias matching reference project contract."""
+    return is_target_allowed_for_active_scan(target)
+
+
+def require_allowed_target(target: str) -> str:
+    """Return the normalized host, or raise if it is not on the allowlist."""
+    host = normalize_host(target)
+    if not host:
+        raise ValueError("Target is empty.")
+    if not is_target_allowed(host):
+        raise PermissionError(
+            f"Refusing to scan '{host}'. Add it to targets.allowlist only if you own it."
+        )
+    return host
+
+_normalize_host = normalize_host
+
+
+def is_loopback(host: str) -> bool:
+    return normalize_host(host) in {"localhost", "127.0.0.1", "::1"}
