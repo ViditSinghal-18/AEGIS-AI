@@ -861,8 +861,18 @@ tab_graph, tab_findings, tab_remediation, tab_compliance, tab_osint, tab_copilot
 # TAB 1: Interactive Visual Attack Graph (D3.js)
 # ==========================================
 with tab_graph:
-    st.markdown("### 🕸️ Interactive Attack Surface Network Topology")
-    st.caption("Dynamic force-directed cyber graph illustrating the target, IP endpoints, public subdomains, open ports, and correlated risk nodes.")
+    st.markdown("### 🕸️ Interactive Bayesian Attack Graph & Exploit Path Analysis")
+    st.caption("Dynamic force-directed cyber graph modeling multi-step threat propagation, Bayesian compromise probabilities (Noisy-OR), and critical cut-sets.")
+
+    # Interactive 'What-If I Patch X?' Counterfactual Simulation
+    sim_col1, sim_col2 = st.columns([1.5, 2.5])
+    with sim_col1:
+        patchable_options = ["None (Current Posture)"] + [f"vuln_{idx}: {str(f.get('title', 'Vulnerability'))[:45]}" for idx, f in enumerate(findings[:6])]
+        selected_patch = st.selectbox("🎯 Simulate Remediation ('What-If I Patch X?')", patchable_options, key="what_if_patch_select")
+
+    patched_nid = None
+    if selected_patch != "None (Current Posture)":
+        patched_nid = selected_patch.split(":")[0]
 
     graph_html = render_attack_surface_graph_html(
         target=target,
@@ -870,8 +880,31 @@ with tab_graph:
         ports=discovered_ports,
         subdomains=discovered_subdomains,
         ips=discovered_ips,
+        patched_node_id=patched_nid,
     )
-    components.html(graph_html, height=510, scrolling=False)
+    components.html(graph_html, height=550, scrolling=False)
+
+    # Display What-If Counterfactual telemetry
+    if patched_nid:
+        from dashboard.bayesian_attack_graph import build_attack_graph_from_findings
+        sim_bag = build_attack_graph_from_findings(target=target, findings=findings, ports=discovered_ports, subdomains=discovered_subdomains)
+        sim_res = sim_bag.simulate_what_if_patch(patched_nid)
+        
+        c_m1, c_m2, c_m3 = st.columns(3)
+        with c_m1:
+            st.metric("Baseline Compromise Risk", f"{sim_res['baseline_probability']:.1%}")
+        with c_m2:
+            st.metric("Post-Remediation Risk", f"{sim_res['counterfactual_probability']:.1%}", delta=f"-{sim_res['percentage_risk_reduction']}%", delta_color="inverse")
+        with c_m3:
+            st.metric("Risk Reduction", f"{sim_res['absolute_reduction']:.1%}")
+        st.success(f"🛡️ **Remediation Impact:** {sim_res['summary']}")
+    else:
+        from dashboard.bayesian_attack_graph import build_attack_graph_from_findings
+        sim_bag = build_attack_graph_from_findings(target=target, findings=findings, ports=discovered_ports, subdomains=discovered_subdomains)
+        choke = sim_bag.compute_minimal_chokepoints()
+        mpath = sim_bag.find_most_probable_path()
+        if choke.chokepoint_nodes:
+            st.info(f"💡 **Recommended Strategic Action:** {choke.explanation}")
 
 
 # ==========================================

@@ -1,5 +1,5 @@
 {
-  "calibration_timestamp": "2026-11-11T13:07:19.774600+00:00",
+  "calibration_timestamp": "2026-11-11T13:58:34.998498+00:00",
   "methodology": "Supervised Logistic Regression with Temporal Train/Test Split",
   "citation": "Inspired by Bozorgi et al. (2010) and Jacobs et al. (EPSS 2021) [verify before publishing]",
   "split_year": 2023,

@@ -255,6 +255,25 @@ AEGIS-AI implements research-backed filters to suppress false positives without 
 
 ---
 
+## 🕸️ Empirical Attack-Path Analysis (Phase 3)
+
+AEGIS-AI models multi-step cyber compromise using probabilistic graphical networks:
+
+1. **Bayesian Attack Graph (`dashboard/bayesian_attack_graph.py`):**
+   - Computes conditional compromise probabilities per node using FIRST EPSS exploit likelihood (inspired by Poolsappasit et al., IEEE TDSC 2012).
+   - Resolves multi-parent attack convergence with canonical Noisy-OR probability aggregation.
+   - Powers dynamic **"What-If I Patch X?"** counterfactual simulations, computing exact percentage risk reduction in Crown Jewels compromise probability.
+
+2. **Dijkstra Most-Probable Exploit Path:**
+   - Finds the highest-probability attack trajectory from External Ingress to Crown Jewels by minimizing negative log-probabilities ($w = -\ln p$) via Dijkstra's algorithm (inspired by Jha, Sheyner, & Wing, CSFW 2002).
+   - Renders the path visually in glowing crimson with edge-level exploit probabilities.
+
+3. **Minimal Critical Chokepoint Cut-Set:**
+   - Solves for the minimal set of strategic remediations that sever 100% of viable attack paths to critical assets using Greedy Set-Cover over enumerated paths (inspired by Jha et al. 2002).
+   - Highlights chokepoint nodes with golden protective shields in the visual attack graph.
+
+---
+
 ## 🛡️ Responsible Security & Disclosure
 
 AEGIS-AI is designed for authorized defensive reconnaissance, posture assessment, and compliance governance. It enforces strict SSRF protections against internal networks, private RFC 1918 subnets, and cloud instance metadata (`169.254.169.254`). Active scanning features require verified domain authorization.
