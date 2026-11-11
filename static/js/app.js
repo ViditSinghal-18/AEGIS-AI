@@ -204,11 +204,38 @@ window.AegisApp = (function () {
         setCard('compSoc2', comp.soc_2);
     }
 
+    let currentRemediationBundle = null;
+    let currentRemediationTab = 'nginx';
+
     async function triggerScan(targetInput) {
         const target = targetInput || (document.getElementById('scanTargetInput') ? document.getElementById('scanTargetInput').value.trim() : '');
         if (!target) {
             AegisUtils.showToast('Please enter a target domain or IP.', 'warning');
             return;
+        }
+
+        const chkActive = document.getElementById('chkActiveScan');
+        const isActive = chkActive && chkActive.checked && !chkActive.disabled;
+
+        if (isActive) {
+            AegisUtils.showToast(`Starting authorized active port & service scan on ${target}...`, 'info');
+            try {
+                const resp = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target: target, active: true })
+                });
+                const resData = await resp.json();
+                if (resData.success && (resData.data || resData.report)) {
+                    AegisUtils.showToast(`Active scan complete for ${target}!`, 'success');
+                    applyReportData(resData.data || resData.report);
+                    return;
+                } else if (!resData.success && resData.error) {
+                    AegisUtils.showToast(`Active scan notice: ${resData.error}. Falling back to passive OSINT.`, 'warning');
+                }
+            } catch (err) {
+                console.warn('Active scan request failed, continuing with passive pipeline:', err);
+            }
         }
 
         AegisUtils.showToast(`Starting real reconnaissance pipeline on ${target}...`, 'info');
@@ -232,6 +259,8 @@ window.AegisApp = (function () {
             inputScan.onkeydown = (e) => {
                 if (e.key === 'Enter') triggerScan();
             };
+            inputScan.addEventListener('change', updateActiveModeState);
+            inputScan.addEventListener('blur', updateActiveModeState);
         }
 
         // Domain Verification Modal Trigger
@@ -253,6 +282,34 @@ window.AegisApp = (function () {
 
         // Export Dropdowns
         setupExportHandlers();
+
+        // Initial check for active mode capability
+        updateActiveModeState();
+    }
+
+    async function updateActiveModeState() {
+        const inputScan = document.getElementById('scanTargetInput');
+        const target = (inputScan ? inputScan.value.trim() : '') || 'localhost';
+        const chkActive = document.getElementById('chkActiveScan');
+        const container = document.getElementById('activeScanToggleContainer');
+        if (!chkActive) return;
+
+        try {
+            const resp = await fetch(`/api/mode?target=${encodeURIComponent(target)}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                chkActive.disabled = !data.can_active;
+                if (container) {
+                    container.style.opacity = data.can_active ? '1' : '0.45';
+                    container.title = data.can_active
+                        ? 'Active TCP port & banner scan authorized for this target'
+                        : 'Active scanning disabled. Verify domain ownership or run against localhost to authorize.';
+                }
+                if (!data.can_active) {
+                    chkActive.checked = false;
+                }
+            }
+        } catch (e) {}
     }
 
     function toggleCommandPalette() {
@@ -283,10 +340,83 @@ window.AegisApp = (function () {
         bindExport('btnExportSbom', 'cyclonedx');
     }
 
-    function viewRemediation(idx) {
+    async function viewRemediation(idx) {
         selectFinding(idx);
         const modal = document.getElementById('remediationModal');
-        if (modal) modal.style.display = 'flex';
+        if (!modal) return;
+
+        const findings = (currentReport && (currentReport.findings || currentReport.prioritized_findings)) || [];
+        const f = findings[idx] || {};
+        const target = (currentReport && currentReport.target) || 'target.site';
+
+        AegisUtils.safeSetText('remediationModalTitle', `🛠️ Remediation: ${f.title || 'Finding'}`);
+        AegisUtils.safeSetText('remediationModalSubtitle', `Virtual patches & hardening rules for ${target}`);
+        AegisUtils.safeSetText('remediationFindingNote', `🎯 Action: ${f.remediation || f.suggested_action || 'Enforce defense-in-depth headers and access restrictions.'}`);
+
+        modal.style.display = 'flex';
+        const display = document.getElementById('remediationCodeDisplay');
+        if (display) display.textContent = '# Fetching automated virtual patch bundle...';
+
+        try {
+            const resp = await fetch(`/api/remediation?target=${encodeURIComponent(target)}`);
+            if (resp.ok) {
+                currentRemediationBundle = await resp.json();
+                renderRemediationCode(currentRemediationTab);
+            } else {
+                if (display) display.textContent = `# Recommended Fix:\n${f.remediation || 'Apply standard hardening configuration.'}`;
+            }
+        } catch (e) {
+            if (display) display.textContent = `# Recommended Fix:\n${f.remediation || 'Apply standard hardening configuration.'}`;
+        }
+    }
+
+    function renderRemediationCode(tab) {
+        currentRemediationTab = tab;
+        const display = document.getElementById('remediationCodeDisplay');
+        if (!display) return;
+
+        if (!currentRemediationBundle) {
+            display.textContent = '# Loading bundle...';
+            return;
+        }
+
+        let code = '';
+        if (tab === 'nginx') {
+            code = currentRemediationBundle.nginx || '# No Nginx configuration available.';
+        } else if (tab === 'apache') {
+            code = currentRemediationBundle.apache || '# No Apache configuration available.';
+        } else if (tab === 'caddy') {
+            code = currentRemediationBundle.caddy || '# No Caddy configuration available.';
+        } else if (tab === 'helmet') {
+            code = currentRemediationBundle.express_helmet || '# No Helmet configuration available.';
+        } else if (tab === 'waf') {
+            const waf = currentRemediationBundle.waf || {};
+            code = waf.cloudflare_waf_rules || waf.modsecurity_crs_rules || JSON.stringify(waf, null, 2);
+        }
+        display.textContent = code;
+    }
+
+    function switchRemediationTab(tab, btn) {
+        const tabs = document.querySelectorAll('#remediationTabs .tab-btn');
+        tabs.forEach(t => {
+            t.classList.remove('btn-primary');
+            t.classList.add('btn-secondary');
+        });
+        if (btn) {
+            btn.classList.remove('btn-secondary');
+            btn.classList.add('btn-primary');
+        }
+        renderRemediationCode(tab);
+    }
+
+    function copyCurrentRemediation() {
+        const display = document.getElementById('remediationCodeDisplay');
+        if (!display) return;
+        navigator.clipboard.writeText(display.textContent).then(() => {
+            AegisUtils.showToast('Configuration snippet copied to clipboard!', 'success');
+        }).catch(() => {
+            AegisUtils.showToast('Failed to copy.', 'error');
+        });
     }
 
     return {
@@ -294,7 +424,10 @@ window.AegisApp = (function () {
         triggerScan,
         selectFinding,
         viewRemediation,
-        toggleCommandPalette
+        switchRemediationTab,
+        copyCurrentRemediation,
+        toggleCommandPalette,
+        updateActiveModeState
     };
 })();
 

@@ -12,6 +12,7 @@ python-dotenv>=1.0.0,<2.0.0
 # HTTP Transport, Telemetry & Threat Intelligence
 requests>=2.31.0,<3.0.0
 urllib3>=2.0.7,<3.0.0
+openai>=1.0.0
 
 # Optional Active Network Reconnaissance (Local / Docker only; not run on Vercel)
 python-nmap>=0.7.1
@@ -21,3 +22,8 @@ python-pptx>=0.6.21
 
 # Testing & Quality Assurance
 pytest>=7.4.0
+
+# Optional Streamlit Dashboard, Cloud SDK & AI Agents
+streamlit>=1.30.0
+boto3>=1.34.0  # Optional: only required for AEGIS_LLM_PROVIDER=bedrock
+

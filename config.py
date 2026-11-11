@@ -87,6 +87,21 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "auto").lower()  # auto, bedrock, gemin
 # CORS
 CORS_ORIGIN = os.getenv("CORS_ORIGIN", "*")
 
+# Contextual Risk Prioritization Weights (sum = 1.0)
+SCORING_WEIGHTS_SOURCE = os.getenv("SCORING_WEIGHTS_SOURCE", "default").lower()  # default | calibrated
+WEIGHT_CVSS = float(os.getenv("WEIGHT_CVSS", "0.35"))
+WEIGHT_EPSS = float(os.getenv("WEIGHT_EPSS", "0.30"))
+WEIGHT_EXPOSURE = float(os.getenv("WEIGHT_EXPOSURE", "0.20"))
+WEIGHT_CRITICALITY = float(os.getenv("WEIGHT_CRITICALITY", "0.15"))
+
+# FAIR-Style Quantitative Loss Parameters (User-Configurable)
+FAIR_SIMULATIONS = int(os.getenv("FAIR_SIMULATIONS", "1000"))
+FAIR_SEED = int(os.getenv("FAIR_SEED", "42"))
+FAIR_LOSS_MIN = float(os.getenv("FAIR_LOSS_MIN", "5000.0"))
+FAIR_LOSS_MODE = float(os.getenv("FAIR_LOSS_MODE", "25000.0"))
+FAIR_LOSS_MAX = float(os.getenv("FAIR_LOSS_MAX", "150000.0"))
+
+
 
 def normalize_host(raw: str) -> str:
     """

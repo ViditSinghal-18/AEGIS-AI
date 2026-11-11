@@ -6,11 +6,12 @@ and threat actor path simulation based on report findings.
 
 from __future__ import annotations
 
-import json
-import os
+import logging
 from typing import Any
 
-from config import AWS_REGION, BEDROCK_MODEL_ID
+import ai.llm as llm
+
+logger = logging.getLogger(__name__)
 
 
 def query_copilot(
@@ -19,37 +20,31 @@ def query_copilot(
     history: list[dict[str, str]] | None = None,
 ) -> str:
     """
-    Process an analyst query using Amazon Bedrock if available,
+    Process an analyst query using the configured LLM if available,
     or our intelligent offline defensive security reasoner.
     """
-    target = report.get("target", "Target Host")
-    findings = report.get("findings", [])
-    mode = report.get("mode", "passive")
-    summary = report.get("summary", "No summary available.")
-    top_risks = report.get("top_risks", [])
-
-    # Try Bedrock LLM first if configured
-    bedrock_response = _call_bedrock_copilot(prompt_text, report, history)
-    if bedrock_response:
-        return bedrock_response
+    # Try configured LLM first if enabled
+    llm_response = _call_llm_copilot(prompt_text, report, history)
+    if llm_response:
+        return llm_response
 
     # Heuristic Security Reasoner fallback
     return _generate_offline_copilot_response(prompt_text, report)
 
 
-def _call_bedrock_copilot(
+def _call_llm_copilot(
     prompt_text: str,
     report: dict[str, Any],
     history: list[dict[str, str]] | None = None,
 ) -> str | None:
-    """Attempt invocation of Amazon Bedrock Claude / Nova."""
+    """Attempt invocation of the configured LLM provider. Returns None when unavailable."""
+    if not llm.is_enabled():
+        return None
+
     try:
-        import boto3
-        client = boto3.client("bedrock-runtime", region_name=AWS_REGION)
-        
         target = report.get("target", "Unknown")
         findings = report.get("findings", [])
-        
+
         findings_context = []
         for f in findings[:10]:
             findings_context.append(
@@ -74,16 +69,14 @@ Findings:
 
 User Request: {prompt_text}"""
 
-        response = client.converse(
-            modelId=BEDROCK_MODEL_ID,
-            system=[{"text": system_prompt}],
-            messages=[{"role": "user", "content": [{"text": user_content}]}],
-            inferenceConfig={"maxTokens": 1200, "temperature": 0.3},
-        )
-        parts = response.get("output", {}).get("message", {}).get("content", [])
-        text = "".join(p.get("text", "") for p in parts if isinstance(p, dict) and "text" in p)
-        return text.strip() or None
-    except Exception:
+        result = llm.complete(system_prompt, user_content, max_tokens=1200, temperature=0.3)
+        return result.text.strip() or None
+
+    except llm.LLMUnavailable as exc:
+        logger.warning("LLM copilot unavailable: %s", exc)
+        return None
+    except Exception as exc:
+        logger.warning("LLM copilot call failed: %s: %s", type(exc).__name__, exc)
         return None
 
 
@@ -125,9 +118,6 @@ def _generate_offline_copilot_response(prompt_text: str, report: dict[str, Any])
 
     # 2. Quick-Wins / Fast Fixes
     if "quick" in p or "fast" in p or "win" in p or "priority" in p:
-        header_findings = [f for f in findings if "header" in str(f.get("title", "")).lower() or "csp" in str(f.get("title", "")).lower() or "hsts" in str(f.get("title", "")).lower()]
-        token_findings = [f for f in findings if "version" in str(f.get("title", "")).lower() or "disclosure" in str(f.get("title", "")).lower()]
-        
         lines = [
             f"### ⚡ Top 3 Quick-Win Fixes for `{target}`",
             "These mitigations require under 15 minutes of configuration and provide immediate defense posture elevation:",

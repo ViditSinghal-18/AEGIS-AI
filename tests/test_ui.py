@@ -16,6 +16,8 @@ class TestUIAndStaticAssets:
         assert "/static/css/styles.css" in html
         assert "/static/js/app.js" in html
         assert "/static/js/globe.js" in html
+        assert "remediationModal" in html
+        assert "chkActiveScan" in html
         
         # Verify Security Headers
         assert "Content-Security-Policy" in res.headers

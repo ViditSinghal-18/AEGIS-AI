@@ -49,6 +49,7 @@ from remediation.waf_rules import (
     generate_modsecurity_rules,
 )
 from ai.copilot import query_copilot
+import ai.llm as llm
 from dashboard.attack_graph import render_attack_surface_graph_html
 
 # --- Page Setup & Cyber Dark SOC Theme ---
@@ -631,7 +632,7 @@ with st.sidebar.expander("🔑 Domain Ownership Verification", expanded=False):
 # Sidebar footer status
 st.sidebar.markdown("---")
 auth_status_text = "🔒 Password Protected" if DASHBOARD_PASSWORD else "🟢 Public Demo Mode"
-st.sidebar.caption(f"Status: {auth_status_text} | Engine: Amazon Bedrock AI & Heuristic SOC")
+st.sidebar.caption(f"Status: {auth_status_text} | Engine: {llm.describe()}")
 
 
 # --- Main Dashboard Header ---
@@ -815,7 +816,7 @@ with kpi4:
     )
 
 with kpi5:
-    engine_name = "Amazon Bedrock AI" if report.get("used_llm") else "Heuristic Engine"
+    engine_name = "LLM-assisted" if report.get("used_llm") else "Heuristic Engine"
     model_str = report.get("model_id") or "CVSS 3.1 Fallback"
     st.markdown(
         f"""
@@ -1496,23 +1497,23 @@ with tab_copilot:
             key="copilot_user_input",
             height=90,
         )
-        MAX_BEDROCK_QUERIES_PER_SESSION = int(os.getenv("MAX_BEDROCK_QUERIES_PER_SESSION", "20"))
-        current_calls = st.session_state.get("bedrock_query_count", 0)
-        remaining_calls = max(0, MAX_BEDROCK_QUERIES_PER_SESSION - current_calls)
+        MAX_LLM_QUERIES_PER_SESSION = int(os.getenv("MAX_LLM_QUERIES_PER_SESSION", os.getenv("MAX_BEDROCK_QUERIES_PER_SESSION", "20")))
+        current_calls = st.session_state.get("ai_query_count", 0)
+        remaining_calls = max(0, MAX_LLM_QUERIES_PER_SESSION - current_calls)
 
-        st.caption(f"🛡️ Demo Safety Guardrail: {remaining_calls}/{MAX_BEDROCK_QUERIES_PER_SESSION} Bedrock queries remaining in this session.")
+        st.caption(f"🛡️ Demo Safety Guardrail: {remaining_calls}/{MAX_LLM_QUERIES_PER_SESSION} AI queries remaining in this session.")
 
         if st.button("🚀 Ask SOC Copilot", type="primary"):
             copilot_query = str(st.session_state.get("copilot_user_input") or "").strip()
             if not copilot_query:
                 st.warning("Enter a question or choose a one-click prompt first.")
-            elif current_calls >= MAX_BEDROCK_QUERIES_PER_SESSION:
+            elif current_calls >= MAX_LLM_QUERIES_PER_SESSION:
                 st.error(
-                    f"🛑 Demo Rate Limit Reached: Maximum of {MAX_BEDROCK_QUERIES_PER_SESSION} Bedrock queries "
+                    f"🛑 Demo Rate Limit Reached: Maximum of {MAX_LLM_QUERIES_PER_SESSION} AI queries "
                     "allowed per session to prevent runaway API spend. Please refresh your session or log in as administrator."
                 )
             else:
-                st.session_state.bedrock_query_count = current_calls + 1
+                st.session_state.ai_query_count = current_calls + 1
                 with st.spinner("AI SOC Analyst reasoning with report telemetry..."):
                     st.session_state.copilot_answer = query_copilot(copilot_query, report)
 

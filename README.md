@@ -132,25 +132,42 @@ To unlock **Verified Active Mode** for a domain outside `targets.allowlist`, AEG
 
 ## 🤖 Configuring AI Copilot LLM Providers
 
-AEGIS-AI features an abstracted multi-provider LLM interface. Set the desired API key in your `.env` file; AEGIS automatically detects the key and selects the provider:
+AEGIS-AI features a provider-neutral LLM abstraction (`ai/llm.py`). The provider is controlled **strictly** via the `AEGIS_LLM_PROVIDER` environment variable (`none` by default).
+
+### Quickstart with Free LLMs (Groq recommended)
+
+1. Obtain a free API key from [Groq Console](https://console.groq.com/).
+2. Set the following in your `.env` file:
 
 ```bash
-# Anthropic Claude 3.5 Sonnet (Default if key present)
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Google Gemini 2.0 Flash
-GEMINI_API_KEY=AIzaSy...
-
-# AWS Bedrock (Bedrock Converse API)
-AWS_ACCESS_KEY_ID=AKIA...
-AWS_SECRET_ACCESS_KEY=...
-AWS_REGION=us-east-1
-
-# Local Ollama (Completely offline & air-gapped)
-OLLAMA_HOST=http://localhost:11434
+AEGIS_LLM_PROVIDER=openai_compatible
+AEGIS_LLM_BASE_URL=https://api.groq.com/openai/v1
+AEGIS_LLM_API_KEY=gsk_your_groq_key_here
+AEGIS_LLM_MODEL=llama-3.1-8b-instant
+AEGIS_LLM_MODEL_LARGE=llama-3.3-70b-versatile
 ```
 
-*If no external LLM key is configured, AEGIS automatically activates its built-in **Deterministic Heuristic Reasoner**, providing verified, zero-hallucination answers derived directly from scan telemetry.*
+3. Test your configuration:
+
+```bash
+python verify_llm.py
+```
+
+### Other Supported Providers
+
+- **Cerebras (Fast / Free tier):**
+  `AEGIS_LLM_PROVIDER=openai_compatible`, `AEGIS_LLM_BASE_URL=https://api.cerebras.ai/v1`, `AEGIS_LLM_MODEL=llama3.1-8b`.
+- **OpenRouter Free Tier:**
+  `AEGIS_LLM_PROVIDER=openai_compatible`, `AEGIS_LLM_BASE_URL=https://openrouter.ai/api/v1`, `AEGIS_LLM_MODEL=meta-llama/llama-3.1-8b-instruct:free`.
+- **Google Gemini (OpenAI-compatible endpoint):**
+  `AEGIS_LLM_PROVIDER=openai_compatible`, `AEGIS_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`, `AEGIS_LLM_MODEL=gemini-2.0-flash`.
+  *(Note: Google's free tier terms may allow prompt data usage for model training).*
+- **Local Ollama (Offline / Air-gapped):**
+  `AEGIS_LLM_PROVIDER=ollama`, `OLLAMA_HOST=http://localhost:11434`, `AEGIS_LLM_MODEL=llama3.2`.
+- **Amazon Bedrock (Optional Cloud Provider):**
+  `AEGIS_LLM_PROVIDER=bedrock`, with `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION`.
+
+*If `AEGIS_LLM_PROVIDER=none` or unset, AEGIS automatically activates its built-in **Deterministic Heuristic Reasoner**, performing zero LLM network requests and providing verified, zero-hallucination answers derived directly from scan telemetry.*
 
 ---
 
@@ -186,10 +203,36 @@ python tests/validate.py
 
 ## 📑 Project Documentation Index
 
+- [`docs/REFERENCES.md`](docs/REFERENCES.md): Research citations, papers, and methodologies inspiring AEGIS-AI.
 - [`docs/AUDIT.md`](docs/AUDIT.md): Initial forensic codebase audit and gap analysis.
 - [`docs/FEATURES.md`](docs/FEATURES.md): Traceability matrix mapping every claimed feature to real source code and automated tests.
 - [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md): Transparent disclosure of operational boundaries, AST reachability conditions, and serverless constraints.
 - [`docs/EVALUATION.md`](docs/EVALUATION.md): OWASP Juice Shop benchmark results, alert reduction metrics, and grounding accuracy.
+
+---
+
+## 🔬 Scientifically Defensible Scoring & Risk Quantification (Phase 1)
+
+AEGIS-AI incorporates research-inspired risk quantification modules under `scoring/`:
+
+1. **Empirical Weight Calibration (`calibrate_weights.py`):**
+   - Learns scoring weights via supervised Logistic Regression against empirical weaponization data (CISA KEV), with temporal train/test splitting (e.g. `< 2023` vs `≥ 2023`) to prevent future data leakage (inspired by Bozorgi et al. 2010 and Jacobs et al. 2021).
+   - Generates Precision@k and Recall@k comparison vs CVSS-only and EPSS-only baselines into `reports/calibration_<date>.json`.
+   - Opt-in via `SCORING_WEIGHTS_SOURCE=calibrated` in configuration without silently overriding production defaults.
+
+2. **Rank Agreement Concordance (`scoring/ranking_metrics.py`):**
+   - Evaluates vulnerability prioritization concordance using Spearman $\rho$, Kendall $\tau$-b (tie-corrected), and Rank-Biased Overlap (RBO@k with parameter $p$) (inspired by Webber et al. 2010).
+
+3. **Stakeholder-Specific Vulnerability Categorization (`scoring/ssvc.py`):**
+   - Computes operational action decisions (`Track`, `Track*`, `Attend`, `Act`) alongside priority queues based on exploitation state, ingress exposure, automatable status, and mission criticality (inspired by Spring et al. 2019 / CISA SSVC).
+
+4. **Calibrated Uncertainty Intervals (`scoring/uncertainty.py`):**
+   - Produces a 90% confidence risk interval (`risk_interval_90`) around point scores. Widens when version matching is banner-derived, advisory catalogs diverge, or EPSS telemetry is absent (inspired by Angelopoulos & Bates 2021).
+   - Explicitly noted as a calibrated residual heuristic rather than finite-sample exchangeable conformal prediction.
+
+5. **FAIR-Style Quantitative Loss Modeling (`scoring/fair_loss.py`):**
+   - Runs seeded, reproducible Monte Carlo simulations modeling Threat Event Frequency from EPSS and Loss Magnitude scaled by asset criticality (inspired by Open FAIR and Hubbard & Seiersen 2016).
+   - Generates Annual Loss Expectancy (ALE mean, median, 90% CI) with user-editable loss parameters and mandatory disclaimer (*"illustrative, user-supplied assumptions"*).
 
 ---
 

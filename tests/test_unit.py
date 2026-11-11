@@ -621,7 +621,7 @@ class TestSecurityPipeline(unittest.TestCase):
             "top_risks": ["Exposed web service", "Missing TLS hardening"],
             "summary": "Sample test summary",
         }
-        with patch("ai.copilot._call_bedrock_copilot", return_value=None):
+        with patch("ai.copilot._call_llm_copilot", return_value=None):
             # Test CISO briefing prompt
             ans1 = query_copilot("Generate executive briefing for CISO", report)
             self.assertIn("Executive", ans1)

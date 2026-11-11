@@ -1,0 +1,98 @@
+{
+  "calibration_timestamp": "2026-11-11T12:54:37.470779+00:00",
+  "methodology": "Supervised Logistic Regression with Temporal Train/Test Split",
+  "citation": "Inspired by Bozorgi et al. (2010) and Jacobs et al. (EPSS 2021) [verify before publishing]",
+  "split_year": 2023,
+  "sample_counts": {
+    "total_dataset": 300,
+    "train_pre_split": 141,
+    "test_post_split": 159,
+    "test_positives_in_kev": 86
+  },
+  "learned_weights": {
+    "cvss": 0.172,
+    "epss": 0.507,
+    "exposure": 0.19,
+    "criticality": 0.131
+  },
+  "default_weights": {
+    "cvss": 0.35,
+    "epss": 0.3,
+    "exposure": 0.2,
+    "criticality": 0.15
+  },
+  "comparative_metrics": {
+    "calibrated_weights": {
+      "k=10": {
+        "precision": 1.0,
+        "recall": 0.1163
+      },
+      "k=25": {
+        "precision": 1.0,
+        "recall": 0.2907
+      },
+      "k=50": {
+        "precision": 1.0,
+        "recall": 0.5814
+      },
+      "k=100": {
+        "precision": 0.85,
+        "recall": 0.9884
+      }
+    },
+    "default_production_weights": {
+      "k=10": {
+        "precision": 1.0,
+        "recall": 0.1163
+      },
+      "k=25": {
+        "precision": 1.0,
+        "recall": 0.2907
+      },
+      "k=50": {
+        "precision": 1.0,
+        "recall": 0.5814
+      },
+      "k=100": {
+        "precision": 0.85,
+        "recall": 0.9884
+      }
+    },
+    "cvss_only_baseline": {
+      "k=10": {
+        "precision": 0.8,
+        "recall": 0.093
+      },
+      "k=25": {
+        "precision": 0.88,
+        "recall": 0.2558
+      },
+      "k=50": {
+        "precision": 0.88,
+        "recall": 0.5116
+      },
+      "k=100": {
+        "precision": 0.81,
+        "recall": 0.9419
+      }
+    },
+    "epss_only_baseline": {
+      "k=10": {
+        "precision": 1.0,
+        "recall": 0.1163
+      },
+      "k=25": {
+        "precision": 1.0,
+        "recall": 0.2907
+      },
+      "k=50": {
+        "precision": 1.0,
+        "recall": 0.5814
+      },
+      "k=100": {
+        "precision": 0.85,
+        "recall": 0.9884
+      }
+    }
+  }
+}

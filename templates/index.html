@@ -43,6 +43,10 @@
         <div class="target-bar">
             <span style="font-size: 0.9rem; margin-left: 6px;" aria-hidden="true">🎯</span>
             <input type="text" id="scanTargetInput" class="target-input mono" value="owasp.org" placeholder="Host / URL (e.g. owasp.org)" aria-label="Target domain or IP address">
+            <label id="activeScanToggleContainer" title="Active TCP port & service probing (requires verified domain ownership or allowlist)" style="display: flex; align-items: center; gap: 5px; font-size: 0.74rem; color: #94a3b8; margin: 0 4px; cursor: pointer; user-select: none;">
+                <input type="checkbox" id="chkActiveScan" style="accent-color: #00f0ff; cursor: pointer;">
+                <span id="activeScanLabel">Active</span>
+            </label>
             <button class="btn-scan" id="btnStartScan" aria-label="Run security audit">
                 <span id="scanSpinner">⚡</span>
                 <span id="scanBtnText">Run Audit</span>
@@ -330,6 +334,35 @@
                 <button class="modal-close" onclick="document.getElementById('verificationModal').style.display='none'">&times;</button>
             </div>
             <div id="verificationModalBody" style="padding: 16px;"></div>
+        </div>
+    </div>
+
+    <!-- REMEDIATION & VIRTUAL PATCHING MODAL -->
+    <div id="remediationModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-box" style="max-width: 720px; width: 90%;">
+            <div class="modal-header">
+                <div>
+                    <h3 id="remediationModalTitle">🛠️ Security Remediation &amp; Virtual Patching</h3>
+                    <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;" id="remediationModalSubtitle">Production hardening rules &amp; configurations</div>
+                </div>
+                <button class="modal-close" onclick="document.getElementById('remediationModal').style.display='none'">&times;</button>
+            </div>
+            <div id="remediationModalBody" style="padding: 16px;">
+                <div style="display: flex; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 12px; flex-wrap: wrap;" id="remediationTabs">
+                    <button class="btn btn-sm btn-primary tab-btn" onclick="AegisApp.switchRemediationTab('nginx', this)">Nginx</button>
+                    <button class="btn btn-sm btn-secondary tab-btn" onclick="AegisApp.switchRemediationTab('apache', this)">Apache</button>
+                    <button class="btn btn-sm btn-secondary tab-btn" onclick="AegisApp.switchRemediationTab('caddy', this)">Caddy</button>
+                    <button class="btn btn-sm btn-secondary tab-btn" onclick="AegisApp.switchRemediationTab('helmet', this)">Helmet (Node.js)</button>
+                    <button class="btn btn-sm btn-secondary tab-btn" onclick="AegisApp.switchRemediationTab('waf', this)">WAF Rules</button>
+                </div>
+                <div style="position: relative;">
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 6px;">
+                        <button class="btn btn-secondary btn-sm" onclick="AegisApp.copyCurrentRemediation()">📋 Copy Configuration</button>
+                    </div>
+                    <pre id="remediationCodeDisplay" style="background: #030712; border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 6px; padding: 14px; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 0.8rem; color: #38bdf8; max-height: 320px; overflow: auto; white-space: pre-wrap; line-height: 1.5;"></pre>
+                </div>
+                <div id="remediationFindingNote" style="margin-top: 12px; font-size: 0.8rem; color: #cbd5e1; background: rgba(0, 240, 255, 0.05); padding: 10px; border-radius: 4px; border-left: 3px solid #00f0ff;"></div>
+            </div>
         </div>
     </div>
 

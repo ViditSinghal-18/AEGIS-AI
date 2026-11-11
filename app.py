@@ -156,6 +156,17 @@ FLEET_INVENTORY = [
 def index():
     return render_template("index.html")
 
+@app.route("/health")
+@app.route("/api/health")
+def api_health():
+    """Healthcheck endpoint for Docker container and uptime monitors."""
+    return jsonify({
+        "status": "healthy",
+        "service": "AEGIS-AI",
+        "version": "3.0",
+        "mode": "operational"
+    }), 200
+
 @app.route("/slides")
 @app.route("/presentation")
 def presentation_slides():
@@ -171,7 +182,7 @@ def view_dashboard():
     if os.path.exists(dash_path):
         with open(dash_path, "r", encoding="utf-8") as f:
             return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
-    return jsonify({"error": "dashboard.html not found"}), 404
+    return render_template("index.html")
 
 @app.route("/api/inventory", methods=["GET"])
 def get_inventory():
@@ -179,14 +190,22 @@ def get_inventory():
 
 @app.route("/api/report", methods=["GET"])
 def get_report():
+    target = request.args.get("target")
     data = None
-    if os.path.exists(REPORT_FILE):
-        with open(REPORT_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    elif os.path.exists(SAMPLE_REPORT_FILE):
-        with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        data["sample_data"] = True
+    if target:
+        try:
+            data = read_json("prioritized_report.json", target=target)
+        except Exception:
+            pass
+
+    if not data:
+        if os.path.exists(REPORT_FILE):
+            with open(REPORT_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        elif os.path.exists(SAMPLE_REPORT_FILE):
+            with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            data["sample_data"] = True
 
     if data:
         # Guarantee geo_telemetry is populated with real/fallback coordinates for the 3D globe
@@ -332,44 +351,41 @@ def trigger_scan():
             }), 500
 
     # Otherwise execute Authorized Active Scan on allowlisted / verified host
-    stages = ["discovery.py", "correlate.py", "prioritize.py"]
-    logs = []
-    
-    for script in stages:
-        script_path = os.path.join(BASE_DIR, script)
+    try:
+        from backend.service import build_scan_request, run_scan
+        ports = req_data.get("ports")
+        scan_req = build_scan_request(
+            target=target,
+            ports=ports,
+            force_passive=False,
+            requested_by="api-active"
+        )
+        scan_res = run_scan(scan_req)
         try:
-            cmd = [sys.executable, script_path]
-            if script == "discovery.py":
-                cmd.append(target)
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=12)
-            if res.returncode != 0:
-                break
-            logs.append(f"Successfully finished {script}")
+            fresh_data = read_json("prioritized_report.json", target=target)
         except Exception:
-            break
+            fresh_data = scan_res.to_dict()
 
-    if os.path.exists(REPORT_FILE):
-        with open(REPORT_FILE, "r", encoding="utf-8") as f:
-            fresh_data = json.load(f)
-        if target:
-            fresh_data["target"] = target
-        fresh_data["operational_mode"] = mode_name
-    else:
-        fresh_data = {
-            "target": target,
-            "status": "Ready",
-            "operational_mode": mode_name,
-            "prioritized_findings": []
-        }
+        if isinstance(fresh_data, dict):
+            fresh_data["operational_mode"] = mode_name
+            fresh_data["can_active"] = can_active
+            fresh_data["mode_rationale"] = mode_rationale
+            safe_save_json(REPORT_FILE, fresh_data)
 
-    return jsonify({
-        "success": True, 
-        "mode": mode_name,
-        "can_active": can_active,
-        "rationale": mode_rationale,
-        "message": "Authorized active port scanning pipeline completed.", 
-        "data": fresh_data
-    })
+        return jsonify({
+            "success": True, 
+            "mode": mode_name,
+            "can_active": can_active,
+            "rationale": mode_rationale,
+            "message": "Authorized active port scanning pipeline completed.", 
+            "data": fresh_data,
+            "report": fresh_data
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Active scan pipeline error: {str(e)}"
+        }), 500
 
 @app.route("/api/scan-online", methods=["POST"])
 def trigger_scan_online():

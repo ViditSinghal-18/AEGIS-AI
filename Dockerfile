@@ -43,7 +43,7 @@ EXPOSE 5000
 
 # Container healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/api/report || exit 1
+    CMD curl -f http://localhost:5000/api/health || exit 1
 
 # Launch AEGIS application
 CMD ["python", "app.py"]

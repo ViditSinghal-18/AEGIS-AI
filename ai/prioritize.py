@@ -1,19 +1,22 @@
 """
-Ask Amazon Bedrock (Claude) to rank findings and explain them in plain language.
+Ask an LLM (Groq, Ollama, Bedrock, …) to rank findings and explain them in plain language.
 
-If Bedrock is unavailable, we fall back to a local ranking using CVSS scores
-so the dashboard still works for a demo.
+If no LLM is configured or the call fails, we fall back to a local ranking using CVSS
+scores so the dashboard still works with heuristics only.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Any
 
-from config import AWS_REGION, BEDROCK_MODEL_ID
+import ai.llm as llm
 from schemas import PrioritizedFinding, PrioritizedReport
 from storage import read_json, write_json
+
+logger = logging.getLogger(__name__)
 
 # CVE-ID format: CVE-YYYY-NNNNN (4-digit year, 4+ digit sequence)
 _CVE_ID_RE = re.compile(r"^CVE-\d{4}-\d{4,}$", re.IGNORECASE)
@@ -77,50 +80,14 @@ def _strip_fences(text: str) -> str:
     return text.strip()
 
 
-def _invoke_bedrock(user_payload: str) -> tuple[str, str]:
+def _invoke_llm(user_payload: str) -> tuple[str, str]:
     """
-    Invoke Amazon Bedrock using the model-agnostic Converse API.
-    Works transparently with Amazon Nova, Anthropic Claude, Meta Llama, and Mistral.
+    Call the configured LLM via ai.llm.complete().
     Returns (response_text, model_id_used).
+    Falls back gracefully when no LLM provider is configured.
     """
-    import boto3
-
-    client = boto3.client("bedrock-runtime", region_name=AWS_REGION)
-    candidates = [BEDROCK_MODEL_ID]
-    for fallback in [
-        "amazon.nova-micro-v1:0",
-        "amazon.nova-lite-v1:0",
-        "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "anthropic.claude-3-5-haiku-20241022-v1:0",
-        "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-        "anthropic.claude-3-haiku-20240307-v1:0",
-    ]:
-        if fallback not in candidates:
-            candidates.append(fallback)
-
-    last_exc = None
-    for model_id in candidates:
-        try:
-            response = client.converse(
-                modelId=model_id,
-                system=[{"text": SYSTEM_RULES}],
-                messages=[{"role": "user", "content": [{"text": user_payload}]}],
-                inferenceConfig={"maxTokens": 4000, "temperature": 0.2},
-            )
-            parts = response.get("output", {}).get("message", {}).get("content", [])
-            text = "".join(p.get("text", "") for p in parts if isinstance(p, dict) and "text" in p)
-            if text:
-                return text, model_id
-        except Exception as exc:
-            last_exc = exc
-            msg = str(exc)
-            if "UnrecognizedClientException" in msg or "AccessDeniedException" in msg or "Credentials" in msg:
-                raise exc
-            continue
-
-    if last_exc:
-        raise last_exc
-    raise RuntimeError("Bedrock invocation failed: No models returned a response.")
+    result = llm.complete(SYSTEM_RULES, user_payload, max_tokens=4000, temperature=0.2)
+    return result.text, result.model_id
 
 
 def _parse_llm_json(text: str) -> dict[str, Any]:
@@ -311,13 +278,13 @@ def _heuristic_report(correlated: dict) -> PrioritizedReport:
     top = [f.title for f in findings[:3]]
     return PrioritizedReport(
         target=correlated.get("target", ""),
-        summary="Automated ranking without an LLM (Bedrock fallback). Prioritized by CISA KEV, EPSS threat probability, and CVSS severity.",
+        summary="Automated ranking without an LLM. Prioritized by CISA KEV, EPSS threat probability, and CVSS severity.",
         top_risks=top,
         findings=findings,
         model_id="heuristic-fallback",
         used_llm=False,
         mode=correlated.get("mode", "active"),
-        notes=["Bedrock was not used; results are prioritized by KEV/EPSS/CVSS heuristics."],
+        notes=["No LLM was used; results are prioritized by KEV/EPSS/CVSS heuristics."],
     )
 
 
@@ -337,7 +304,7 @@ def _from_llm_dict(correlated: dict, data: dict, used_llm: bool, note: str = "",
             )
         )
     notes = [note] if note else []
-    resolved_model = model_id or (BEDROCK_MODEL_ID if used_llm else "heuristic-fallback")
+    resolved_model = model_id or ("llm-result" if used_llm else "heuristic-fallback")
     return PrioritizedReport(
         target=correlated.get("target", ""),
         summary=str(data.get("summary") or ""),
@@ -393,12 +360,12 @@ def prioritize(correlated: dict | None = None) -> PrioritizedReport:
 
     valid_first_try = True
     try:
-        text, used_model = _invoke_bedrock(user_msg)
+        text, used_model = _invoke_llm(user_msg)
         try:
             parsed = _parse_llm_json(text)
         except json.JSONDecodeError:
             valid_first_try = False
-            text, used_model = _invoke_bedrock(user_msg + "\n\nYour previous reply was not valid JSON. Return valid JSON only adhering to the schema.")
+            text, used_model = _invoke_llm(user_msg + "\n\nYour previous reply was not valid JSON. Return valid JSON only adhering to the schema.")
             parsed = _parse_llm_json(text)
 
         # Validate the LLM response before accepting it
@@ -411,7 +378,7 @@ def prioritize(correlated: dict | None = None) -> PrioritizedReport:
         report.notes.append(f"AI JSON validation: {'Valid on 1st attempt' if valid_first_try else 'Recovered on retry'}")
     except Exception as exc:
         report = _heuristic_report(correlated)
-        report.notes.append(f"Bedrock fallback reason: {exc.__class__.__name__}: {exc}")
+        report.notes.append(f"LLM fallback reason: {exc.__class__.__name__}: {exc}")
 
     write_json("prioritized_report.json", report)
     return report

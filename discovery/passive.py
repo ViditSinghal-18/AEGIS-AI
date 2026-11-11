@@ -324,6 +324,23 @@ def discover_passive(domain: str) -> DiscoveredAssets:
             )
         )
 
+    # Add passive ports observed via Shodan InternetDB
+    seen_ports = {p.port for p in ports_found}
+    for sport in shodan_intel.get("ports", []):
+        if sport not in seen_ports:
+            seen_ports.add(sport)
+            ports_found.append(
+                OpenPort(
+                    port=sport,
+                    protocol="tcp",
+                    state="open",
+                    service="https" if sport in (443, 8443) else ("http" if sport in (80, 8080, 3000, 8000) else "service"),
+                    product="",
+                    version="",
+                    extra="passive-shodan-internetdb",
+                )
+            )
+
     # Passive Metadata bundle
     passive_meta = {
         "dns": dns_info,

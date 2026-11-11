@@ -25,13 +25,37 @@ from correlation.mitre_attack import map_finding_to_mitre, generate_attack_walkt
 from correlation.compliance import calculate_compliance
 from storage import generate_cyclonedx_sbom, write_json, save_run_history
 from ast_analyzer import analyze_source_tree, evaluate_component_reachability
+from scoring.ssvc import evaluate_ssvc
+from scoring.uncertainty import compute_risk_interval
+from scoring.fair_loss import simulate_fair_loss, simulate_portfolio_fair_loss
+from scoring.calibrate_weights import load_calibrated_weights
 
 
-# Mathematical Weights for Contextual Blending (Sum = 1.0)
-W_CVSS = 0.35
-W_EPSS = 0.30
-W_EXPOSURE = 0.25
-W_CRIT = 0.10
+def get_active_weights() -> tuple[float, float, float, float, str]:
+    """Retrieve scoring weights based on configured source (default vs calibrated)."""
+    weights_source = getattr(config, "SCORING_WEIGHTS_SOURCE", "default").lower()
+    if weights_source == "calibrated":
+        cal_weights = load_calibrated_weights()
+        return (
+            cal_weights.get("cvss", 0.35),
+            cal_weights.get("epss", 0.30),
+            cal_weights.get("exposure", 0.20),
+            cal_weights.get("criticality", 0.15),
+            "calibrated",
+        )
+    return (
+        getattr(config, "WEIGHT_CVSS", 0.35),
+        getattr(config, "WEIGHT_EPSS", 0.30),
+        getattr(config, "WEIGHT_EXPOSURE", 0.20),
+        getattr(config, "WEIGHT_CRITICALITY", 0.15),
+        "default",
+    )
+
+
+W_CVSS = getattr(config, "WEIGHT_CVSS", 0.35)
+W_EPSS = getattr(config, "WEIGHT_EPSS", 0.30)
+W_EXPOSURE = getattr(config, "WEIGHT_EXPOSURE", 0.20)
+W_CRIT = getattr(config, "WEIGHT_CRITICALITY", 0.15)
 
 
 def prioritize_findings(
@@ -71,6 +95,7 @@ def prioritize_findings(
     source_analysis = analyze_source_tree(source_path) if source_path else None
 
     # 4. Score each finding
+    w_cvss, w_epss, w_exp, w_crit, weights_source = get_active_weights()
     prioritized_list = []
     for item in enriched:
         f = dict(item)
@@ -89,10 +114,10 @@ def prioritize_findings(
         s_crit = max(0.1, min(1.0, float(business_criticality)))
 
         # S_Exposure
-        s_exp = s_exposure
+        s_exposure_val = s_exposure
 
         # Calculate base blended exposure score (0.0 - 1.0)
-        exposure_score = (s_cvss * W_CVSS) + (s_epss * W_EPSS) + (s_exp * W_EXPOSURE) + (s_crit * W_CRIT)
+        exposure_score = (s_cvss * w_cvss) + (s_epss * w_epss) + (s_exposure_val * w_exp) + (s_crit * w_crit)
 
         # S_Code reachability modulation
         affected_comp = f.get("affected_component")
@@ -126,12 +151,43 @@ def prioritize_findings(
         # Map MITRE ATT&CK technique
         f["mitre_attack"] = map_finding_to_mitre(f)
 
+        # Scientifically Defensible Decision & Uncertainty Additions (Phase 1)
+        ssvc_eval = evaluate_ssvc(
+            in_cisa_kev=bool(f.get("in_cisa_kev")),
+            epss_prob=s_epss,
+            exposure_factor=s_exposure_val,
+            is_behind_waf=is_behind_waf,
+            is_network_automatable=True,
+            business_criticality=s_crit * 10.0,
+            cvss_base_score=cvss_raw,
+        )
+        f["ssvc"] = ssvc_eval
+        f["ssvc_decision"] = ssvc_eval["decision"]
+
+        f["risk_interval_90"] = compute_risk_interval(
+            point_score=risk_score,
+            finding_context=f,
+        )
+
+        f["fair_expected_loss"] = simulate_fair_loss(
+            epss_prob=s_epss,
+            exposure_factor=s_exposure_val,
+            business_criticality=s_crit * 10.0,
+        )
+
         # Transparent Explainable AI (XAI) Formula breakdown
         f["xai_formula"] = {
-            "formula": "Score = ((S_CVSS * 0.35) + (S_EPSS * 0.30) + (S_Exposure * 0.25) + (S_Crit * 0.10)) * 10",
+            "formula": f"Score = ((S_CVSS * {w_cvss:.2f}) + (S_EPSS * {w_epss:.2f}) + (S_Exposure * {w_exp:.2f}) + (S_Crit * {w_crit:.2f})) * 10",
+            "weights_source": weights_source,
+            "weights": {
+                "cvss": round(w_cvss, 3),
+                "epss": round(w_epss, 3),
+                "exposure": round(w_exp, 3),
+                "criticality": round(w_crit, 3),
+            },
             "s_cvss": round(s_cvss, 3),
             "s_epss": round(s_epss, 4),
-            "s_exposure": round(s_exp, 2),
+            "s_exposure": round(s_exposure_val, 2),
             "s_crit": round(s_crit, 2),
             "final_score": risk_score
         }
@@ -189,6 +245,22 @@ def prioritize_findings(
             "contextual_average": round(sum(f["contextual_risk_score"] for f in prioritized_list) / max(1, len(prioritized_list)), 1),
             "epss_max": round(max([f.get("epss_probability", 0.0) for f in prioritized_list] or [0.0]), 4),
             "cisa_kev_flagged_count": sum(1 for f in prioritized_list if f.get("in_cisa_kev"))
+        },
+        "portfolio_fair_loss": simulate_portfolio_fair_loss(prioritized_list),
+        "ssvc_summary": {
+            "Act": sum(1 for f in prioritized_list if f.get("ssvc_decision") == "Act"),
+            "Attend": sum(1 for f in prioritized_list if f.get("ssvc_decision") == "Attend"),
+            "Track*": sum(1 for f in prioritized_list if f.get("ssvc_decision") == "Track*"),
+            "Track": sum(1 for f in prioritized_list if f.get("ssvc_decision") == "Track"),
+        },
+        "scoring_metadata": {
+            "weights_source": weights_source,
+            "active_weights": {
+                "cvss": round(w_cvss, 3),
+                "epss": round(w_epss, 3),
+                "exposure": round(w_exp, 3),
+                "criticality": round(w_crit, 3),
+            },
         }
     }
 
@@ -200,3 +272,21 @@ def prioritize_findings(
         pass
 
     return report
+
+
+if __name__ == "__main__":
+    import sys
+    from storage import read_json
+    target_arg = sys.argv[1].strip() if len(sys.argv) > 1 and sys.argv[1].strip() else "localhost"
+    try:
+        disc = read_json("discovery_report.json", target=target_arg)
+    except Exception:
+        disc = {"target": target_arg, "discovered_assets": []}
+    try:
+        corr = read_json("correlated_findings.json", target=target_arg)
+        findings = corr.get("findings", []) if isinstance(corr, dict) else (corr if isinstance(corr, list) else [])
+    except Exception:
+        findings = []
+    rep = prioritize_findings(findings, disc)
+    print(f"[+] Prioritized {len(rep.get('findings', []))} findings for {target_arg}")
+

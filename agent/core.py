@@ -1,4 +1,4 @@
-"""Core Strands Agent implementation utilizing Amazon Bedrock and defensive tools."""
+"""Core Strands Agent implementation with provider-neutral LLM routing."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import os
 from typing import Any
 
 from config import AWS_REGION, BEDROCK_MODEL_ID
+import ai.llm as llm
 from agent.tools import active_scan, correlate, explain, passive_scan
 
 SYSTEM_PROMPT = """You are a defensive AI Security Operations Center (SOC) agent.
@@ -38,6 +39,39 @@ def get_bedrock_model(model_id: str | None = None, region_name: str | None = Non
     )
 
 
+def get_model(model_id: str | None = None, region_name: str | None = None) -> Any:
+    """Return the appropriate Strands model based on AEGIS_LLM_PROVIDER.
+
+    Provider is chosen by the AEGIS_LLM_PROVIDER environment variable:
+    - bedrock           -> BedrockModel (requires AWS credentials)
+    - openai_compatible -> OpenAIModel (Groq, Cerebras, OpenRouter, Gemini, etc.)
+    - ollama            -> OpenAIModel pointed at local Ollama
+    - none / unset      -> RuntimeError; call create_security_agent only when LLM is configured
+    """
+    prov = llm.active_provider()
+
+    if prov == "bedrock":
+        return get_bedrock_model(model_id=model_id, region_name=region_name)
+
+    if prov in ("openai_compatible", "ollama"):
+        from strands.models.openai import OpenAIModel  # requires `openai` package
+
+        if prov == "ollama":
+            base_url = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/") + "/v1"
+            api_key = "ollama"
+        else:
+            base_url = os.getenv("AEGIS_LLM_BASE_URL", "https://api.groq.com/openai/v1")
+            api_key = os.getenv("AEGIS_LLM_API_KEY", "")
+
+        mid = model_id or os.getenv("AEGIS_LLM_MODEL", "llama3.2")
+        return OpenAIModel(client_args={"api_key": api_key, "base_url": base_url}, model_id=mid)
+
+    raise RuntimeError(
+        "No LLM provider configured. Set AEGIS_LLM_PROVIDER to 'bedrock', "
+        "'openai_compatible', or 'ollama' before creating the security agent."
+    )
+
+
 def create_security_agent(
     model: Any | None = None,
     interventions: list[Any] | None = None,
@@ -57,7 +91,7 @@ def create_security_agent(
     from strands import Agent
     from decision_patterns.grounded_tool_call import GroundedToolCallIntervention
 
-    agent_model = model or get_bedrock_model()
+    agent_model = model or get_model()
     agent_tools = [passive_scan, active_scan, correlate, explain]
 
     if interventions is None:

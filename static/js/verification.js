@@ -96,6 +96,18 @@ window.AegisVerification = (function () {
                     badge.style.background = 'rgba(16, 185, 129, 0.2)';
                     badge.style.borderColor = '#10b981';
                 }
+
+                // Enable active scan checkbox
+                const chk = document.getElementById('chkActiveScan');
+                const container = document.getElementById('activeScanToggleContainer');
+                if (chk) {
+                    chk.disabled = false;
+                    chk.checked = true;
+                }
+                if (container) {
+                    container.style.opacity = '1';
+                    container.title = 'Active scanning unlocked via verified domain ownership';
+                }
             } else {
                 AegisUtils.showToast(data.message || 'Verification token not found yet. DNS may take up to 2 minutes to propagate.', 'warning');
             }

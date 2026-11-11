@@ -2,10 +2,10 @@
 
 Routes each security finding to one of three tiers:
 1. 'template' -> Zero token cost, ~0ms latency (static configuration & security header patches).
-2. 'small'    -> Amazon Nova Micro or Claude 3.5 Haiku (low latency, minimal cost for standard CVEs).
-3. 'large'    -> Anthropic Claude 3.5 Sonnet (full reasoning for Critical/High KEV & complex attack paths).
+2. 'small'    -> Small LLM tier (low latency, minimal cost for standard CVEs).
+3. 'large'    -> Large LLM tier (full reasoning for Critical/High KEV & complex attack paths).
 
-Tracks latency and real token counts returned by the Amazon Bedrock Converse API.
+Tracks latency and real token counts returned by the LLM provider.
 """
 
 from __future__ import annotations
@@ -17,8 +17,9 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from config import AWS_REGION, BEDROCK_MODEL_ID
+from config import BEDROCK_MODEL_ID
 from decision_patterns.grounded_tool_call.client import DeciderClient
+import ai.llm as llm
 
 logger = logging.getLogger(__name__)
 
@@ -160,8 +161,7 @@ class FindingRouter:
             )
 
         model_id = MODEL_TIER_SMALL if tier == "small" else MODEL_TIER_LARGE
-        return self._call_bedrock_remediation(finding, model_id=model_id, tier=tier, target=target)
-
+        return self._call_llm_remediation(finding, model_id=model_id, tier=tier, target=target)
     def _get_template_remediation(self, finding: dict[str, Any]) -> str:
         """Deterministic, zero-token remediation templates for common posture issues."""
         t = str(finding.get("title", "")).lower()
@@ -190,14 +190,16 @@ class FindingRouter:
             )
         return "Apply standard defensive hardening configuration for this web service."
 
-    def _call_bedrock_remediation(
+    def _call_llm_remediation(
         self,
         finding: dict[str, Any],
         model_id: str,
         tier: str,
         target: str,
     ) -> RoutedExecutionResult:
-        """Invoke Amazon Bedrock Converse API and extract real token metrics."""
+        """Invoke the configured LLM provider and extract real token metrics."""
+        title = finding.get("title", "Security Finding")
+        system = "You are a defensive security remediation engineer."
         prompt = (
             f"Target: {target}\n"
             f"Finding: {finding.get('title')}\n"
@@ -206,63 +208,48 @@ class FindingRouter:
             "Provide defensive hardening instructions with exact copy-paste configuration."
         )
 
+        # Map tier label to llm tier
+        llm_tier = "large" if tier == "large" else "default"
+
         start = time.perf_counter()
         try:
-            import boto3
-
-            client = boto3.client("bedrock-runtime", region_name=AWS_REGION)
-            response = client.converse(
-                modelId=model_id,
-                system=[{"text": "You are a defensive security remediation engineer."}],
-                messages=[{"role": "user", "content": [{"text": prompt}]}],
-                inferenceConfig={"maxTokens": 400, "temperature": 0.2},
-            )
+            result = llm.complete(system, prompt, max_tokens=400, temperature=0.2, tier=llm_tier)
             elapsed_ms = (time.perf_counter() - start) * 1000.0
 
-            usage = response.get("usage", {})
-            input_tokens = int(usage.get("inputTokens", 0))
-            output_tokens = int(usage.get("outputTokens", 0))
-
-            output_text = ""
-            for part in response.get("output", {}).get("message", {}).get("content", []):
-                if isinstance(part, dict) and "text" in part:
-                    output_text += part["text"]
-
-            cost = self._calculate_cost(model_id, input_tokens, output_tokens)
+            cost = self._calculate_cost(result.model_id, result.input_tokens, result.output_tokens)
 
             return RoutedExecutionResult(
-                finding_title=finding.get("title", ""),
+                finding_title=title,
                 tier=tier,
-                model_id=model_id,
-                remediation_text=output_text.strip(),
+                model_id=result.model_id,
+                remediation_text=result.text.strip(),
                 latency_ms=round(elapsed_ms, 2),
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
                 cost_usd=round(cost, 6),
-                is_estimated_cost=False,  # REAL tokens from Bedrock Converse API
+                is_estimated_cost=False,
             )
 
         except Exception as exc:
-            # Fallback estimation if AWS Bedrock credentials are not live in the test runner
             elapsed_ms = (time.perf_counter() - start) * 1000.0
-            est_input_tokens = len(prompt.split()) * 2
-            est_output_tokens = 150 if tier == "small" else 300
-            est_cost = self._calculate_cost(model_id, est_input_tokens, est_output_tokens)
-
+            template = f"Remediation for {title}: Apply vendor patch, restrict ingress, and follow least-privilege principles."
             return RoutedExecutionResult(
-                finding_title=finding.get("title", ""),
+                finding_title=title,
                 tier=tier,
-                model_id=f"{model_id} (offline simulated: {type(exc).__name__})",
-                remediation_text=f"Remediation patch for {finding.get('title')}: Update package and restrict ingress.",
-                latency_ms=round(elapsed_ms if elapsed_ms > 50 else (120.0 if tier == 'small' else 850.0), 2),
-                input_tokens=est_input_tokens,
-                output_tokens=est_output_tokens,
-                cost_usd=round(est_cost, 6),
-                is_estimated_cost=True,  # Clearly labeled as estimate
+                model_id=f"llm-unavailable ({type(exc).__name__})",
+                remediation_text=template,
+                latency_ms=round(elapsed_ms, 2),
+                input_tokens=0,
+                output_tokens=0,
+                cost_usd=0.0,
+                is_estimated_cost=False,
             )
 
     def _calculate_cost(self, model_id: str, input_tokens: int, output_tokens: int) -> float:
-        """Calculate USD cost using official pricing."""
+        """Calculate USD cost using official Bedrock pricing. Free providers return 0.0."""
+        if llm.active_provider() != "bedrock":
+            return 0.0
+
         rates = BEDROCK_PRICING.get(model_id)
         if not rates:
             # Match by prefix (e.g., us.anthropic vs anthropic)

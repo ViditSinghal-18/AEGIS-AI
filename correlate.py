@@ -253,3 +253,17 @@ def correlate_findings(
             })
 
     return findings
+
+
+if __name__ == "__main__":
+    import sys
+    from storage import read_json, write_json
+    target_arg = sys.argv[1].strip() if len(sys.argv) > 1 and sys.argv[1].strip() else "localhost"
+    try:
+        disc = read_json("discovery_report.json", target=target_arg)
+    except Exception:
+        disc = {"target": target_arg, "discovered_assets": []}
+    findings = correlate_findings(disc)
+    write_json("correlated_findings.json", {"target": target_arg, "findings": findings}, target=target_arg)
+    print(f"[+] Correlated {len(findings)} findings for {target_arg}")
+

@@ -44,6 +44,8 @@ def get_available_llm_provider() -> Tuple[str, str]:
         return "anthropic", os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
     if os.getenv("GEMINI_API_KEY", "").strip():
         return "gemini", os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    if os.getenv("OPENAI_API_KEY", "").strip():
+        return "openai", os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     if os.getenv("AWS_ACCESS_KEY_ID", "").strip() or os.getenv("AWS_REGION", "").strip():
         return "bedrock", getattr(config, "BEDROCK_MODEL_ID", "anthropic.claude-3-sonnet-20240229-v1:0")
     if os.getenv("OLLAMA_HOST", "").strip():
@@ -146,9 +148,38 @@ def call_bedrock(prompt: str, context: str, model: str) -> Optional[str]:
         return None
 
 
+def call_openai(prompt: str, context: str, model: str) -> Optional[str]:
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        return None
+    try:
+        import requests
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"{context}\n\nUser Question: {prompt}"}
+            ],
+            "max_tokens": 800,
+            "temperature": 0.2
+        }
+        res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=12.0)
+        if res.status_code == 200:
+            data = res.json()
+            return data["choices"][0]["message"]["content"].strip()
+    except Exception:
+        pass
+    return None
+
+
 def call_ollama(prompt: str, context: str, model: str) -> Optional[str]:
     host = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
     try:
+        import requests
         url = f"{host}/api/generate"
         payload = {
             "model": model,
@@ -156,7 +187,7 @@ def call_ollama(prompt: str, context: str, model: str) -> Optional[str]:
             "stream": False,
             "options": {"num_predict": 600}
         }
-        res = safe_fetch(url, method="POST", data=json.dumps(payload), headers={"Content-Type": "application/json"}, timeout=15.0)
+        res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=15.0)
         if res.status_code == 200:
             return res.json().get("response", "").strip()
     except Exception:
@@ -196,6 +227,19 @@ def call_rule_based_fallback(prompt: str, report: Dict[str, Any]) -> str:
             f"- **Compliance Posture:** {comp_score}% Readiness (Grade {comp_grade})\n"
             f"- **Highest Priority Vector:** #{1} {top_title}\n"
             f"- **Recommended Next Action:** Review virtual patches at `/api/remediation` and enforce missing perimeter headers."
+        )
+
+    # 1b. Quick-Wins / Fast Fixes
+    if any(k in p for k in ["quick", "fast", "win", "easy"]):
+        return (
+            f"### ⚡ Quick-Win Fixes for `{target}`\n\n"
+            f"1. **Deploy Essential HTTP Security Headers (HSTS, CSP, X-Frame-Options)**\n"
+            f"   - *Effort:* 5 minutes in reverse proxy (Nginx/Apache/Caddy/Cloudflare).\n"
+            f"   - *Impact:* Prevents Clickjacking, MIME-sniffing, and MitM transport downgrade.\n\n"
+            f"2. **Suppress Server Banner and Information Leakage**\n"
+            f"   - *Effort:* Set `server_tokens off;` in Nginx or remove `X-Powered-By` header.\n\n"
+            f"3. **Enforce DNS Email Security (SPF & DMARC)**\n"
+            f"   - *Effort:* Add TXT records at DNS registrar to block email spoofing."
         )
 
     # 2. Compliance / Regulatory
@@ -320,6 +364,8 @@ def query_copilot(prompt: str, report: Dict[str, Any]) -> Dict[str, Any]:
         raw_answer = call_anthropic(prompt, wrapped_context, model_name)
     elif provider_name == "gemini":
         raw_answer = call_gemini(prompt, wrapped_context, model_name)
+    elif provider_name == "openai":
+        raw_answer = call_openai(prompt, wrapped_context, model_name)
     elif provider_name == "bedrock":
         raw_answer = call_bedrock(prompt, wrapped_context, model_name)
     elif provider_name == "ollama":

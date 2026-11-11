@@ -92,6 +92,13 @@ class TestProviderSelection:
         provider, model = get_available_llm_provider()
         assert provider == "gemini"
 
+    def test_openai_selected_when_key_present(self, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-proj-test-openai-key")
+        provider, model = get_available_llm_provider()
+        assert provider == "openai"
+
 
 class TestGroundingAndGuardrails:
     def test_grounding_passes_for_verified_cve(self, sample_report):

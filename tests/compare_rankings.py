@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
 
 from ai.prioritize import _heuristic_report, prioritize
 from storage import read_json
+from scoring.ranking_metrics import compute_ranking_concordance, rank_biased_overlap, spearman_rho, kendall_tau
 
 
 def _cvss_only_ranking(correlated: dict) -> list[dict]:
@@ -123,9 +124,14 @@ def main() -> None:
             key = c["title"].strip().lower()[:40]
             heur_ranks.append(heur_map.get(key, c["rank"]))
 
-        rho = spearman_rank_correlation(cvss_ranks, heur_ranks)
+        rho = spearman_rho(cvss_ranks, heur_ranks)
+        tau = kendall_tau(cvss_ranks, heur_ranks)
+        rbo10 = rank_biased_overlap([c["title"] for c in cvss_ranked[:n]], [f.title for f in heuristic_ranked[:n]], p=0.9, k=10)
         print("\n" + "=" * 80)
-        print(f"  Spearman's Rank Correlation (CVSS Baseline vs KEV/EPSS Enriched): rho = {rho:.3f}")
+        print(f"  Ranking Agreement Metrics (CVSS Baseline vs KEV/EPSS Enriched):")
+        print(f"  - Spearman rho : {rho:.3f}")
+        print(f"  - Kendall tau-b: {tau:.3f}")
+        print(f"  - RBO@10 (p=0.9): {rbo10:.3f}")
         if rho < 0.8:
             print("  [*] INSIGHT: Threat Intelligence (KEV/EPSS) significantly reordered priorities,")
             print("      promoting actively exploited/weaponized flaws above high-CVSS theoretical issues.")
