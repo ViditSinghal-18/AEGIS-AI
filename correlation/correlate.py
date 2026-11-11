@@ -12,6 +12,9 @@ from storage import read_json, write_json
 # Keys are lowercased substrings matched against the issue string;
 # first match wins, so order from most- to least-specific matters.
 _ISSUE_SEVERITY: list[tuple[str, str]] = [
+    # Critical credentials and infrastructure takeovers (Phase 4)
+    ("exposed secret", "Critical"),
+    ("dangling subdomain takeover", "Critical"),
     # Actively exploitable or confidentiality risk
     ("without tls encryption", "High"),
     ("weak tls grade", "High"),
@@ -90,6 +93,22 @@ def _config_issues(discovered: dict) -> list[tuple[str, str]]:
     passive_dns_issues = discovered.get("passive_meta", {}).get("dns", {}).get("issues") or []
     for dns_issue in passive_dns_issues:
         _add(f"DNS Email Security: {dns_issue}")
+
+    # Phase 4: Exposed Secrets
+    for sec in discovered.get("passive_meta", {}).get("exposed_secrets") or []:
+        sec_type = sec.get("secret_type") if isinstance(sec, dict) else getattr(sec, "secret_type", "Secret")
+        sec_loc = sec.get("location") if isinstance(sec, dict) else getattr(sec, "location", "")
+        sec_hint = sec.get("masked_hint") if isinstance(sec, dict) else getattr(sec, "masked_hint", "****")
+        _add(f"Exposed Secret Detected: {sec_type} at {sec_loc} ({sec_hint})")
+
+    # Phase 4: Verified Dangling Subdomain Takeovers
+    for d in discovered.get("passive_meta", {}).get("dangling_dns") or []:
+        is_vuln = d.get("is_vulnerable") if isinstance(d, dict) else getattr(d, "is_vulnerable", False)
+        if is_vuln:
+            sub = d.get("subdomain") if isinstance(d, dict) else getattr(d, "subdomain", "")
+            prov = d.get("provider_name") if isinstance(d, dict) else getattr(d, "provider_name", "Cloud Service")
+            cname = d.get("cname_target") if isinstance(d, dict) else getattr(d, "cname_target", "")
+            _add(f"Dangling Subdomain Takeover: {sub} -> {prov} ({cname})")
 
     # Passive CT subdomains summary note
     ct_subs = discovered.get("passive_meta", {}).get("ct_subdomains") or []

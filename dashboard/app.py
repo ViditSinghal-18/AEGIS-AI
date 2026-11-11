@@ -1393,7 +1393,43 @@ with tab_osint:
 
     with sub_osint_telemetry:
         if assets_data:
-            o_tab1, o_tab2, o_tab3, o_tab4 = st.tabs(["📧 DNS & Email Security", "🔒 TLS/SSL Certificate", "📜 CT Subdomains", "🔌 Open Ports"])
+            breach_meta = passive_meta.get("breach_propensity") or {}
+            email_meta = passive_meta.get("email_security") or {}
+            csp_meta = passive_meta.get("csp") or {}
+            dangling_meta = passive_meta.get("dangling_dns") or []
+            secrets_meta = passive_meta.get("exposed_secrets") or []
+
+            # Phase 4: External Posture Index & Breach Propensity Banner
+            if breach_meta or email_meta or csp_meta:
+                st.markdown("#### 🛡️ External Perimeter Hygiene & Breach Propensity Index")
+                st.caption("Empirical multi-factor external risk assessment (inspired by Liu et al. 2015, Weichselbaum et al. 2016, Durumeric et al. 2015).")
+                bp_col1, bp_col2, bp_col3, bp_col4 = st.columns(4)
+                with bp_col1:
+                    posture_grade = breach_meta.get("posture_grade", "N/A")
+                    posture_score = breach_meta.get("overall_score", 0.0)
+                    st.metric("Posture Grade", f"{posture_grade}", f"{posture_score:.0f}/100" if posture_score else None)
+                with bp_col2:
+                    prop_tier = breach_meta.get("propensity_tier", "Unknown")
+                    tier_delta = "Elevated Risk" if prop_tier in ["High", "Critical"] else "Normal"
+                    st.metric("Breach Propensity", prop_tier, delta=tier_delta, delta_color="inverse" if prop_tier in ["High", "Critical"] else "off")
+                with bp_col3:
+                    em_grade = email_meta.get("grade", "N/A")
+                    em_score = email_meta.get("score", 0)
+                    st.metric("Email Defense Grade", f"{em_grade}", f"{em_score}/100" if em_score else None)
+                with bp_col4:
+                    csp_grade = csp_meta.get("grade", "N/A")
+                    csp_score = csp_meta.get("score", 0)
+                    st.metric("CSP Defense Grade", f"{csp_grade}", f"{csp_score}/100" if csp_score else None)
+                st.divider()
+
+            o_tab1, o_tab2, o_tab3, o_tab4, o_tab5, o_tab6 = st.tabs([
+                "📧 DNS & Email Security",
+                "🔒 TLS/SSL Certificate",
+                "🛡️ Content Security Policy (CSP)",
+                "⚠️ Secrets & Takeovers",
+                "📜 CT Subdomains",
+                "🔌 Open Ports",
+            ])
             
             with o_tab1:
                 dns_data = passive_meta.get("dns", {})
@@ -1404,11 +1440,20 @@ with tab_osint:
                     st.write(f"- **AAAA (IPv6):** `{', '.join(dns_data.get('AAAA', [])) or 'None'}`")
                     st.write(f"- **MX (Mail Servers):** `{', '.join(dns_data.get('MX', [])) or 'None'}`")
                 with col_d2:
-                    st.markdown("**Email Spoofing Defenses**")
-                    spf = dns_data.get("SPF")
-                    dmarc = dns_data.get("DMARC")
+                    st.markdown("**Email Spoofing & Transport Defenses**")
+                    spf = email_meta.get("spf_record") or dns_data.get("SPF")
+                    dmarc = email_meta.get("dmarc_record") or dns_data.get("DMARC")
                     st.markdown(f"- **SPF Record:** {'`' + spf + '`' if spf else '❌ **Missing SPF Record (High Spoofing Risk)**'}")
                     st.markdown(f"- **DMARC Record:** {'`' + dmarc + '`' if dmarc else '❌ **Missing DMARC Policy (High Phishing Risk)**'}")
+                    if email_meta:
+                        st.write(f"- **DMARC Policy:** `{email_meta.get('dmarc_policy', 'none')}` ({email_meta.get('dmarc_percentage', 100)}% enforcement)")
+                        st.write(f"- **MTA-STS (RFC 8461):** `{'✅ Enforced (' + email_meta.get('mta_sts_mode', 'none') + ')' if email_meta.get('mta_sts_enabled') else '❌ Disabled'}`")
+                        st.write(f"- **TLS-RPT (RFC 8460):** `{'✅ Enabled' if email_meta.get('tls_rpt_enabled') else '❌ Disabled'}`")
+
+                if email_meta.get("weaknesses"):
+                    with st.expander("⚠️ Email Security Weaknesses"):
+                        for w in email_meta.get("weaknesses", []):
+                            st.write(f"- {w}")
 
             with o_tab2:
                 tls_data = passive_meta.get("tls", {})
@@ -1427,6 +1472,44 @@ with tab_osint:
                     st.info(f"TLS info: {tls_data.get('error', 'Not available for this target or port 443 closed.')}")
 
             with o_tab3:
+                st.markdown("**Content Security Policy (CSP) Inspection**")
+                if csp_meta and csp_meta.get("is_present"):
+                    st.success(f"CSP Header Detected — Defense Grade: **{csp_meta.get('grade')}** ({csp_meta.get('score')}/100)")
+                    if csp_meta.get("strengths"):
+                        st.markdown("**Strengths:**")
+                        for s in csp_meta.get("strengths", []):
+                            st.write(f"- ✅ {s}")
+                    if csp_meta.get("weaknesses"):
+                        st.markdown("**Weaknesses & XSS Bypass Risks:**")
+                        for w in csp_meta.get("weaknesses", []):
+                            st.write(f"- ⚠️ {w}")
+                    if csp_meta.get("parsed_directives"):
+                        with st.expander("View Parsed CSP Directives"):
+                            st.json(csp_meta.get("parsed_directives"))
+                else:
+                    st.error("❌ Missing Content-Security-Policy Header (Grade: F / 0 pts). Browser lacks client-side XSS defense-in-depth.")
+                    st.caption("Recommended baseline: `default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`")
+
+            with o_tab4:
+                st.markdown("**Exposed Credentials & Subdomain Takeovers**")
+                sec_col, take_col = st.columns(2)
+                with sec_col:
+                    st.markdown(f"**Exposed Secrets Detected ({len(secrets_meta)}):**")
+                    if secrets_meta:
+                        for s in secrets_meta:
+                            st.error(f"🚨 **{s.get('secret_type')}** at `{s.get('location')}`\n\nMasked Hint: `{s.get('masked_hint')}`\n\n*Action:* {s.get('remediation')}")
+                    else:
+                        st.success("✅ No credentials, VCS (.git/HEAD), or sensitive .env files publicly exposed.")
+                with take_col:
+                    vuln_takeovers = [d for d in dangling_meta if d.get("is_vulnerable")]
+                    st.markdown(f"**Verified Dangling DNS Takeovers ({len(vuln_takeovers)}):**")
+                    if vuln_takeovers:
+                        for vt in vuln_takeovers:
+                            st.error(f"🚨 **{vt.get('subdomain')}** -> {vt.get('provider_name')}\n\nCNAME: `{vt.get('cname_target')}`\n\nEvidence: `{vt.get('evidence')}`\n\n*Action:* {vt.get('remediation')}")
+                    else:
+                        st.success("✅ No verified dangling DNS records or unclaimed cloud service pointers detected.")
+
+            with o_tab5:
                 ct_subdomains = passive_meta.get("certificate_transparency", [])
                 st.markdown(f"Found **{len(ct_subdomains)}** public subdomains in Certificate Transparency logs (`crt.sh`):")
                 if ct_subdomains:
@@ -1435,7 +1518,7 @@ with tab_osint:
                 else:
                     st.info("No subdomains found in CT logs.")
 
-            with o_tab4:
+            with o_tab6:
                 ports = assets_data.get("ports", [])
                 if ports:
                     st.markdown(f"**Discovered Open TCP Ports ({len(ports)}):**")

@@ -27,6 +27,11 @@ import requests
 
 from config import DATA_DIR
 from discovery.safe_fetch import safe_fetch, SafeFetchError
+from discovery.csp_grader import grade_csp
+from discovery.email_grader import grade_email_security
+from discovery.dangling_dns import verify_dangling_dns
+from discovery.secret_classifier import probe_exposed_files
+from discovery.breach_propensity import calculate_breach_propensity
 from schemas import DiscoveredAssets, HttpCheck, OpenPort, TlsGrade
 from storage import write_json
 
@@ -119,6 +124,8 @@ def _probe_passive_http(domain: str) -> HttpCheck:
         version_issues.append(f"version-disclosure-x-powered-by: X-Powered-By discloses '{header_map['x-powered-by']}'")
 
     title = _extract_title(response.text)
+    if "content-security-policy" in header_map:
+        notes.append(f"csp_raw:{header_map['content-security-policy']}")
 
     return HttpCheck(
         url=final_url,
@@ -341,18 +348,55 @@ def discover_passive(domain: str) -> DiscoveredAssets:
                 )
             )
 
+    # 6. Phase 4: External Posture Intelligence
+    raw_csp = ""
+    for n in (http_check.notes or []):
+        if n.startswith("csp_raw:"):
+            raw_csp = n.split("csp_raw:", 1)[1]
+            break
+    csp_grade_res = grade_csp(raw_csp)
+    email_sec_res = grade_email_security(domain)
+    dangling_res = [verify_dangling_dns(s) for s in ct_subdomains[:4]]
+    secret_findings = probe_exposed_files(f"https://{domain}") if http_check.reachable else []
+
+    breach_report = calculate_breach_propensity(
+        target=domain,
+        email_score=email_sec_res.score,
+        csp_score=csp_grade_res.score,
+        tls_valid=(tls_check.grade in ["Valid", "A+", "A", "B", "Valid (Self-Signed)"]),
+        tls_days_left=(tls_check.raw or {}).get("days_until_expiry"),
+        exposed_secrets_count=len(secret_findings),
+        dangling_takeovers_count=sum(1 for d in dangling_res if d.is_vulnerable),
+        open_ports=[p.port for p in ports_found],
+        missing_headers_count=len(http_check.missing_security_headers),
+    )
+
     # Passive Metadata bundle
     passive_meta = {
         "dns": dns_info,
         "ct_subdomains": ct_subdomains,
         "ct_notice": "Subdomains discovered via public Certificate Transparency logs for mapping only (none were probed or scanned).",
         "shodan": shodan_intel,
+        "csp": csp_grade_res.to_dict(),
+        "email_security": email_sec_res.to_dict(),
+        "dangling_dns": [d.to_dict() for d in dangling_res],
+        "exposed_secrets": [s.to_dict() for s in secret_findings],
+        "breach_propensity": breach_report.to_dict(),
     }
+
+    notes.append(f"External Posture Grade: {breach_report.posture_grade} ({breach_report.overall_score:.1f}/100) — Breach Propensity: {breach_report.propensity_tier}")
+    notes.append(f"Email Security Grade: {email_sec_res.grade} ({email_sec_res.score}/100) — DMARC: {email_sec_res.dmarc_policy}")
+    notes.append(f"CSP Defense Grade: {csp_grade_res.grade} ({csp_grade_res.score}/100)")
 
     if ct_subdomains:
         notes.append(f"Discovered {len(ct_subdomains)} subdomains from Certificate Transparency logs.")
     for issue in dns_info.get("issues", []):
         notes.append(issue)
+    for sec in secret_findings:
+        notes.append(f"Exposed Secret Detected: {sec.secret_type} at {sec.location} ({sec.masked_hint})")
+    for d in dangling_res:
+        if d.is_vulnerable:
+            notes.append(f"Dangling Subdomain Takeover: {d.subdomain} points to unallocated {d.provider_name}")
 
     assets = DiscoveredAssets(
         target=domain,

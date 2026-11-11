@@ -93,4 +93,8 @@
 
 18. **Li & Paxson, 2017 (Vulnerability Lifetime Analytics)**
     * *Citation:* Inspired by Li, F., & Paxson, V. "A Large-Scale Empirical Study of Anonymity and Patching in Software Ecosystems." In *IEEE S&P*, 2017.
-    * *Usage in AEGIS:* Kaplan–Meier patch-survival analytics and MTTR metrics.
+    * *Usage in AEGIS:* Kaplan–Meier patch-survival analytics, MTTR metrics, and SLA breach probability estimation.
+
+19. **Page, 1954 / Adams & MacKay, 2007 (CUSUM & Change-Point Drift Detection)**
+    * *Citation:* Inspired by Page, E. S. "Continuous Inspection Schemes." *Biometrika*, 41(1/2), 1954; and Adams, R. P., & MacKay, D. J. "Bayesian Online Changepoint Detection." *arXiv preprint arXiv:0710.3742*, 2007.
+    * *Usage in AEGIS:* Statistical cumulative sum (CUSUM) drift detection and change-point analysis on longitudinal exposure scores.
