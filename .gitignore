@@ -41,3 +41,4 @@ data/history/
 data/*
 !data/sample/
 !data/sample/**
+!data/cve_symbols.yaml

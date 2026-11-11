@@ -236,6 +236,25 @@ AEGIS-AI incorporates research-inspired risk quantification modules under `scori
 
 ---
 
+## 🎯 High-Fidelity Vulnerability Triage (Phase 2: Fewer False Positives)
+
+AEGIS-AI implements research-backed filters to suppress false positives without hiding evidence:
+
+1. **Advisory Consistency Check (`correlation/advisory_consistency.py`):**
+   - Cross-verifies affected version intervals and CVSS scores between NVD and Google OSV (inspired by Dong et al., USENIX Security 2019).
+   - Attaches an evidence-grounded confidence badge (`HIGH`, `MEDIUM`, `LOW`) and discrepancy explanation to findings.
+
+2. **Distribution Backport-Aware Matching (`correlation/backport_detector.py`):**
+   - Detects Linux distribution packaging patterns (Ubuntu LTS, Debian, RHEL, CentOS, Alpine) in versions and banners.
+   - Flags candidate findings as `possibly_backported` with reduced confidence (`LOW`), alerting security analysts that vendor security teams may have backported fixes into the stable package build.
+
+3. **Function-Level AST Reachability Analysis (`ast_analyzer.py` & `data/cve_symbols.yaml`):**
+   - Maps CVEs to specific vulnerable symbols and function entrypoints (inspired by Ponta et al., Eclipse Steady / IEEE ICSME 2018).
+   - Evaluates call graphs and imports to assign exact verdicts: `reachable_function` (Factor 1.0), `imported_only` (Factor 0.3), `not_reachable` (Factor 0.0), or `unknown (no source provided)` (Factor 1.0).
+   - Feeds code reachability directly into the contextual risk score as an explicit, documented multiplier.
+
+---
+
 ## 🛡️ Responsible Security & Disclosure
 
 AEGIS-AI is designed for authorized defensive reconnaissance, posture assessment, and compliance governance. It enforces strict SSRF protections against internal networks, private RFC 1918 subnets, and cloud instance metadata (`169.254.169.254`). Active scanning features require verified domain authorization.

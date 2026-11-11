@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from correlation.enrich import enrich_cves
 from correlation.nvd_lookup import lookup_cves
+from correlation.backport_detector import detect_backport
 from schemas import CorrelatedAsset, CorrelatedFindings, CveRecord
 from storage import read_json, write_json
 
@@ -131,7 +132,14 @@ def correlate(discovered: dict | None = None) -> CorrelatedFindings:
         query_key = f"{product}|{version}"
         if query_key not in seen_queries:
             raw_cves = lookup_cves(product, version) if product and product != "unknown" else []
-            seen_queries[query_key] = enrich_cves(raw_cves)
+            enriched = enrich_cves(raw_cves)
+            # Backport-aware matching (Phase 2)
+            bp_verdict = detect_backport(product, version)
+            if bp_verdict.possibly_backported:
+                for c in enriched:
+                    c.possibly_backported = True
+                    c.confidence = "low"
+            seen_queries[query_key] = enriched
         cves = seen_queries[query_key]
         port = raw.get("port")
         exposure = (

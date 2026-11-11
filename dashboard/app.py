@@ -983,6 +983,8 @@ with tab_findings:
                 "Rank": f"#{item.get('rank', '-')}",
                 "Severity": str(item.get("severity", "Info")).upper(),
                 "Title": item.get("title", "Untitled"),
+                "Confidence": item.get("confidence", "high").upper(),
+                "Reachability": item.get("reachability_verdict", "n/a"),
                 "Exploitability / Threat Context": item.get("exploitability", "-"),
                 "CVEs": ", ".join(item.get("related_cves") or []) or "None",
                 "Source": item.get("source", "configuration"),
@@ -995,6 +997,8 @@ with tab_findings:
                 "Rank": st.column_config.TextColumn(width="small"),
                 "Severity": st.column_config.TextColumn(width="small"),
                 "Title": st.column_config.TextColumn(width="medium"),
+                "Confidence": st.column_config.TextColumn(width="small"),
+                "Reachability": st.column_config.TextColumn(width="medium"),
                 "Exploitability / Threat Context": st.column_config.TextColumn(width="large"),
                 "CVEs": st.column_config.TextColumn(width="small"),
             },
@@ -1017,6 +1021,25 @@ with tab_findings:
                 st.markdown(f"**🔍 Why It Matters:**\n\n{item.get('why_it_matters', 'No description provided.')}")
             with c_info2:
                 st.markdown(f"**🏷️ Discovery Vector:** `{item.get('source', 'config')}`")
+
+                # Confidence & Backport Badges (Phase 2)
+                conf = str(item.get("confidence") or "high").upper()
+                conf_color = "#10b981" if conf == "HIGH" else ("#f59e0b" if conf == "MEDIUM" else "#ef4444")
+                st.markdown(f"**Confidence:** <span style='color:{conf_color};font-weight:700;'>{conf}</span>", unsafe_allow_html=True)
+                if item.get("confidence_reason"):
+                    st.caption(f"Reason: {item.get('confidence_reason')}")
+
+                if item.get("possibly_backported"):
+                    distro = (item.get("backport_verdict") or {}).get("distro", "Linux distribution")
+                    st.warning(f"⚠️ **Possibly Backported**: Distro-packaged build detected ({distro}). Vendor patches may already be backported.")
+
+                # Reachability Verdict (Phase 2)
+                reach = item.get("reachability_verdict")
+                if reach:
+                    st.markdown(f"**Code Reachability:** `{reach}`")
+                    if item.get("matched_symbols"):
+                        st.caption(f"Matched symbols: {', '.join(item.get('matched_symbols'))}")
+
                 cves = item.get("related_cves") or []
                 if cves:
                     st.markdown("**Public CVEs:**")

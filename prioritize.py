@@ -24,7 +24,13 @@ from correlation.enrich import enrich_findings
 from correlation.mitre_attack import map_finding_to_mitre, generate_attack_walkthrough
 from correlation.compliance import calculate_compliance
 from storage import generate_cyclonedx_sbom, write_json, save_run_history
-from ast_analyzer import analyze_source_tree, evaluate_component_reachability
+from ast_analyzer import (
+    analyze_source_tree,
+    evaluate_component_reachability,
+    evaluate_cve_function_reachability,
+)
+from correlation.advisory_consistency import check_advisory_consistency
+from correlation.backport_detector import detect_backport
 from scoring.ssvc import evaluate_ssvc
 from scoring.uncertainty import compute_risk_interval
 from scoring.fair_loss import simulate_fair_loss, simulate_portfolio_fair_loss
@@ -119,17 +125,72 @@ def prioritize_findings(
         # Calculate base blended exposure score (0.0 - 1.0)
         exposure_score = (s_cvss * w_cvss) + (s_epss * w_epss) + (s_exposure_val * w_exp) + (s_crit * w_crit)
 
-        # S_Code reachability modulation
-        affected_comp = f.get("affected_component")
-        if affected_comp:
+        # Phase 2: Function-Level Reachability (Ponta et al. 2018 / Eclipse Steady)
+        cve_list = f.get("related_cves") or []
+        primary_cve = cve_list[0] if cve_list else None
+        affected_comp = f.get("affected_component") or f.get("product")
+
+        if primary_cve and source_analysis and source_analysis.get("source_provided"):
+            reach_info = evaluate_cve_function_reachability(
+                cve_id=primary_cve,
+                package_name=affected_comp or "",
+                source_analysis=source_analysis,
+            )
+            s_code = reach_info["reachability_factor"]
+            f["reachability_verdict"] = reach_info["verdict"]
+            f["reachability_factor"] = s_code
+            f["reachability_evidence"] = reach_info["evidence"]
+            f["vulnerable_symbols"] = reach_info.get("vulnerable_symbols", [])
+            f["matched_symbols"] = reach_info.get("matched_symbols", [])
+            exposure_score *= s_code
+        elif affected_comp and source_analysis and source_analysis.get("source_provided"):
             reach_info = evaluate_component_reachability(affected_comp, source_analysis)
             s_code = reach_info["reachability_factor"]
             f["reachability_verdict"] = reach_info["reachability_verdict"]
+            f["reachability_factor"] = s_code
             f["reachability_evidence"] = reach_info["evidence"]
             exposure_score *= s_code
+        elif not source_analysis or not source_analysis.get("source_provided"):
+            s_code = 1.0
+            if affected_comp or primary_cve:
+                f["reachability_verdict"] = "unknown (no source provided)"
+                f["reachability_factor"] = 1.0
+                f["reachability_evidence"] = "Remote target scanned without source code repository. Function-level execution path cannot be verified."
+            else:
+                f["reachability_verdict"] = "not applicable (perimeter configuration finding)"
+                f["reachability_factor"] = 1.0
+                f["reachability_evidence"] = "Finding relates to network/protocol configuration rather than application code."
         else:
+            s_code = 1.0
             f["reachability_verdict"] = "not applicable (perimeter configuration finding)"
+            f["reachability_factor"] = 1.0
             f["reachability_evidence"] = "Finding relates to network/protocol configuration rather than application code."
+
+        # Phase 2: Backport-aware matching (Linux distros: Ubuntu, Debian, RHEL)
+        version_str = str(f.get("version") or f.get("affected_version") or "")
+        banner_str = str(f.get("banner") or discovery_data.get("http", {}).get("server_banner") or "")
+        bp_verdict = detect_backport(product=affected_comp or "", version_string=version_str, banner=banner_str)
+        if bp_verdict.possibly_backported:
+            f["possibly_backported"] = True
+            f["backport_verdict"] = bp_verdict.to_dict()
+            f["confidence"] = "low"
+            f["confidence_reason"] = bp_verdict.explanation
+        else:
+            f["possibly_backported"] = False
+            f["backport_verdict"] = bp_verdict.to_dict()
+
+        # Phase 2: Advisory consistency check (Dong et al. 2019)
+        if primary_cve:
+            adv_res = check_advisory_consistency(primary_cve)
+            f["advisory_consistency"] = adv_res.to_dict()
+            f["advisory_confidence"] = adv_res.confidence
+            f["advisory_reason"] = adv_res.reason
+            if adv_res.confidence == "low":
+                f["confidence"] = "low"
+                f["confidence_reason"] = adv_res.reason
+                f["advisory_discrepancy"] = True
+            elif adv_res.confidence == "high" and f.get("confidence") not in ["low", "medium"]:
+                f["confidence"] = "high"
 
         # Scale final contextual risk score to 1.0 - 10.0
         risk_score = round(max(1.0, min(10.0, exposure_score * 10.0)), 1)
@@ -177,7 +238,7 @@ def prioritize_findings(
 
         # Transparent Explainable AI (XAI) Formula breakdown
         f["xai_formula"] = {
-            "formula": f"Score = ((S_CVSS * {w_cvss:.2f}) + (S_EPSS * {w_epss:.2f}) + (S_Exposure * {w_exp:.2f}) + (S_Crit * {w_crit:.2f})) * 10",
+            "formula": f"Score = (((S_CVSS * {w_cvss:.2f}) + (S_EPSS * {w_epss:.2f}) + (S_Exposure * {w_exp:.2f}) + (S_Crit * {w_crit:.2f})) * {s_code:.2f}) * 10",
             "weights_source": weights_source,
             "weights": {
                 "cvss": round(w_cvss, 3),
@@ -189,7 +250,11 @@ def prioritize_findings(
             "s_epss": round(s_epss, 4),
             "s_exposure": round(s_exposure_val, 2),
             "s_crit": round(s_crit, 2),
-            "final_score": risk_score
+            "s_code": round(s_code, 2),
+            "reachability_verdict": f.get("reachability_verdict"),
+            "backport_status": "possibly_backported" if f.get("possibly_backported") else "standard",
+            "advisory_confidence": f.get("advisory_confidence", "n/a"),
+            "final_score": risk_score,
         }
 
         prioritized_list.append(f)

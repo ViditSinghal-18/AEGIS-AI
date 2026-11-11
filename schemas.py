@@ -83,6 +83,7 @@ class CveRecord:
     confidence: str = "high"
     kev: bool = False
     epss: float | None = None
+    possibly_backported: bool = False
 
 
 @dataclass
@@ -118,6 +119,10 @@ class PrioritizedFinding:
     suggested_action: str
     related_cves: list[str]
     source: str
+    confidence: str = "high"
+    confidence_reason: str = ""
+    possibly_backported: bool = False
+    reachability_verdict: str = "unknown (no source provided)"
 
 
 @dataclass

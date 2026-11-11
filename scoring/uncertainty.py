@@ -50,8 +50,11 @@ def compute_risk_interval(
     margin = 0.40
     widening_factors: List[str] = []
 
-    # 1. Banner-Derived Version Matching (Unauthenticated / Heuristic Banner)
-    if "banner" in source or "header" in source or "banner" in evidence:
+    # 1. Banner-Derived Version Matching or Distro Backport Candidate
+    if ctx.get("possibly_backported"):
+        margin += 0.55
+        widening_factors.append("Distribution backport candidate: Linux vendor backports may remediate flaw (+0.55)")
+    elif "banner" in source or "header" in source or "banner" in evidence:
         margin += 0.50
         widening_factors.append("Banner-derived version matching: server tokens may be spoofed or obfuscated (+0.50)")
 

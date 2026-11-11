@@ -1,0 +1,147 @@
+# AEGIS-AI: Hand-Curated CVE Vulnerable Symbol Mapping
+# Inspired by Ponta, Plate, & Sabetta, "Beyond Metadata: Code-Centric and Usage-Based Analysis of Known Vulnerabilities in Open-Source Software", IEEE ICSME 2018 (Eclipse Steady)
+#
+# Maps public CVE IDs to specific vulnerable symbols (functions, methods, classes)
+# in target packages across Python and JavaScript ecosystems.
+
+version: "1.0.0"
+updated_at: "2026-11-11"
+
+cves:
+  # PyJWT Key Confusion / Algorithm Confusion
+  CVE-2022-29217:
+    package: "pyjwt"
+    language: "python"
+    vulnerable_symbols:
+      - "decode"
+      - "algorithms.HMACAlgorithm.prepare_key"
+      - "jwt.decode"
+    description: "Key confusion in PyJWT decode allowing token forgery with asymmetric public keys"
+
+  # Urllib3 URL Authority Catastrophic Backtracking (ReDoS)
+  CVE-2021-33503:
+    package: "urllib3"
+    language: "python"
+    vulnerable_symbols:
+      - "strip_header"
+      - "clean_header"
+      - "request"
+      - "urlopen"
+      - "PoolManager.request"
+    description: "Catastrophic ReDoS backtracking in URL authority parser"
+
+  # Urllib3 Cookie Leakage on Cross-Origin Redirect
+  CVE-2023-43804:
+    package: "urllib3"
+    language: "python"
+    vulnerable_symbols:
+      - "CookieJar"
+      - "extract_cookies"
+      - "urlopen"
+      - "request"
+    description: "Urllib3 does not remove Cookie header when following cross-origin redirects"
+
+  # Requests Cross-Origin Authorization Header Leak
+  CVE-2023-32681:
+    package: "requests"
+    language: "python"
+    vulnerable_symbols:
+      - "rebuild_auth"
+      - "rebuild_proxies"
+      - "Session.send"
+      - "get"
+      - "post"
+    description: "Requests forwards Proxy-Authorization and Authorization headers on cross-origin redirects"
+
+  # Pytest ReDoS in py.path.local
+  CVE-2022-42969:
+    package: "pytest"
+    language: "python"
+    vulnerable_symbols:
+      - "py.path.local"
+      - "make_numbered_dir"
+      - "local"
+    description: "ReDoS vulnerability in py library make_numbered_dir"
+
+  # Jinja2 Sandbox Escape
+  CVE-2019-10906:
+    package: "jinja2"
+    language: "python"
+    vulnerable_symbols:
+      - "from_string"
+      - "render"
+      - "SandboxedEnvironment"
+    description: "Sandbox breakout in Jinja2 when str.format_map is invoked"
+
+  # PyYAML Arbitrary Code Execution
+  CVE-2020-14343:
+    package: "pyyaml"
+    language: "python"
+    vulnerable_symbols:
+      - "load"
+      - "full_load"
+      - "unsafe_load"
+    description: "PyYAML load allows arbitrary Python object instantiation when Loader is unspecified"
+
+  # Lodash Command Injection / Prototype Pollution in template
+  CVE-2021-23337:
+    package: "lodash"
+    language: "javascript"
+    vulnerable_symbols:
+      - "template"
+      - "templateSettings"
+      - "defaultsDeep"
+    description: "Command injection via lodash template variable injection"
+
+  # Lodash ReDoS in toNumber and trim
+  CVE-2020-28500:
+    package: "lodash"
+    language: "javascript"
+    vulnerable_symbols:
+      - "toNumber"
+      - "trim"
+      - "trimEnd"
+      - "trimStart"
+    description: "ReDoS in lodash via large string input to toNumber and trim"
+
+  # Express Path Traversal in serve-static
+  CVE-2023-38606:
+    package: "express"
+    language: "javascript"
+    vulnerable_symbols:
+      - "serve-static"
+      - "static"
+      - "send"
+      - "sendFile"
+    description: "Path traversal via malformed URI patterns in static file handler"
+
+  # Tough-Cookie Prototype Pollution
+  CVE-2023-26136:
+    package: "tough-cookie"
+    language: "javascript"
+    vulnerable_symbols:
+      - "setCookie"
+      - "parse"
+      - "Cookie.parse"
+      - "CookieJar.setCookie"
+    description: "Prototype pollution in tough-cookie when parsing crafted Cookie headers"
+
+  # Axios ReDoS
+  CVE-2021-3749:
+    package: "axios"
+    language: "javascript"
+    vulnerable_symbols:
+      - "trim"
+      - "followRedirects"
+    description: "Regular expression denial of service in trim function of axios"
+
+  # Log4j JNDI Lookup Injection
+  CVE-2021-44228:
+    package: "log4j-core"
+    language: "java"
+    vulnerable_symbols:
+      - "lookup"
+      - "format"
+      - "Interpolator.lookup"
+      - "JndiLookup.lookup"
+    description: "Remote code execution via JNDI injection in Log4j Message Pattern Converter"
