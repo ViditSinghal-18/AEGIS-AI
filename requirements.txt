@@ -23,6 +23,12 @@ python-pptx>=0.6.21
 # Testing & Quality Assurance
 pytest>=7.4.0
 
+# Machine Learning, Graph Analytics & Statistics (Phases 1-6)
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-learn>=1.3.0
+networkx>=3.0
+
 # Optional Streamlit Dashboard, Cloud SDK & AI Agents
 streamlit>=1.30.0
 boto3>=1.34.0  # Optional: only required for AEGIS_LLM_PROVIDER=bedrock

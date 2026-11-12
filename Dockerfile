@@ -27,25 +27,27 @@ RUN groupadd -g 1001 aegisgroup && \
 
 WORKDIR /app
 
-# Copy dependency definition and install
+# Create isolated virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy dependency definition and install within virtual environment
 COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application source code
 COPY . /app/
 
-# Create runtime data directory and grant permissions to non-root user
-RUN mkdir -p /app/data && chown -R aegis:aegisgroup /app
+# Create runtime data/report directories and grant permissions to non-root user
+RUN mkdir -p /app/data /app/reports && \
+    chown -R aegis:aegisgroup /app /opt/venv
 
 # Switch to unprivileged user
 USER aegis
 
 # Expose HTTP port
 EXPOSE 5000
-
-# Container healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/api/health || exit 1
 
 # Launch AEGIS application
 CMD ["python", "app.py"]
