@@ -359,11 +359,17 @@ class BayesianAttackGraph:
         selected_chokepoints: List[str] = []
         selected_vulns: List[str] = []
 
+        # Deterministic candidate order: prioritize nodes with known patchable CVEs, then alphabetical
+        sorted_candidates = sorted(
+            candidate_nodes,
+            key=lambda c: (0 if c in node_to_vuln else 1, c),
+        )
+
         while uncovered_paths:
             best_node = None
             best_covered_count = 0
 
-            for cand in candidate_nodes:
+            for cand in sorted_candidates:
                 if cand in selected_chokepoints:
                     continue
                 # Count paths containing cand

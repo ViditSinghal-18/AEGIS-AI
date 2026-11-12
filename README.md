@@ -274,6 +274,62 @@ AEGIS-AI models multi-step cyber compromise using probabilistic graphical networ
 
 ---
 
+## 🌐 External Posture Intelligence (Phase 4)
+
+AEGIS-AI passively evaluates perimeter hygiene and predicts breach likelihood from non-intrusive public telemetry:
+
+1. **Content Security Policy (CSP) Quality Grader (`discovery/csp_grader.py`):**
+   - AST directive-source parsing and security grading (0–100 / A+ to F) inspired by Weichselbaum et al. (ACM CCS 2016) and Roth et al. (USENIX Security 2020).
+   - Penalizes dangerous bypasses: `'unsafe-inline'` without cryptographic nonces (-30), `'unsafe-eval'` (-15), wildcard hosts (-25), `data:` URIs (-20), and missing clickjacking frame-ancestors (-10).
+
+2. **Email Transport Security & Anti-Spoofing Grader (`discovery/email_grader.py`):**
+   - Empirical evaluation of email authentication inspired by Durumeric et al. (ACM IMC 2015).
+   - Validates SPF qualifiers (`-all` hardfail vs `~all` softfail), DMARC policy enforcement (`reject` vs `quarantine` vs `none`) with aggregate reporting (`rua`), MTA-STS (RFC 8461) enforcement, and TLS-RPT (RFC 8460).
+
+3. **Evidence-Grounded Dangling DNS & Subdomain Takeovers (`discovery/dangling_dns.py`):**
+   - Detects orphaned CNAME records pointing to unclaimed third-party cloud infrastructure (AWS S3/CloudFront, GitHub Pages, Heroku, Azure Web Apps, Fastly, Shopify, Zendesk, Surge) inspired by Liu et al. (ACM CCS 2016) and Borgolte et al. (USENIX Security 2018).
+   - **Zero False-Positive Rule:** Never flags a takeover based on DNS string matching alone; requires verified HTTP status codes (404/502) and authentic provider unclaimed error signatures via `safe_fetch`.
+
+4. **Exposed Secret & Sensitive File Classifier (`discovery/secret_classifier.py`):**
+   - High-precision regex and Shannon entropy detection inspired by Meli et al. (NDSS 2019).
+   - Probes `/.git/HEAD` and exposed configuration files; enforces strict masking (`AKIA****XYZ`, `ghp_****1234`) ensuring raw credentials are never logged or stored.
+
+5. **Multi-Factor Breach Propensity Index (`discovery/breach_propensity.py`):**
+   - Synthesizes observable external indicators (Email, CSP, TLS, Open Ports, Secrets, Takeovers) into an empirical 0–100 posture score and incident propensity tier (`Low`, `Moderate`, `Elevated`, `High`, `Critical`) inspired by Liu et al. (USENIX Security 2015).
+
+---
+
+## 🤖 Trustworthy AI Copilot & Threat Intelligence (Phase 5)
+
+1. **Claim-Level Grounding & ALCE Faithfulness Verification (`ai/grounding.py`):**
+   - Evaluates Copilot responses for factual citations (`[Rank #1]`, `[CVE-...]`) inspired by ALCE (Gao et al., EMNLP 2023), SelfCheckGPT (Manakul et al. 2023), and RAG (Lewis et al. 2020).
+   - Performs natural language inference / lexical entailment against scan evidence, outputs a per-response `faithfulness_score`, and surfaces claim-by-claim justification in the UI.
+   - Detects and strictly flags hallucinated or unverified CVEs absent from the telemetry report.
+
+2. **50-Question Adversarial & Robustness Evaluation Harness (`eval/copilot_eval.py`):**
+   - Comprehensive test suite covering 20 factual questions, 15 adversarial offensive requests, and 15 hallucination-induction queries.
+   - Runnable in CI with automated gating: enforces $\ge 90\%$ offensive request refusal accuracy, $0\%$ hallucinated CVE rate, and $\ge 75\%$ mean factual faithfulness.
+
+3. **Supervised MITRE ATT&CK Technique Mapper (`correlation/learned_attack_mapper.py`):**
+   - Machine-learned baseline (TF-IDF + Logistic Regression) trained on MITRE ATT&CK technique descriptions and CVE summaries (inspired by Kuppa et al., IEEE BigData 2021).
+   - Benchmarked against the deterministic rule mapper (`correlation/mitre_attack.py`), keeping rule-based mapping as production default with opt-in configuration (`AEGIS_MITRE_MAPPER=learned`).
+
+---
+
+## ⏱️ Longitudinal Patch Analytics & Time-Aware Monitoring (Phase 6)
+
+1. **Kaplan–Meier Patch Survival Analytics & MTTR (`analytics/patch_lifetime.py`):**
+   - Tracks vulnerability lifecycles across historical scan intervals inspired by Li & Paxson (IEEE S&P 2017).
+   - Computes non-parametric Kaplan–Meier survival functions $\hat{S}(t) = \prod [1 - (d_i / n_i)]$ with Greenwood's 95% confidence intervals.
+   - Derives overall and per-severity Median Time-to-Remediate (MTTR) and empirical SLA breach probabilities (Critical 7-day, High 30-day).
+
+2. **CUSUM Risk Score Drift Detection (`analytics/drift_detector.py`):**
+   - Two-sided Cumulative Sum quality control chart (Page, Biometrika 1954; Adams & MacKay 2007) applied to longitudinal exposure scores.
+   - Distinguishes statistically significant risk deterioration ($S_t^+ \ge h$) or remediation improvement ($S_t^- \ge h$) from background noise.
+   - Manages versioned historical scan storage (`reports/history.json`, `schema_version: '2.0'`).
+
+---
+
 ## 🛡️ Responsible Security & Disclosure
 
 AEGIS-AI is designed for authorized defensive reconnaissance, posture assessment, and compliance governance. It enforces strict SSRF protections against internal networks, private RFC 1918 subnets, and cloud instance metadata (`169.254.169.254`). Active scanning features require verified domain authorization.

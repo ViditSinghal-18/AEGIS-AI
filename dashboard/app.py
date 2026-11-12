@@ -48,7 +48,9 @@ from remediation.waf_rules import (
     generate_cloudflare_waf_rules,
     generate_modsecurity_rules,
 )
-from ai.copilot import query_copilot
+from ai.copilot import query_copilot, query_copilot_with_grounding
+from analytics.patch_lifetime import calculate_patch_analytics
+from analytics.drift_detector import CusumDriftDetector, load_history
 import ai.llm as llm
 from dashboard.attack_graph import render_attack_surface_graph_html
 
@@ -1540,48 +1542,169 @@ with tab_osint:
             st.info("Run an active or passive scan to populate deep OSINT asset telemetry.")
 
     with sub_osint_diff:
-        st.markdown("### 🔄 Historical Remediation & Regression Analysis")
-        st.caption("Compare security reports over time to verify whether fixes took effect and catch newly introduced risks.")
+        st.markdown("### 🔄 Longitudinal Security Analytics & Regression Intelligence")
+        st.caption("Time-aware vulnerability lifetime monitoring, Kaplan–Meier survival curves, MTTR, and CUSUM change-point drift detection (Li & Paxson 2017, Page 1954).")
 
-        if len(history_files) > 1:
-            prev_options = [f.name for f in history_files if not (selected_history and f.name == selected_history.name)]
-            comp_file = st.selectbox("Select Baseline Comparison Scan:", prev_options, key="baseline_diff_sel")
-            
-            if comp_file:
-                comp_path = next((f for f in history_files if f.name == comp_file), None)
-                if comp_path:
-                    try:
-                        baseline_report = json.loads(comp_path.read_text(encoding="utf-8"))
-                        diff = diff_reports(report, baseline_report)
-                        
-                        d_c1, d_c2, d_c3 = st.columns(3)
-                        d_c1.metric("🆕 New Vulnerabilities", len(diff["new"]), delta=f"+{len(diff['new'])}" if diff["new"] else "0", delta_color="inverse")
-                        d_c2.metric("✅ Remediated Issues", len(diff["resolved"]), delta=f"-{len(diff['resolved'])}" if diff["resolved"] else "0", delta_color="normal")
-                        d_c3.metric("🔄 Persisting Issues", len(diff["unchanged"]))
+        h_tab_km, h_tab_cusum, h_tab_diff = st.tabs([
+            "📈 Kaplan–Meier Patch Analytics (MTTR)",
+            "⚡ CUSUM Statistical Drift Detection",
+            "🔄 Snapshot Regression Diff",
+        ])
 
-                        dt_new, dt_res, dt_unc = st.tabs(["🆕 New Issues", "✅ Remediated Issues", "🔄 Persisting Issues"])
-                        with dt_new:
-                            if diff["new"]:
-                                for item in diff["new"]:
-                                    st.error(f"**[NEW]** {item.get('title')} ({item.get('severity')}) — {item.get('exploitability')}")
-                            else:
-                                st.success("No new vulnerabilities detected since baseline!")
-                        with dt_res:
-                            if diff["resolved"]:
-                                for item in diff["resolved"]:
-                                    st.success(f"**[RESOLVED]** {item.get('title')} ({item.get('severity')})")
-                            else:
-                                st.info("No previously open vulnerabilities were resolved in this run.")
-                        with dt_unc:
-                            if diff["unchanged"]:
-                                for item in diff["unchanged"]:
-                                    st.warning(f"**[PERSISTING]** {item.get('title')} ({item.get('severity')})")
-                            else:
-                                st.info("No overlapping findings.")
-                    except Exception as ex:
-                        st.error(f"Failed to diff reports: {ex}")
-        else:
-            st.info("Run multiple assessments over time to generate historical diffs and remediation metrics.")
+        # Load versioned historical scan snapshots
+        hist_data = load_history(target=target)
+        snapshots = hist_data.get("snapshots", [])
+
+        # If history.json is empty but history_files has reports, synthesize snapshots
+        if not snapshots and history_files:
+            snapshots = []
+            for idx, hf in enumerate(history_files[:6]):
+                try:
+                    rep_d = json.loads(hf.read_text(encoding="utf-8"))
+                    snapshots.append({
+                        "snapshot_id": f"scan-{idx+1}",
+                        "timestamp_days": float(idx * 7.0),
+                        "overall_risk_score": float(rep_d.get("metrics", {}).get("risk_score", 5.0)),
+                        "findings": rep_d.get("findings", []),
+                    })
+                except Exception:
+                    pass
+
+        # If still only current scan, add current scan snapshot for baseline
+        if not snapshots and report:
+            snapshots = [{
+                "snapshot_id": "current-scan",
+                "timestamp_days": 0.0,
+                "overall_risk_score": float(report.get("metrics", {}).get("risk_score", 5.5)),
+                "findings": report.get("findings", []),
+            }]
+
+        with h_tab_km:
+            st.markdown("#### ⏳ Vulnerability Lifetime Survival Analysis (Kaplan–Meier)")
+            st.caption("Non-parametric estimation of remediation probability S(t) = P(Lifetime > t) and Mean/Median Time-to-Remediate.")
+
+            if len(snapshots) >= 1:
+                patch_report = calculate_patch_analytics(snapshots)
+                km_c1, km_c2, km_c3, km_c4 = st.columns(4)
+                with km_c1:
+                    mttr_val = f"{patch_report.overall_mttr_days:.1f} days" if patch_report.overall_mttr_days is not None else "Pending"
+                    st.metric("Overall MTTR", mttr_val)
+                with km_c2:
+                    st.metric("Remediated Issues", patch_report.remediated_count)
+                with km_c3:
+                    st.metric("Unremediated (Active)", patch_report.unremediated_count)
+                with km_c4:
+                    crit_sla = patch_report.sla_breach_probabilities.get("Critical", 0.0) * 100
+                    st.metric("Critical SLA Breach Risk (7d)", f"{crit_sla:.1f}%")
+
+                if patch_report.survival_curve:
+                    st.markdown("**Kaplan–Meier Survival Table:**")
+                    km_rows = [
+                        {
+                            "Time (Days)": pt.time_days,
+                            "Survival Prob S(t)": f"{pt.survival_prob * 100:.1f}%",
+                            "At-Risk Count": pt.at_risk_count,
+                            "Remediated Events": pt.events_count,
+                            "95% CI Lower": f"{pt.ci_lower * 100:.1f}%",
+                            "95% CI Upper": f"{pt.ci_upper * 100:.1f}%",
+                        }
+                        for pt in patch_report.survival_curve
+                    ]
+                    st.dataframe(km_rows, use_container_width=True)
+
+                if patch_report.lifecycles:
+                    with st.expander("📋 Tracked Vulnerability Lifecycles"):
+                        life_rows = [
+                            {
+                                "Finding": l.title[:50],
+                                "Severity": l.severity,
+                                "Duration (Days)": l.duration_days,
+                                "Status": "✅ Remediated" if l.is_resolved else "⚠️ Open (Censored)",
+                            }
+                            for l in patch_report.lifecycles
+                        ]
+                        st.dataframe(life_rows, use_container_width=True)
+            else:
+                st.info("Accumulate at least one scan to initialize Kaplan–Meier patch survival tracking.")
+
+        with h_tab_cusum:
+            st.markdown("#### ⚡ CUSUM Quality Control Chart & Risk Drift Detection")
+            st.caption("Two-sided Cumulative Sum (Page 1954) identifies statistically significant risk score deterioration vs baseline noise.")
+
+            score_series = [float(s.get("overall_risk_score", 5.0)) for s in snapshots]
+            if len(score_series) >= 2:
+                detector = CusumDriftDetector()
+                drift_res = detector.detect(score_series)
+
+                cu_c1, cu_c2, cu_c3 = st.columns(3)
+                with cu_c1:
+                    status_badge = "🟢 Stable Posture"
+                    if drift_res.drift_detected:
+                        status_badge = "🚨 Deterioration" if drift_res.direction == "deterioration" else "🟢 Improvement"
+                    st.metric("Drift Status", status_badge)
+                with cu_c2:
+                    st.metric("Baseline Mean (μ₀)", f"{drift_res.baseline_mean:.2f}")
+                with cu_c3:
+                    delta_str = f"{drift_res.shift_magnitude:+.2f}"
+                    st.metric("Shift from Baseline (Δ)", delta_str, delta=delta_str, delta_color="inverse")
+
+                st.info(drift_res.explanation)
+
+                with st.expander("View Longitudinal CUSUM Chart Data"):
+                    cu_table = [
+                        {
+                            "Scan #": idx + 1,
+                            "Risk Score": score_series[idx],
+                            "CUSUM+ (Deterioration)": drift_res.cusum_positive[idx] if idx < len(drift_res.cusum_positive) else 0.0,
+                            "CUSUM- (Improvement)": drift_res.cusum_negative[idx] if idx < len(drift_res.cusum_negative) else 0.0,
+                            "Decision Threshold (h)": round(drift_res.threshold, 2),
+                        }
+                        for idx in range(len(score_series))
+                    ]
+                    st.dataframe(cu_table, use_container_width=True)
+            else:
+                st.info("CUSUM drift analysis requires at least 2 historical scan records to evaluate baseline drift.")
+
+        with h_tab_diff:
+            if len(history_files) > 1:
+                prev_options = [f.name for f in history_files if not (selected_history and f.name == selected_history.name)]
+                comp_file = st.selectbox("Select Baseline Comparison Scan:", prev_options, key="baseline_diff_sel")
+                
+                if comp_file:
+                    comp_path = next((f for f in history_files if f.name == comp_file), None)
+                    if comp_path:
+                        try:
+                            baseline_report = json.loads(comp_path.read_text(encoding="utf-8"))
+                            diff = diff_reports(report, baseline_report)
+                            
+                            d_c1, d_c2, d_c3 = st.columns(3)
+                            d_c1.metric("🆕 New Vulnerabilities", len(diff["new"]), delta=f"+{len(diff['new'])}" if diff["new"] else "0", delta_color="inverse")
+                            d_c2.metric("✅ Remediated Issues", len(diff["resolved"]), delta=f"-{len(diff['resolved'])}" if diff["resolved"] else "0", delta_color="normal")
+                            d_c3.metric("🔄 Persisting Issues", len(diff["unchanged"]))
+
+                            dt_new, dt_res, dt_unc = st.tabs(["🆕 New Issues", "✅ Remediated Issues", "🔄 Persisting Issues"])
+                            with dt_new:
+                                if diff["new"]:
+                                    for item in diff["new"]:
+                                        st.error(f"**[NEW]** {item.get('title')} ({item.get('severity')}) — {item.get('exploitability')}")
+                                else:
+                                    st.success("No new vulnerabilities detected since baseline!")
+                            with dt_res:
+                                if diff["resolved"]:
+                                    for item in diff["resolved"]:
+                                        st.success(f"**[RESOLVED]** {item.get('title')} ({item.get('severity')})")
+                                else:
+                                    st.info("No previously open vulnerabilities were resolved in this run.")
+                            with dt_unc:
+                                if diff["unchanged"]:
+                                    for item in diff["unchanged"]:
+                                        st.warning(f"**[PERSISTING]** {item.get('title')} ({item.get('severity')})")
+                                else:
+                                    st.info("No overlapping findings.")
+                        except Exception as ex:
+                            st.error(f"Failed to diff reports: {ex}")
+            else:
+                st.info("Run multiple assessments over time to generate historical diffs and remediation metrics.")
 
 
 # ==========================================
@@ -1654,10 +1777,34 @@ with tab_copilot:
             else:
                 st.session_state.ai_query_count = current_calls + 1
                 with st.spinner("AI SOC Analyst reasoning with report telemetry..."):
-                    st.session_state.copilot_answer = query_copilot(copilot_query, report)
+                    ans_text, grounding_res = query_copilot_with_grounding(copilot_query, report)
+                    st.session_state.copilot_answer = ans_text
+                    st.session_state.copilot_grounding = grounding_res
 
-        if st.session_state.copilot_answer:
+        if st.session_state.get("copilot_answer"):
             st.markdown(st.session_state.copilot_answer)
+
+            # Phase 5: Grounding & Faithfulness Feedback Panel (ALCE: Gao et al. 2023)
+            grounding_data = st.session_state.get("copilot_grounding")
+            if grounding_data:
+                g_col1, g_col2, g_col3 = st.columns(3)
+                with g_col1:
+                    score_pct = grounding_data.faithfulness_score * 100
+                    st.caption(f"🛡️ **Faithfulness Score (ALCE):** `{score_pct:.1f}%`")
+                with g_col2:
+                    st.caption(f"📑 **Finding Citations:** `{len(grounding_data.citations_found)}` found")
+                with g_col3:
+                    if grounding_data.is_faithful:
+                        st.caption("✅ **Evidence-Grounded Verdict:** Passed")
+                    else:
+                        st.caption("⚠️ **Evidence-Grounded Verdict:** Review Claim Warnings")
+
+                if grounding_data.claim_details:
+                    with st.expander("🔍 View Claim-by-Claim Evidence Entailment"):
+                        for c in grounding_data.claim_details:
+                            badge = "🟢 Supported" if c.is_supported else "🔴 Unsupported"
+                            st.write(f"- {badge}: **{c.claim_text}**")
+                            st.caption(f"  *Reason:* {c.reason} | *Evidence:* `{c.evidence_snippet}`")
 
     with sub_copilot_export:
         st.markdown("### 📥 Executive Reports & SIEM Integration")

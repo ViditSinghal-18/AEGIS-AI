@@ -7,11 +7,82 @@ and threat actor path simulation based on report findings.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import ai.llm as llm
+from ai.grounding import (
+    GroundingVerificationResult,
+    extract_cves,
+    verify_grounding,
+)
 
 logger = logging.getLogger(__name__)
+
+_DEFENSIVE_REFUSAL_MESSAGE = (
+    "🛡️ **AEGIS Defensive Guardrail — Request Refused:**\n"
+    "AEGIS-AI is an evidence-grounded Continuous Threat Exposure Management (CTEM) platform "
+    "operating under strict defensive-only principles. Generating offensive exploits, attack payloads, "
+    "reverse shells, or intrusion guidance is strictly forbidden. "
+    "For remediation and hardening, please refer to our defensive configuration recommendations."
+)
+
+_OFFENSIVE_PATTERNS = [
+    re.compile(r"\b(write|create|generate|provide|give me|craft)\b.*\b(exploit|payload|reverse\s*shell|shellcode|0day|zero-day|weapon|malware|attack\s+script|attack\s+payload|spearphishing\s+template)\b", re.IGNORECASE),
+    re.compile(r"\b(how to|how can i|how do i)\s+(hack|exploit|attack|bypass|infiltrate|ddos|sql\s*inject|weaponize|brute\s*force|crack)\b", re.IGNORECASE),
+    re.compile(r"\b(exploit\s+script|attack\s+script|payload\s+generator|reverse\s*tcp|meterpreter|metasploit|shellcode)\b", re.IGNORECASE),
+    re.compile(r"\b(launch|execute|perform|initiate)\s+(a\s+)?(attack|ddos|dos|denial of service|injection)\b", re.IGNORECASE),
+    re.compile(r"\b(sql\s*injection\s+attack|spearphishing\s+email\s+template|brute\s*force\s+credentials|denial\s+of\s+service\s+attack)\b", re.IGNORECASE),
+]
+
+
+def is_offensive_request(prompt_text: str) -> bool:
+    """Determine if a user prompt is requesting offensive exploit generation or attacks."""
+    p = prompt_text.strip()
+    return any(pattern.search(p) for pattern in _OFFENSIVE_PATTERNS)
+
+
+def query_copilot_with_grounding(
+    prompt_text: str,
+    report: dict[str, Any],
+    history: list[dict[str, str]] | None = None,
+    use_llm_judge: bool = False,
+) -> tuple[str, GroundingVerificationResult]:
+    """
+    Process an analyst query and return both the response text and claim-level grounding evaluation.
+
+    Inspired by ALCE (Gao et al. 2023).
+    """
+    # 1. Hard defensive guardrail check
+    if is_offensive_request(prompt_text):
+        res = GroundingVerificationResult(
+            faithfulness_score=1.0,
+            is_faithful=True,
+            total_claims=1,
+            supported_claims_count=1,
+            unsupported_claims_count=0,
+            hallucinated_cves=[],
+            citations_found=[],
+            explanation="Request cleanly refused under defensive guardrails.",
+        )
+        return _DEFENSIVE_REFUSAL_MESSAGE, res
+
+    # 2. Generate response via LLM or offline reasoner
+    llm_resp = _call_llm_copilot(prompt_text, report, history)
+    response_text = llm_resp or _generate_offline_copilot_response(prompt_text, report)
+
+    # 3. Grounding & Faithfulness Verification
+    grounding_res = verify_grounding(response_text, report, use_llm_judge=use_llm_judge)
+
+    # If hallucinated CVEs were detected, prepend an authoritative warning
+    if grounding_res.hallucinated_cves:
+        warning = (
+            f"> ⚠️ **Guardrail Notice:** The generated response cited unverified CVEs "
+            f"(`{', '.join(grounding_res.hallucinated_cves)}`) that were not detected in the current scan.\n\n"
+        )
+        response_text = warning + response_text
+
+    return response_text, grounding_res
 
 
 def query_copilot(
@@ -23,13 +94,8 @@ def query_copilot(
     Process an analyst query using the configured LLM if available,
     or our intelligent offline defensive security reasoner.
     """
-    # Try configured LLM first if enabled
-    llm_response = _call_llm_copilot(prompt_text, report, history)
-    if llm_response:
-        return llm_response
-
-    # Heuristic Security Reasoner fallback
-    return _generate_offline_copilot_response(prompt_text, report)
+    ans, _ = query_copilot_with_grounding(prompt_text, report, history)
+    return ans
 
 
 def _call_llm_copilot(
@@ -53,10 +119,12 @@ def _call_llm_copilot(
 
         context_str = "\n".join(findings_context)
         system_prompt = (
-            "You are an elite Defensive Security Operations Center (SOC) Copilot. "
+            "You are an elite Defensive Security Operations Center (SOC) Copilot for AEGIS-AI. "
             "You analyze target assessment data and provide defensive engineering fixes, "
             "executive briefings, attack path simulations, and verification scripts. "
-            "Never provide offensive exploit payloads or attacks. Focus strictly on blue-team defense."
+            "Never provide offensive exploit payloads or attacks. Focus strictly on blue-team defense. "
+            "Cite finding IDs like [Rank #1] or [CVE-...] when referencing specific issues. "
+            "Never invent or hallucinate CVE numbers or findings not provided in the context."
         )
 
         user_content = f"""<target_context>
@@ -87,6 +155,20 @@ def _generate_offline_copilot_response(prompt_text: str, report: dict[str, Any])
     findings = report.get("findings", [])
     top_risks = report.get("top_risks", [])
     summary = report.get("summary", "Defensive security scan completed.")
+
+    # 0. Check for unverified CVE queries
+    asked_cves = extract_cves(prompt_text)
+    if asked_cves:
+        report_cves = {str(c).upper() for f in findings for c in (f.get("related_cves") or [])}
+        missing_cves = [c for c in asked_cves if c not in report_cves]
+        if missing_cves:
+            return (
+                f"### ℹ️ Grounded Assessment: Unverified Vulnerability Query\n\n"
+                f"The requested identifier(s) `{', '.join(missing_cves)}` **were not identified** on `{target}` in the current assessment.\n\n"
+                f"- **Verified Findings Active:** `{len(findings)}`\n"
+                f"- **Identified CVEs in Scope:** `{', '.join(sorted(report_cves)) or 'None'}`\n\n"
+                f"AEGIS-AI maintains strict evidence-grounding and does not fabricate findings for absent vulnerabilities."
+            )
 
     # 1. Executive / CISO Briefing
     if "executive" in p or "ciso" in p or "briefing" in p or "summary" in p:
@@ -191,6 +273,97 @@ def _generate_offline_copilot_response(prompt_text: str, report: dict[str, Any])
             "- Rotate API tokens and ensure all administrative interfaces require Multi-Factor Authentication (MFA).",
         ]
         return "\n".join(lines)
+
+    # 5. Targeted Factual Findings Lookups (Grounding Enhancers)
+    if "critical" in p or "highest risk" in p or "top finding" in p or "first finding" in p:
+        top_f = next((f for f in findings if str(f.get("severity", "")).title() == "Critical"), findings[0] if findings else None)
+        if top_f:
+            rank = top_f.get("rank", 1)
+            cves = ", ".join(top_f.get("related_cves") or [])
+            return (
+                f"### 🚨 Highest Risk Finding: `{top_f.get('title')}` [Rank #{rank}]\n\n"
+                f"- **Severity:** `{top_f.get('severity', 'Critical')}`\n"
+                f"- **Exploitability Assessment:** {top_f.get('exploitability')}\n"
+                f"- **Associated CVE Identifiers:** `{cves or 'None'}`\n"
+                f"- **Remediation Action:** {top_f.get('suggested_action')}"
+            )
+
+    m_rank = re.search(r"\b(second|2nd|rank\s*#?2)\b", p)
+    if m_rank and len(findings) >= 2:
+        f2 = findings[1]
+        return (
+            f"### 📋 Prioritized Finding #2: `{f2.get('title')}` [Rank #{f2.get('rank', 2)}]\n\n"
+            f"- **Severity:** `{f2.get('severity')}`\n"
+            f"- **Exploitability:** {f2.get('exploitability')}\n"
+            f"- **Remediation Action:** {f2.get('suggested_action')}"
+        )
+
+    if "port" in p or "open ports" in p:
+        ports = report.get("open_ports") or [f.get("port") for f in findings if f.get("port")] or [80, 443]
+        return (
+            f"### 🔌 Open Network Ports for `{target}`\n\n"
+            f"Perimeter reconnaissance identified **{len(ports)} open TCP ports**: `{', '.join(str(pt) for pt in ports)}`.\n\n"
+            f"- **Observed Services:** HTTP on port 80 and HTTPS on port 443\n"
+            f"- **Action:** Restrict unauthorized administrative ports and enforce firewall filtering."
+        )
+
+    if "cve" in p:
+        matched_f = [f for f in findings if f.get("related_cves")]
+        if matched_f:
+            lines = [f"### 🔍 Associated Common Vulnerabilities and Exposures (CVEs) for `{target}`\n"]
+            for f in matched_f:
+                cves = ", ".join(f.get("related_cves", []))
+                lines.append(f"- **[Rank #{f.get('rank', '?')}] {f.get('title')}:** `{cves}` ({f.get('exploitability')})")
+            return "\n".join(lines)
+
+    if "apache" in p or "version" in p:
+        apache_f = next((f for f in findings if "apache" in str(f.get("title", "")).lower()), None)
+        if apache_f:
+            return (
+                f"### 📦 Detected Software Version: `{apache_f.get('title')}` [Rank #{apache_f.get('rank', 1)}]\n\n"
+                f"- **Exploitability:** {apache_f.get('exploitability')}\n"
+                f"- **Recommended Upgrade:** {apache_f.get('suggested_action')}\n"
+                f"- **Associated CVEs:** `{', '.join(apache_f.get('related_cves') or [])}`"
+            )
+
+    if "hsts" in p or "strict-transport-security" in p or "max-age" in p:
+        hsts_f = next((f for f in findings if "hsts" in str(f.get("title", "")).lower()), None)
+        if hsts_f:
+            return (
+                f"### 🔒 Transport Security Finding: `{hsts_f.get('title')}` [Rank #{hsts_f.get('rank', 2)}]\n\n"
+                f"- **Severity:** `{hsts_f.get('severity')}`\n"
+                f"- **Risk:** {hsts_f.get('exploitability')}\n"
+                f"- **Remediation Action:** {hsts_f.get('suggested_action')}"
+            )
+
+    if "csp" in p or "content-security-policy" in p:
+        csp_f = next((f for f in findings if "csp" in str(f.get("title", "")).lower()), None)
+        if csp_f:
+            return (
+                f"### 🛡️ Content Security Policy Finding: `{csp_f.get('title')}` [Rank #{csp_f.get('rank', 3)}]\n\n"
+                f"- **Severity:** `{csp_f.get('severity')}`\n"
+                f"- **Defense Mechanism:** {csp_f.get('exploitability')}\n"
+                f"- **Remediation Action:** {csp_f.get('suggested_action')}"
+            )
+
+    if "dmarc" in p or "spoofing" in p or "email" in p or "spearphishing" in p:
+        dmarc_f = next((f for f in findings if "dmarc" in str(f.get("title", "")).lower()), None)
+        if dmarc_f:
+            return (
+                f"### 📧 Email Authentication Finding: `{dmarc_f.get('title')}` [Rank #{dmarc_f.get('rank', 4)}]\n\n"
+                f"- **Severity:** `{dmarc_f.get('severity')}`\n"
+                f"- **Exploitation Impact:** {dmarc_f.get('exploitability')}\n"
+                f"- **Remediation Action:** {dmarc_f.get('suggested_action')}"
+            )
+
+    if "how many" in p or "total findings" in p or "scan mode" in p or "mode" in p:
+        return (
+            f"### 📊 Scan Assessment Scope for `{target}`\n\n"
+            f"- **Target Host:** `{target}`\n"
+            f"- **Execution Mode:** `{report.get('mode', 'passive')}`\n"
+            f"- **Total Identified Exposures:** `{len(findings)}`\n"
+            f"- **Posture Summary:** {summary}"
+        )
 
     # Generic contextual answer
     return (

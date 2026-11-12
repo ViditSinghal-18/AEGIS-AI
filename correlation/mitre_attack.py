@@ -5,6 +5,7 @@ Maps attack surface findings, open ports, missing headers, and CVEs into MITRE A
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 
@@ -172,8 +173,43 @@ def map_findings_to_mitre(findings: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def map_finding_to_mitre(finding: dict[str, Any]) -> dict[str, Any]:
-    """Map an individual finding to MITRE ATT&CK techniques."""
+def map_finding_to_mitre(finding: dict[str, Any], mapper_mode: str | None = None) -> dict[str, Any]:
+    """Map an individual finding to MITRE ATT&CK techniques.
+
+    Supports rule-based mapping (default) and learned TF-IDF+Linear classifier (Kuppa et al. 2021).
+    """
+    mode = mapper_mode or os.getenv("AEGIS_MITRE_MAPPER", "rule").lower()
+    
+    # 1. Check if learned mapper mode is requested
+    if mode == "learned":
+        try:
+            from correlation.learned_attack_mapper import get_learned_attack_mapper
+            learned_pred = get_learned_attack_mapper().predict(finding)
+            t_id = learned_pred.technique_id
+            
+            matching_rule = next((r for r in TECHNIQUE_RULES if r["technique_id"] == t_id), None)
+            if matching_rule:
+                primary = {
+                    "technique_id": matching_rule["technique_id"],
+                    "technique_name": matching_rule["technique_name"],
+                    "tactic_id": matching_rule["tactic_id"],
+                    "tactic_name": matching_rule["tactic_name"],
+                    "url": matching_rule["url"],
+                    "mitigation": matching_rule["mitigation"],
+                    "confidence": learned_pred.confidence,
+                    "mapping_source": "learned_classifier",
+                }
+                return {
+                    "technique_id": t_id,
+                    "technique_name": matching_rule["technique_name"],
+                    "techniques": [primary],
+                    "primary": primary,
+                    "confidence": learned_pred.confidence,
+                    "mapping_source": "learned_classifier",
+                }
+        except Exception:
+            pass  # Fallback to rule-based mapper
+
     title = str(finding.get("title", "")).lower()
     source = str(finding.get("source", "")).lower()
     evidence = str(finding.get("evidence", "")).lower()
