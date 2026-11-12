@@ -26,8 +26,8 @@ ROOT = Path(__file__).resolve().parent
 ENV = os.getenv("AEGIS_ENV", os.getenv("FLASK_ENV", "production")).lower()
 IS_VERCEL = bool(os.getenv("VERCEL") == "1" or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 DEBUG = os.getenv("AEGIS_DEBUG", "false").lower() in ("true", "1", "yes") and not IS_VERCEL
-PORT = int(os.getenv("PORT", "5000"))
-HOST = os.getenv("HOST", "127.0.0.1")
+PORT = int(os.getenv("PORT", os.getenv("AEGIS_PORT", "5000")))
+HOST = os.getenv("HOST", os.getenv("AEGIS_HOST", "0.0.0.0"))
 SECRET_KEY = os.getenv("SECRET_KEY", "aegis-defense-default-key-change-in-prod")
 
 # Optional access control token for scan endpoints

@@ -8,6 +8,8 @@ FROM python:3.11-slim
 # Prevent Python from writing .pyc files and enable unbuffered output
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    HOST=0.0.0.0 \
+    PORT=5000 \
     AEGIS_HOST=0.0.0.0 \
     AEGIS_PORT=5000 \
     AEGIS_DATA_DIR=/app/data
