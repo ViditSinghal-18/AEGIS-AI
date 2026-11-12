@@ -8,6 +8,7 @@ Flask>=3.0.0,<3.2.0
 
 # Environment Configuration & Secret Management
 python-dotenv>=1.0.0,<2.0.0
+PyYAML>=6.0
 
 # HTTP Transport, Telemetry & Threat Intelligence
 requests>=2.31.0,<3.0.0
@@ -32,4 +33,5 @@ networkx>=3.0
 # Optional Streamlit Dashboard, Cloud SDK & AI Agents
 streamlit>=1.30.0
 boto3>=1.34.0  # Optional: only required for AEGIS_LLM_PROVIDER=bedrock
+strands-agents>=1.0.0
 
