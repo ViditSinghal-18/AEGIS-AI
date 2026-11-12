@@ -621,8 +621,8 @@ with st.sidebar.expander("🔑 Domain Ownership Verification", expanded=False):
             """,
             unsafe_allow_html=True,
         )
-        st.markdown(f"**Method A (DNS TXT):**\n`_attacksurface-verify.{v_domain}`")
-        st.markdown(f"**Method B (HTTP):**\n`https://{v_domain}/.well-known/attacksurface-verify.txt`")
+        st.markdown(f"**Method A (DNS TXT):**\n`_aegis-verify.{v_domain}`")
+        st.markdown(f"**Method B (HTTP):**\n`https://{v_domain}/.well-known/aegis-verify.txt`")
 
     active_verified = load_verified_targets()
     if active_verified:

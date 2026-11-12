@@ -4,6 +4,8 @@ from verification.verify import (
     check_verification,
     is_domain_verified,
     load_verified_targets,
+    check_domain_verification,
+    generate_verification_token,
 )
 
 __all__ = [
@@ -11,4 +13,6 @@ __all__ = [
     "check_verification",
     "is_domain_verified",
     "load_verified_targets",
+    "check_domain_verification",
+    "generate_verification_token",
 ]

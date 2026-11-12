@@ -108,49 +108,54 @@ def start_verification(domain: str) -> dict[str, str]:
 def _check_dns_txt_record(domain: str, expected_token: str) -> bool:
     """
     Check DNS TXT record using Cloudflare DoH (works on serverless / Vercel),
-    with fallback to local nslookup.
+    with fallback to local nslookup. Checks both _aegis-verify and legacy _attacksurface-verify prefixes.
     """
-    txt_host = f"_aegis-verify.{domain}"
+    candidate_hosts = [f"_aegis-verify.{domain}", f"_attacksurface-verify.{domain}"]
 
-    # 1. Cloudflare DNS-over-HTTPS check (OS-independent and serverless safe)
-    try:
-        doh_url = f"https://cloudflare-dns.com/dns-query?name={txt_host}&type=TXT"
-        resp = safe_fetch(doh_url, headers={"Accept": "application/dns-json"}, timeout=4.0)
-        if resp.status_code == 200:
-            answers = resp.json().get("Answer", [])
-            for ans in answers:
-                data_val = str(ans.get("data", "")).strip('"')
-                if expected_token in data_val:
-                    return True
-    except Exception:
-        pass
+    for txt_host in candidate_hosts:
+        # 1. Cloudflare DNS-over-HTTPS check (OS-independent and serverless safe)
+        try:
+            doh_url = f"https://cloudflare-dns.com/dns-query?name={txt_host}&type=TXT"
+            resp = safe_fetch(doh_url, headers={"Accept": "application/dns-json"}, timeout=4.0)
+            if resp.status_code == 200:
+                answers = resp.json().get("Answer", [])
+                for ans in answers:
+                    data_val = str(ans.get("data", "")).strip('"')
+                    if expected_token in data_val:
+                        return True
+        except Exception:
+            pass
 
-    # 2. Local nslookup fallback
-    try:
-        proc = subprocess.run(
-            ["nslookup", "-type=TXT", txt_host],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if expected_token in proc.stdout:
-            return True
-    except Exception:
-        pass
+        # 2. Local nslookup fallback
+        try:
+            proc = subprocess.run(
+                ["nslookup", "-type=TXT", txt_host],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if expected_token in proc.stdout:
+                return True
+        except Exception:
+            pass
 
     return False
 
 
 def _check_well_known_file(domain: str, expected_token: str) -> bool:
-    """Fetch https://<domain>/.well-known/aegis-verify.txt via safe_fetch."""
-    url = f"https://{domain}/.well-known/aegis-verify.txt"
-    try:
-        response = safe_fetch(url, timeout=5.0)
-        if response.status_code == 200:
-            if expected_token in response.text.strip():
-                return True
-    except (SafeFetchError, Exception):
-        pass
+    """Fetch /.well-known verification file via safe_fetch."""
+    candidate_urls = [
+        f"https://{domain}/.well-known/aegis-verify.txt",
+        f"https://{domain}/.well-known/attacksurface-verify.txt",
+    ]
+    for url in candidate_urls:
+        try:
+            response = safe_fetch(url, timeout=5.0)
+            if response.status_code == 200:
+                if expected_token in response.text.strip():
+                    return True
+        except (SafeFetchError, Exception):
+            pass
     return False
 
 
@@ -200,3 +205,13 @@ def load_verified_targets() -> dict[str, dict[str, Any]]:
     """Return all currently active and non-expired verified target records."""
     data = _load_verified_data()
     return {k: v for k, v in data.items() if is_domain_verified(k)}
+
+
+def generate_verification_token(domain: str) -> str:
+    """Convenience alias: generate and store challenge token for a domain, returning token string."""
+    info = start_verification(domain)
+    return str(info.get("token", ""))
+
+
+check_domain_verification = check_verification
+
