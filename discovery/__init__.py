@@ -8,8 +8,8 @@ import datetime
 import time
 from typing import Any, Dict, List
 
+import discovery.safe_fetch
 from discovery.safe_fetch import (
-    safe_fetch,
     SafeFetchError,
     PinnedIPAdapter,
     resolve_and_validate_hostname,

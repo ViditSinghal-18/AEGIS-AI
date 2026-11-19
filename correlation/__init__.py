@@ -3,7 +3,7 @@ AEGIS-AI Vulnerability Correlation & Intelligence Package.
 """
 from __future__ import annotations
 
-from correlation.correlate import correlate
+import correlation.correlate
 from correlation.compliance import map_compliance, calculate_compliance
 from correlation.mitre_attack import (
     map_findings_to_mitre,
