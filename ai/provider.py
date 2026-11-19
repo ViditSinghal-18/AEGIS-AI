@@ -40,12 +40,6 @@ RULES:
 
 def get_available_llm_provider() -> Tuple[str, str]:
     """Detect available LLM provider based on environment variables."""
-    llm_prov = os.getenv("AEGIS_LLM_PROVIDER", "").strip().lower()
-    if llm_prov == "free":
-        return "free", "Free AI (Zero-Key Open Model)"
-    if llm_prov == "openai_compatible":
-        import ai.llm as llm_mod
-        return "openai_compatible", llm_mod.describe()
     if os.getenv("ANTHROPIC_API_KEY", "").strip():
         return "anthropic", os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
     if os.getenv("GEMINI_API_KEY", "").strip():
@@ -56,6 +50,12 @@ def get_available_llm_provider() -> Tuple[str, str]:
         return "bedrock", getattr(config, "BEDROCK_MODEL_ID", "anthropic.claude-3-sonnet-20240229-v1:0")
     if os.getenv("OLLAMA_HOST", "").strip():
         return "ollama", os.getenv("OLLAMA_MODEL", "llama3.2")
+    llm_prov = os.getenv("AEGIS_LLM_PROVIDER", "").strip().lower()
+    if llm_prov == "free":
+        return "free", "Free AI (Zero-Key Open Model)"
+    if llm_prov == "openai_compatible" and os.getenv("AEGIS_LLM_API_KEY", "").strip():
+        import ai.llm as llm_mod
+        return "openai_compatible", llm_mod.describe()
     return "rule-based", "AEGIS Defensive Heuristic Reasoner"
 
 

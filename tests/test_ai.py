@@ -74,9 +74,12 @@ class TestProviderSelection:
     def test_fallback_selected_when_no_keys_present(self, monkeypatch):
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
         monkeypatch.delenv("AWS_REGION", raising=False)
         monkeypatch.delenv("OLLAMA_HOST", raising=False)
+        monkeypatch.delenv("AEGIS_LLM_PROVIDER", raising=False)
+        monkeypatch.delenv("AEGIS_LLM_API_KEY", raising=False)
         provider, model = get_available_llm_provider()
         assert provider == "rule-based"
         assert "Heuristic" in model or "Defensive" in model

@@ -67,6 +67,33 @@ def query_copilot_with_grounding(
         )
         return _DEFENSIVE_REFUSAL_MESSAGE, res
 
+    # 1b. Hard evidence-grounding guardrail: unverified absent CVE query check
+    asked_cves = extract_cves(prompt_text)
+    if asked_cves:
+        findings = report.get("findings", [])
+        report_cves = {str(c).upper() for f in findings for c in (f.get("related_cves") or [])}
+        missing_cves = [c for c in asked_cves if c not in report_cves]
+        if missing_cves:
+            target = report.get("target", "Target")
+            unverified_msg = (
+                f"### ℹ️ Grounded Assessment: Unverified Vulnerability Query\n\n"
+                f"The requested identifier(s) `{', '.join(missing_cves)}` **were not identified** on `{target}` in the current assessment.\n\n"
+                f"- **Verified Findings Active:** `{len(findings)}`\n"
+                f"- **Identified CVEs in Scope:** `{', '.join(sorted(report_cves)) or 'None'}`\n\n"
+                f"AEGIS-AI maintains strict evidence-grounding and does not fabricate findings for absent vulnerabilities."
+            )
+            res = GroundingVerificationResult(
+                faithfulness_score=1.0,
+                is_faithful=True,
+                total_claims=1,
+                supported_claims_count=1,
+                unsupported_claims_count=0,
+                hallucinated_cves=[],
+                citations_found=[],
+                explanation="Unverified absent CVE query cleanly grounded and reported.",
+            )
+            return unverified_msg, res
+
     # 2. Generate response via LLM or offline reasoner
     llm_resp = _call_llm_copilot(prompt_text, report, history)
     response_text = llm_resp or _generate_offline_copilot_response(prompt_text, report)
