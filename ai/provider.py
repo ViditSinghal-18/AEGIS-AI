@@ -43,6 +43,9 @@ def get_available_llm_provider() -> Tuple[str, str]:
     llm_prov = os.getenv("AEGIS_LLM_PROVIDER", "").strip().lower()
     if llm_prov == "free":
         return "free", "Free AI (Zero-Key Open Model)"
+    if llm_prov == "openai_compatible":
+        import ai.llm as llm_mod
+        return "openai_compatible", llm_mod.describe()
     if os.getenv("ANTHROPIC_API_KEY", "").strip():
         return "anthropic", os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
     if os.getenv("GEMINI_API_KEY", "").strip():
@@ -390,7 +393,15 @@ def query_copilot(prompt: str, report: Dict[str, Any]) -> Dict[str, Any]:
     provider_name, model_name = get_available_llm_provider()
     raw_answer = None
 
-    if provider_name == "free":
+    if provider_name == "openai_compatible":
+        try:
+            import ai.llm as llm_mod
+            user_content = f"{wrapped_context}\n\nUser Question: {prompt}"
+            res = llm_mod.complete(SYSTEM_PROMPT, user_content, max_tokens=1000, temperature=0.2)
+            raw_answer = res.text.strip()
+        except Exception:
+            raw_answer = None
+    elif provider_name == "free":
         raw_answer = call_free_ai(prompt, wrapped_context, model_name)
     elif provider_name == "anthropic":
         raw_answer = call_anthropic(prompt, wrapped_context, model_name)
