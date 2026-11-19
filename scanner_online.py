@@ -1,4 +1,5 @@
 import json
+import ipaddress
 import ssl
 import socket
 import urllib.parse
@@ -84,14 +85,18 @@ def assess_website(target_input):
     try:
         ip_addr = socket.gethostbyname(hostname)
         results["resolved_ip"] = ip_addr
-        if (
-            ip_addr.startswith("127.") or 
-            ip_addr.startswith("10.") or 
-            ip_addr.startswith("192.168.") or 
-            (ip_addr.startswith("172.") and 16 <= int(ip_addr.split(".")[1]) <= 31) or
-            ip_addr in ["localhost", "::1"]
-        ):
-            is_private = True
+        try:
+            ip_obj = ipaddress.ip_address(ip_addr)
+            is_private = (
+                ip_obj.is_private
+                or ip_obj.is_loopback
+                or ip_obj.is_link_local
+                or ip_obj.is_reserved
+                or ip_obj.is_multicast
+                or str(ip_obj) in {"169.254.169.254", "fd00:ec2::254"}
+            )
+        except ValueError:
+            is_private = hostname.lower() in {"localhost", "127.0.0.1", "::1"}
     except Exception as e:
         results["resolved_ip"] = f"Unresolved ({str(e)})"
 

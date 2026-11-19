@@ -73,6 +73,10 @@ def save_run_history(target: str, report_data: dict[str, Any]) -> Path:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"run_{timestamp}.json"
     path = history_dir / filename
+    if path.exists():
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"run_{timestamp}.json"
+        path = history_dir / filename
     path.write_text(json.dumps(report_data, indent=2), encoding="utf-8")
     return path
 

@@ -192,7 +192,7 @@ AEGIS-AI was benchmarked against the **OWASP Juice Shop** perimeter attack surfa
 AEGIS-AI includes a comprehensive `pytest` test suite covering safety boundaries, SSRF defenses, scoring formulas, AST reachability, and API endpoints:
 
 ```bash
-# Run complete test suite (59 tests)
+# Run complete test suite (210+ tests covering Phases 1-6)
 python -m pytest tests/ -v
 
 # Run OWASP Juice Shop validation benchmark

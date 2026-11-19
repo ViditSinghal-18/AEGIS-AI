@@ -42,3 +42,5 @@ data/*
 !data/sample/
 !data/sample/**
 !data/cve_symbols.yaml
+reports/*.json
+!reports/sample_*.json

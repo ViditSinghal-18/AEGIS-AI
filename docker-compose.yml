@@ -34,7 +34,7 @@ services:
       - ./data:/app/data
       - ./targets.allowlist:/app/targets.allowlist:ro
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/report"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3

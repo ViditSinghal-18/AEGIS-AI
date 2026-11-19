@@ -49,5 +49,5 @@ USER aegis
 # Expose HTTP port
 EXPOSE 5000
 
-# Launch AEGIS application
-CMD ["python", "app.py"]
+# Launch AEGIS application via production WSGI server
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "app:app"]

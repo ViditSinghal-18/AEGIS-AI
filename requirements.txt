@@ -5,6 +5,7 @@
 
 # Core Web Application & REST API
 Flask>=3.0.0,<3.2.0
+gunicorn>=21.2.0
 
 # Environment Configuration & Secret Management
 python-dotenv>=1.0.0,<2.0.0

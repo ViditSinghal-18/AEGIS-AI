@@ -74,15 +74,23 @@ CISA_KEV_FEED = os.getenv(
 )
 OSV_QUERY_API = os.getenv("OSV_QUERY_API", "https://api.osv.dev/v1/query")
 
-# AI Copilot Backend (Optional LLM configuration)
+# AI Copilot Backend (AEGIS Provider-Neutral Layer)
+AEGIS_LLM_PROVIDER = os.getenv("AEGIS_LLM_PROVIDER", os.getenv("LLM_PROVIDER", "none")).lower()
+AEGIS_LLM_BASE_URL = os.getenv("AEGIS_LLM_BASE_URL", "https://api.groq.com/openai/v1").strip()
+AEGIS_LLM_API_KEY = os.getenv("AEGIS_LLM_API_KEY", "").strip()
+AEGIS_LLM_MODEL = os.getenv("AEGIS_LLM_MODEL", "").strip()
+AEGIS_LLM_MODEL_LARGE = os.getenv("AEGIS_LLM_MODEL_LARGE", "").strip()
+
 AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
 BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "amazon.nova-micro-v1:0")
 DECIDER_URL = os.getenv("DECIDER_URL", "http://127.0.0.1:8088")
 DECIDER_THRESHOLD = float(os.getenv("DECIDER_THRESHOLD", "0.7"))
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+
+# Legacy provider aliases (kept for backwards compatibility)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", AEGIS_LLM_API_KEY).strip()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "auto").lower()  # auto, bedrock, gemini, anthropic, openai, offline
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", AEGIS_LLM_API_KEY).strip()
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", AEGIS_LLM_PROVIDER).lower()
 
 # CORS
 CORS_ORIGIN = os.getenv("CORS_ORIGIN", "*")

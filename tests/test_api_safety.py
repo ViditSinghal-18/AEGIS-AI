@@ -116,6 +116,63 @@ class TestApiSafetyEndpoints(unittest.TestCase):
         finally:
             config.AEGIS_API_TOKEN = orig_token
 
+    def test_scan_history_and_diff_endpoints(self):
+        from storage import save_run_history, target_data_dir
+        import shutil
+        import time
+        test_tgt = "hist-test-host.local"
+        try:
+            rep1 = {"target": test_tgt, "findings": [{"title": "Old Flaw", "related_cves": []}], "overall_risk_score": 60.0}
+            rep2 = {"target": test_tgt, "findings": [{"title": "Old Flaw", "related_cves": []}, {"title": "New Flaw", "related_cves": []}], "overall_risk_score": 80.0}
+            save_run_history(test_tgt, rep1)
+            time.sleep(0.01)
+            save_run_history(test_tgt, rep2)
+
+            res = self.client.get(f"/api/scan/history?target={test_tgt}")
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertIn("history", data)
+            self.assertGreaterEqual(len(data["history"]), 2)
+            self.assertIn("filename", data["history"][0])
+            self.assertIn("timestamp", data["history"][0])
+
+            res_diff = self.client.get(f"/api/scan/diff?target={test_tgt}")
+            self.assertEqual(res_diff.status_code, 200)
+            diff_data = res_diff.get_json()
+            self.assertIn("new", diff_data)
+            self.assertIn("summary", diff_data)
+
+            res_drift = self.client.get(f"/api/drift?target={test_tgt}")
+            self.assertEqual(res_drift.status_code, 200)
+            drift_data = res_drift.get_json()
+            self.assertEqual(drift_data.get("target"), test_tgt)
+            self.assertIn("drift_summary", drift_data)
+        finally:
+            shutil.rmtree(target_data_dir(test_tgt), ignore_errors=True)
+
+    def test_analytics_endpoints(self):
+        res_life = self.client.get("/api/analytics/patch-lifetime")
+        self.assertEqual(res_life.status_code, 200)
+        data_life = res_life.get_json()
+        self.assertIn("total_tracked", data_life)
+        self.assertIn("survival_curve", data_life)
+
+        res_drift = self.client.get("/api/analytics/drift")
+        self.assertEqual(res_drift.status_code, 200)
+        data_drift = res_drift.get_json()
+        self.assertIn("result", data_drift)
+        self.assertIn("drift_detected", data_drift["result"])
+
+    def test_agent_chat_target_guardrail(self):
+        res = self.client.post("/api/agent-chat", json={"message": "audit bad;domain.com"})
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertIn("reply", data)
+
+        res_empty = self.client.post("/api/agent-chat", json={"message": ""})
+        self.assertEqual(res_empty.status_code, 200)
+        self.assertTrue(res_empty.get_json().get("grounded"))
+
 
 if __name__ == "__main__":
     unittest.main()

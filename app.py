@@ -1,9 +1,11 @@
 import json
 import os
+import re
 import subprocess
 import sys
 import csv
 import io
+from datetime import datetime, timezone
 from pathlib import Path
 from flask import Flask, render_template, jsonify, send_file, request, Response
 
@@ -514,14 +516,25 @@ def api_scan_stage_prioritize():
 @app.route("/api/scan/history", methods=["GET"])
 def api_scan_history():
     target = request.args.get("target", "").strip()
-    history = list_run_history(target)
-    return jsonify({"target": target, "history": history})
+    history_paths = list_run_history(target)
+    serialized_history = []
+    for p in history_paths:
+        m = re.search(r"run_(\d{8}_\d{6})", p.name)
+        ts = m.group(1) if m else str(p.stat().st_mtime)
+        serialized_history.append({
+            "filename": p.name,
+            "path": str(p),
+            "timestamp": ts,
+            "mtime": p.stat().st_mtime,
+            "size": p.stat().st_size,
+        })
+    return jsonify({"target": target, "history": serialized_history})
 
 @app.route("/api/scan/diff", methods=["GET", "POST"])
 def api_scan_diff():
     target = request.args.get("target") or (request.get_json(silent=True) or {}).get("target", "")
-    history = list_run_history(target)
-    if len(history) < 2:
+    history_paths = list_run_history(target)
+    if len(history_paths) < 2:
         return jsonify({
             "message": "At least 2 historical scans required for drift comparison.",
             "new": [],
@@ -530,8 +543,8 @@ def api_scan_diff():
             "summary": {"new_count": 0, "resolved_count": 0, "persisting_count": 0}
         })
     try:
-        curr = read_json(history[0]["filename"], target=target)
-        prev = read_json(history[1]["filename"], target=target)
+        curr = json.loads(history_paths[0].read_text(encoding="utf-8"))
+        prev = json.loads(history_paths[1].read_text(encoding="utf-8"))
         diff = diff_reports(curr, prev)
         return jsonify(diff)
     except Exception as e:
@@ -740,17 +753,21 @@ def get_cisa_kev_status():
 @app.route("/api/drift", methods=["GET"])
 def get_exposure_drift():
     """Returns comparative drift metrics between latest two scans if available."""
-    target = request.args.get("target", "")
-    history = list_run_history(target)
-    if len(history) >= 2:
+    target = request.args.get("target", "").strip()
+    history_paths = list_run_history(target)
+    if len(history_paths) >= 2:
         try:
-            curr = read_json(history[0]["filename"], target=target)
-            prev = read_json(history[1]["filename"], target=target)
+            curr = json.loads(history_paths[0].read_text(encoding="utf-8"))
+            prev = json.loads(history_paths[1].read_text(encoding="utf-8"))
             diff = diff_reports(curr, prev)
+            m0 = re.search(r"run_(\d{8}_\d{6})", history_paths[0].name)
+            ts0 = m0.group(1) if m0 else str(history_paths[0].stat().st_mtime)
+            m1 = re.search(r"run_(\d{8}_\d{6})", history_paths[1].name)
+            ts1 = m1.group(1) if m1 else str(history_paths[1].stat().st_mtime)
             return jsonify({
                 "target": target,
-                "current_timestamp": history[0]["timestamp"],
-                "baseline_timestamp": history[1]["timestamp"],
+                "current_timestamp": ts0,
+                "baseline_timestamp": ts1,
                 "drift_summary": diff["summary"],
                 "new_exposures": diff["new"],
                 "remediated": diff["resolved"],
@@ -760,7 +777,70 @@ def get_exposure_drift():
             pass
     return jsonify({
         "message": "Continuous Threat Exposure Management (CTEM) requires multiple scans on the same target to calculate drift.",
-        "scans_recorded": len(history)
+        "scans_recorded": len(history_paths)
+    })
+
+@app.route("/api/analytics/patch-lifetime", methods=["GET"])
+def api_patch_lifetime_analytics():
+    """Compute Kaplan-Meier patch lifetime analytics and MTTR from historical scans."""
+    from analytics.patch_lifetime import calculate_patch_analytics
+    from analytics.drift_detector import load_history
+    target = request.args.get("target", "").strip() or "default"
+    
+    # 1. Try versioned history storage first
+    hist_data = load_history(target=target)
+    snapshots = hist_data.get("snapshots", [])
+    
+    # 2. If snapshots are empty, populate from individual history files
+    if not snapshots and target:
+        history_paths = list_run_history(target)
+        sorted_paths = sorted(history_paths, key=lambda p: p.stat().st_mtime)
+        t0 = sorted_paths[0].stat().st_mtime if sorted_paths else 0
+        for idx, p in enumerate(sorted_paths):
+            try:
+                rep = json.loads(p.read_text(encoding="utf-8"))
+                elapsed_days = round((p.stat().st_mtime - t0) / 86400.0, 2)
+                findings = rep.get("findings", rep.get("prioritized_findings", []))
+                snapshots.append({
+                    "snapshot_id": f"scan-{idx+1}",
+                    "timestamp": datetime.fromtimestamp(p.stat().st_mtime, timezone.utc).isoformat(),
+                    "timestamp_days": elapsed_days,
+                    "overall_risk_score": rep.get("overall_risk_score", rep.get("score", 70.0)),
+                    "findings": findings
+                })
+            except Exception:
+                pass
+
+    report = calculate_patch_analytics(snapshots)
+    return jsonify(report.to_dict())
+
+@app.route("/api/analytics/drift", methods=["GET"])
+def api_cusum_drift_analytics():
+    """Evaluate longitudinal exposure scores for statistical drift using two-sided CUSUM."""
+    from analytics.drift_detector import CusumDriftDetector, load_history
+    target = request.args.get("target", "").strip() or "default"
+    hist_data = load_history(target=target)
+    snapshots = hist_data.get("snapshots", [])
+
+    if not snapshots and target:
+        history_paths = list_run_history(target)
+        sorted_paths = sorted(history_paths, key=lambda p: p.stat().st_mtime)
+        for idx, p in enumerate(sorted_paths):
+            try:
+                rep = json.loads(p.read_text(encoding="utf-8"))
+                score = float(rep.get("overall_risk_score", rep.get("score", 70.0)))
+                snapshots.append({"overall_risk_score": score})
+            except Exception:
+                pass
+
+    series = [float(s.get("overall_risk_score", 0.0)) for s in snapshots if "overall_risk_score" in s]
+    detector = CusumDriftDetector()
+    res = detector.detect(series)
+    return jsonify({
+        "target": target,
+        "sample_count": len(series),
+        "scores_series": series,
+        "result": res.to_dict()
     })
 
 @app.route("/api/agent-chat", methods=["POST"])
@@ -805,8 +885,19 @@ def agent_chat():
     import re
     domain_match = re.search(r'([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?::\d+)?)', user_msg)
     if domain_match and any(w in user_msg.lower() for w in ["check", "audit", "assess", "scan", "safe"]):
-        matched_domain = domain_match.group(1).strip()
+        raw_matched = domain_match.group(1).strip()
         try:
+            matched_domain = validate_target_input(raw_matched)
+            client_ip = request.headers.get("X-Forwarded-For", request.remote_addr or "127.0.0.1").split(",")[0].strip()
+            allowed, _, rate_err = check_rate_limits(client_ip, matched_domain)
+            if not allowed:
+                return jsonify({
+                    "reply": f"⚠️ Rate limit reached for domain security audit requests: {rate_err}",
+                    "provider": "system",
+                    "model": "AEGIS Rate Limiter",
+                    "grounded": True
+                })
+
             audit = assess_website(matched_domain)
             safe_save_json(ONLINE_REPORT_FILE, audit)
             grade = audit.get("grade", "N/A")
@@ -833,6 +924,13 @@ def agent_chat():
                 "model": "AEGIS Real-Time Evaluator",
                 "grounded": True,
                 "audit": audit
+            })
+        except ValidationError as ve:
+            return jsonify({
+                "reply": f"⚠️ Target input rejected by guardrail: {str(ve)}",
+                "provider": "system",
+                "model": "AEGIS Target Guardrail",
+                "grounded": True
             })
         except Exception:
             pass
