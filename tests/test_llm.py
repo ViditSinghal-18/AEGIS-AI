@@ -390,3 +390,29 @@ def test_get_model_none_provider_raises():
     with patch("ai.llm.active_provider", return_value="none"):
         with pytest.raises(RuntimeError, match="No LLM provider configured"):
             get_model()
+
+
+# ---------------------------------------------------------------------------
+# 15. Free AI provider (Zero-Key) success
+# ---------------------------------------------------------------------------
+
+def test_free_provider_success(monkeypatch):
+    monkeypatch.setenv("AEGIS_LLM_PROVIDER", "free")
+    import importlib
+    import ai.llm as llm_mod
+    importlib.reload(llm_mod)
+
+    assert llm_mod.active_provider() == "free"
+    assert llm_mod.is_enabled()
+    assert "Free AI" in llm_mod.describe()
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = _openai_response("FREE_AI_READY", in_tokens=12, out_tokens=3)
+
+    with patch("requests.post", return_value=mock_resp):
+        result = llm_mod.complete("sys", "user")
+
+    assert result.text == "FREE_AI_READY"
+    assert result.provider == "free"
+    assert "free:" in result.model_id

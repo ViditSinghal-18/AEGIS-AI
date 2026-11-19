@@ -40,6 +40,9 @@ RULES:
 
 def get_available_llm_provider() -> Tuple[str, str]:
     """Detect available LLM provider based on environment variables."""
+    llm_prov = os.getenv("AEGIS_LLM_PROVIDER", "").strip().lower()
+    if llm_prov == "free":
+        return "free", "Free AI (Zero-Key Open Model)"
     if os.getenv("ANTHROPIC_API_KEY", "").strip():
         return "anthropic", os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
     if os.getenv("GEMINI_API_KEY", "").strip():
@@ -190,6 +193,33 @@ def call_ollama(prompt: str, context: str, model: str) -> Optional[str]:
         res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=15.0)
         if res.status_code == 200:
             return res.json().get("response", "").strip()
+    except Exception:
+        pass
+    return None
+
+
+def call_free_ai(prompt: str, context: str, model: str = "openai") -> Optional[str]:
+    """Call public free OpenAI-compatible endpoint with zero API key required."""
+    try:
+        import requests
+        base_url = os.getenv("AEGIS_LLM_BASE_URL", "https://text.pollinations.ai/openai").rstrip("/")
+        model_name = os.getenv("AEGIS_LLM_MODEL", "openai")
+        url = f"{base_url}/chat/completions"
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"{context}\n\nUser Question: {prompt}"}
+            ],
+            "max_tokens": 800,
+            "temperature": 0.2
+        }
+        res = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=20.0)
+        if res.status_code == 200:
+            data = res.json()
+            choices = data.get("choices") or []
+            if choices:
+                return choices[0].get("message", {}).get("content", "").strip()
     except Exception:
         pass
     return None
@@ -360,7 +390,9 @@ def query_copilot(prompt: str, report: Dict[str, Any]) -> Dict[str, Any]:
     provider_name, model_name = get_available_llm_provider()
     raw_answer = None
 
-    if provider_name == "anthropic":
+    if provider_name == "free":
+        raw_answer = call_free_ai(prompt, wrapped_context, model_name)
+    elif provider_name == "anthropic":
         raw_answer = call_anthropic(prompt, wrapped_context, model_name)
     elif provider_name == "gemini":
         raw_answer = call_gemini(prompt, wrapped_context, model_name)

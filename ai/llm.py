@@ -33,7 +33,7 @@ _MODEL_ENV = "AEGIS_LLM_MODEL"
 _MODEL_LARGE_ENV = "AEGIS_LLM_MODEL_LARGE"
 
 _DEFAULT_OPENAI_BASE = "https://api.groq.com/openai/v1"
-_VALID_PROVIDERS = frozenset({"none", "openai_compatible", "ollama", "bedrock"})
+_VALID_PROVIDERS = frozenset({"none", "openai_compatible", "ollama", "bedrock", "free"})
 
 
 # ---------------------------------------------------------------------------
@@ -317,6 +317,71 @@ def _call_bedrock(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Provider: free (Public zero-key free AI via OpenAI-compatible endpoint)
+# ---------------------------------------------------------------------------
+def _call_free(
+    system: str,
+    user: str,
+    *,
+    max_tokens: int,
+    temperature: float,
+    tier: str,
+) -> LLMResult:
+    import requests as _requests
+
+    base_url = os.getenv(_BASE_URL_ENV, "https://text.pollinations.ai/openai").rstrip("/")
+    model_default = os.getenv(_MODEL_ENV, "openai").strip()
+    model_large = os.getenv(_MODEL_LARGE_ENV, "").strip()
+    model_id = (model_large if tier == "large" and model_large else model_default) or "openai"
+
+    endpoint = f"{base_url}/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    payload: dict[str, Any] = {
+        "model": model_id,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+
+    t0 = time.perf_counter()
+    try:
+        resp = _requests.post(endpoint, json=payload, headers=headers, timeout=25)
+        if resp.status_code != 200:
+            raise LLMUnavailable(
+                f"Free AI endpoint returned HTTP {resp.status_code} from {base_url}"
+            )
+        data = resp.json()
+    except LLMUnavailable:
+        raise
+    except Exception as exc:
+        raise LLMUnavailable(f"Free AI request failed: {type(exc).__name__}") from exc
+
+    elapsed_ms = (time.perf_counter() - t0) * 1000.0
+
+    choices = data.get("choices") or []
+    if not choices:
+        raise LLMUnavailable("Free AI provider returned empty choices list.")
+
+    text = (choices[0].get("message") or {}).get("content") or ""
+    returned_model = data.get("model") or model_id
+    usage = data.get("usage") or {}
+    input_tokens = int(usage.get("prompt_tokens", 0))
+    output_tokens = int(usage.get("completion_tokens", 0))
+
+    return LLMResult(
+        text=text,
+        model_id=f"free:{returned_model}",
+        provider="free",
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        latency_ms=round(elapsed_ms, 2),
+    )
+
+
 def active_provider() -> str:
     """Return the currently configured provider name (never raises)."""
     return _get_provider()
@@ -332,6 +397,10 @@ def describe() -> str:
     prov = _get_provider()
     if prov == "none":
         return "Heuristic Engine (no LLM)"
+    if prov == "free":
+        base = os.getenv(_BASE_URL_ENV, "https://text.pollinations.ai/openai")
+        model = os.getenv(_MODEL_ENV, "openai")
+        return f"Free AI ({model}): {base}"
     if prov == "openai_compatible":
         base = os.getenv(_BASE_URL_ENV, _DEFAULT_OPENAI_BASE)
         model = os.getenv(_MODEL_ENV, "<model not set>")
@@ -401,6 +470,8 @@ def complete(
     )
 
     try:
+        if prov == "free":
+            return _call_free(**kwargs)
         if prov == "openai_compatible":
             return _call_openai_compatible(**kwargs)
         if prov == "ollama":

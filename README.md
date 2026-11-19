@@ -134,7 +134,22 @@ To unlock **Verified Active Mode** for a domain outside `targets.allowlist`, AEG
 
 AEGIS-AI features a provider-neutral LLM abstraction (`ai/llm.py`). The provider is controlled **strictly** via the `AEGIS_LLM_PROVIDER` environment variable (`none` by default).
 
-### Quickstart with Free LLMs (Groq recommended)
+### Option A: Zero-Key Free AI (Instant Setup, No Sign-up / Credit Card)
+
+Enable live AI reasoning instantly without any API key or registration:
+
+```bash
+# In your .env file
+AEGIS_LLM_PROVIDER=free
+AEGIS_LLM_MODEL=openai
+```
+
+Test your setup:
+```bash
+python verify_llm.py
+```
+
+### Option B: Free Developer Tier LLMs (Groq recommended for high speed)
 
 1. Obtain a free API key from [Groq Console](https://console.groq.com/).
 2. Set the following in your `.env` file:
