@@ -7,7 +7,7 @@ import csv
 import io
 from datetime import datetime, timezone
 from pathlib import Path
-from flask import Flask, render_template, jsonify, send_file, request, Response
+from flask import Flask, render_template, jsonify, send_file, request, Response, send_from_directory
 
 from config import (
     CORS_ORIGIN,
@@ -157,6 +157,11 @@ FLEET_INVENTORY = [
 @app.route("/")
 def index():
     return render_template("index.html")
+
+@app.route("/favicon.ico")
+def favicon():
+    """Serve the AEGIS cyber shield favicon."""
+    return send_from_directory(os.path.join(app.root_path, "static"), "favicon.svg", mimetype="image/svg+xml")
 
 @app.route("/health")
 @app.route("/api/health")
