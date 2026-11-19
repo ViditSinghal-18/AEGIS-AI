@@ -7,7 +7,7 @@ Calculates Spearman's Rank Correlation Coefficient (rho) by hand using Python st
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def spearman_rank_correlation(ranks1: List[int], ranks2: List[int]) -> float:
