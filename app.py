@@ -108,6 +108,13 @@ def apply_security_headers(response):
         response.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Aegis-Token"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+
+    # Prevent browsers from caching stale API responses and HTML templates
+    if request.path.startswith("/api/") or request.path in ("/", "/dashboard"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+
     return response
 
 # In-memory fleet inventory for multi-asset monitoring
