@@ -142,7 +142,7 @@ window.AegisApp = (function () {
                 <tr class="finding-row ${idx === selectedFindingIndex ? 'row-selected' : ''}" onclick="AegisApp.selectFinding(${idx})" style="cursor:pointer;">
                     <td><span class="badge" style="background:${sevColor};color:#fff;font-size:0.75rem;">${AegisUtils.escapeHtml(f.priority_level || f.severity || 'P2')}</span></td>
                     <td style="font-weight:700;color:#00f0ff;">${AegisUtils.escapeHtml(score)}</td>
-                    <td style="color:#f1f5f9;font-weight:600;">${AegisUtils.escapeHtml(f.title || 'Finding')}</td>
+                    <td style="color:#f1f5f9;font-weight:600;">${AegisUtils.escapeHtml(f.title || f.summary || f.vuln_id || 'Finding')}</td>
                     <td>${cves}</td>
                     <td style="color:#94a3b8;font-size:0.8rem;">${AegisUtils.escapeHtml(f.source || 'perimeter')}</td>
                     <td style="color:#38bdf8;font-family:monospace;font-size:0.8rem;">${AegisUtils.escapeHtml(epssProb)}</td>
@@ -164,10 +164,10 @@ window.AegisApp = (function () {
         AegisCharts.renderThreatRadar(f, false, 'threatRadarChart');
 
         // Update Finding Details Drawer / Panel
-        AegisUtils.safeSetText('selectedFindingTitle', f.title || 'Finding');
-        AegisUtils.safeSetText('selectedFindingDesc', f.description || f.why_it_matters || 'No description');
+        AegisUtils.safeSetText('selectedFindingTitle', f.title || f.summary || f.vuln_id || 'Finding');
+        AegisUtils.safeSetText('selectedFindingDesc', f.description || f.why_it_matters || f.summary || 'No description');
         AegisUtils.safeSetText('selectedFindingEvidence', f.evidence || f.exposure_context || 'Verified in perimeter scan');
-        AegisUtils.safeSetText('selectedFindingAction', f.remediation || f.suggested_action || 'Review security configuration');
+        AegisUtils.safeSetText('selectedFindingAction', f.remediation || f.suggested_action || f.recommended_remediation || 'Review security configuration');
         AegisUtils.safeSetText('selectedFindingScore', f.contextual_risk_score || 'N/A');
 
         // Update Attack Simulator walkthrough
@@ -226,11 +226,16 @@ window.AegisApp = (function () {
     let currentRemediationTab = 'nginx';
 
     async function triggerScan(targetInput) {
-        const target = targetInput || (document.getElementById('scanTargetInput') ? document.getElementById('scanTargetInput').value.trim() : '');
+        let target = targetInput || (document.getElementById('scanTargetInput') ? document.getElementById('scanTargetInput').value.trim() : '');
         if (!target) {
             AegisUtils.showToast('Please enter a target domain or IP.', 'warning');
             return;
         }
+
+        // Clean protocol prefix and trailing slashes if user pasted full URL (e.g. http://domain.com/ -> domain.com)
+        target = target.replace(/^[a-zA-Z]+:\/\//, '').replace(/\/.*$/, '').trim();
+        const inputEl = document.getElementById('scanTargetInput');
+        if (inputEl) inputEl.value = target;
 
         // Open live audit terminal when a scan is initiated
         const term = document.getElementById('auditTerminal');
