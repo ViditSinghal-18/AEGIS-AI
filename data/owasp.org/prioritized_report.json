@@ -1,0 +1,1295 @@
+{
+  "target": "owasp.org",
+  "scanned_at": "2026-11-20T13:13:48.331187+00:00",
+  "duration_seconds": 0.01,
+  "mode": "passive",
+  "total_findings": 2,
+  "critical_count": 0,
+  "high_count": 0,
+  "medium_count": 0,
+  "low_count": 2,
+  "findings": [
+    {
+      "title": "Insecure Cookie Flag Configuration",
+      "source": "passive_cookies",
+      "severity": "Medium",
+      "cvss_score": 5.0,
+      "related_cves": [],
+      "description": "cookie-missing-secure: Cookie 'owasp-locale' missing Secure flag",
+      "evidence": "Set-Cookie attribute inspection: cookie-missing-secure: Cookie 'owasp-locale' missing Secure flag",
+      "remediation": "Set Secure, HttpOnly, and SameSite=Lax/Strict flags on all session cookies.",
+      "exposure_context": "Passive OSINT Discovery / Standard Web Ingress",
+      "kev": false,
+      "in_cisa_kev": false,
+      "epss": 0.0,
+      "epss_score": 0.0,
+      "epss_probability": 0.0,
+      "epss_percentile": "0.0%",
+      "reachability_verdict": "not applicable (perimeter configuration finding)",
+      "reachability_factor": 1.0,
+      "reachability_evidence": "Finding relates to network/protocol configuration rather than application code.",
+      "possibly_backported": false,
+      "backport_verdict": {
+        "is_backport_candidate": false,
+        "distro": null,
+        "upstream_version": "",
+        "package_release": null,
+        "possibly_backported": false,
+        "banner_only": false,
+        "adjusted_confidence": "high",
+        "explanation": "Standard upstream version string; no distribution backport packaging patterns detected."
+      },
+      "contextual_risk_score": 3.9,
+      "priority_level": "P4 - Low",
+      "mitre_attack": {
+        "technique_id": "T1596",
+        "technique_name": "Search Open Technical Databases",
+        "techniques": [
+          {
+            "technique_id": "T1596",
+            "technique_name": "Search Open Technical Databases",
+            "tactic_id": "TA0043",
+            "tactic_name": "Reconnaissance",
+            "url": "https://attack.mitre.org/techniques/T1596/",
+            "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+          },
+          {
+            "technique_id": "T1557",
+            "technique_name": "Adversary-in-the-Middle (MitM) / Weak Cryptography",
+            "tactic_id": "TA0006",
+            "tactic_name": "Credential Access",
+            "url": "https://attack.mitre.org/techniques/T1557/",
+            "mitigation": "Enforce HTTP Strict Transport Security (HSTS) with `preload`, secure cookies (`Secure; HttpOnly; SameSite=Strict`), and modern TLS 1.3."
+          }
+        ],
+        "primary": {
+          "technique_id": "T1596",
+          "technique_name": "Search Open Technical Databases",
+          "tactic_id": "TA0043",
+          "tactic_name": "Reconnaissance",
+          "url": "https://attack.mitre.org/techniques/T1596/",
+          "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+        }
+      },
+      "ssvc": {
+        "decision": "Track",
+        "ssvc_decision": "Track",
+        "decision_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+        "ssvc_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+        "rationale": "No active exploit and minimal/internal network footprint.",
+        "ssvc_rationale": "No active exploit and minimal/internal network footprint.",
+        "action_urgency": "Standard maintenance patch cycle",
+        "ssvc_action_urgency": "Standard maintenance patch cycle",
+        "exploitation": "None",
+        "exposure": "Small",
+        "automatable": "Yes",
+        "mission_impact": "Critical",
+        "ssvc_dimensions": {
+          "exploitation": "None",
+          "exposure": "Small",
+          "automatable": "Yes",
+          "mission_impact": "Critical"
+        }
+      },
+      "ssvc_decision": "Track",
+      "risk_interval_90": {
+        "risk_interval_90": [
+          3.1,
+          4.7
+        ],
+        "point_score": 3.9,
+        "dispersion_margin": 0.75,
+        "coverage_nominal": 0.9,
+        "method": "calibrated_residual_heuristic (inspired by conformal prediction)",
+        "uncertainty_widening_factors": [
+          "Absent / default EPSS telemetry: statistical exploitability based on baseline prior (+0.35)"
+        ]
+      },
+      "fair_expected_loss": {
+        "ale_mean": 0.0,
+        "ale_median": 0.0,
+        "ci_90": [
+          0.0,
+          0.0
+        ],
+        "ale_max": 0.0,
+        "loss_probability": 0.0,
+        "parameters": {
+          "simulations": 1000,
+          "seed": 42,
+          "threat_event_prob": 0.0001,
+          "loss_magnitude_min": 10000.0,
+          "loss_magnitude_mode": 50000.0,
+          "loss_magnitude_max": 300000.0,
+          "asset_criticality_factor": 2.0
+        },
+        "assumption_disclaimer": "illustrative, user-supplied assumptions (not actuarial advice)"
+      },
+      "xai_formula": {
+        "formula": "Score = (((S_CVSS * 0.35) + (S_EPSS * 0.30) + (S_Exposure * 0.20) + (S_Crit * 0.15)) * 1.00) * 10",
+        "weights_source": "default",
+        "weights": {
+          "cvss": 0.35,
+          "epss": 0.3,
+          "exposure": 0.2,
+          "criticality": 0.15
+        },
+        "s_cvss": 0.5,
+        "s_epss": 0.0,
+        "s_exposure": 0.3,
+        "s_crit": 1.0,
+        "s_code": 1.0,
+        "reachability_verdict": "not applicable (perimeter configuration finding)",
+        "backport_status": "standard",
+        "advisory_confidence": "n/a",
+        "final_score": 3.9
+      },
+      "rank": 1
+    },
+    {
+      "title": "Insecure Cookie Flag Configuration",
+      "source": "passive_cookies",
+      "severity": "Medium",
+      "cvss_score": 5.0,
+      "related_cves": [],
+      "description": "cookie-missing-httponly: Cookie 'owasp-locale' missing HttpOnly flag",
+      "evidence": "Set-Cookie attribute inspection: cookie-missing-httponly: Cookie 'owasp-locale' missing HttpOnly flag",
+      "remediation": "Set Secure, HttpOnly, and SameSite=Lax/Strict flags on all session cookies.",
+      "exposure_context": "Passive OSINT Discovery / Standard Web Ingress",
+      "kev": false,
+      "in_cisa_kev": false,
+      "epss": 0.0,
+      "epss_score": 0.0,
+      "epss_probability": 0.0,
+      "epss_percentile": "0.0%",
+      "reachability_verdict": "not applicable (perimeter configuration finding)",
+      "reachability_factor": 1.0,
+      "reachability_evidence": "Finding relates to network/protocol configuration rather than application code.",
+      "possibly_backported": false,
+      "backport_verdict": {
+        "is_backport_candidate": false,
+        "distro": null,
+        "upstream_version": "",
+        "package_release": null,
+        "possibly_backported": false,
+        "banner_only": false,
+        "adjusted_confidence": "high",
+        "explanation": "Standard upstream version string; no distribution backport packaging patterns detected."
+      },
+      "contextual_risk_score": 3.9,
+      "priority_level": "P4 - Low",
+      "mitre_attack": {
+        "technique_id": "T1596",
+        "technique_name": "Search Open Technical Databases",
+        "techniques": [
+          {
+            "technique_id": "T1596",
+            "technique_name": "Search Open Technical Databases",
+            "tactic_id": "TA0043",
+            "tactic_name": "Reconnaissance",
+            "url": "https://attack.mitre.org/techniques/T1596/",
+            "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+          },
+          {
+            "technique_id": "T1557",
+            "technique_name": "Adversary-in-the-Middle (MitM) / Weak Cryptography",
+            "tactic_id": "TA0006",
+            "tactic_name": "Credential Access",
+            "url": "https://attack.mitre.org/techniques/T1557/",
+            "mitigation": "Enforce HTTP Strict Transport Security (HSTS) with `preload`, secure cookies (`Secure; HttpOnly; SameSite=Strict`), and modern TLS 1.3."
+          }
+        ],
+        "primary": {
+          "technique_id": "T1596",
+          "technique_name": "Search Open Technical Databases",
+          "tactic_id": "TA0043",
+          "tactic_name": "Reconnaissance",
+          "url": "https://attack.mitre.org/techniques/T1596/",
+          "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+        }
+      },
+      "ssvc": {
+        "decision": "Track",
+        "ssvc_decision": "Track",
+        "decision_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+        "ssvc_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+        "rationale": "No active exploit and minimal/internal network footprint.",
+        "ssvc_rationale": "No active exploit and minimal/internal network footprint.",
+        "action_urgency": "Standard maintenance patch cycle",
+        "ssvc_action_urgency": "Standard maintenance patch cycle",
+        "exploitation": "None",
+        "exposure": "Small",
+        "automatable": "Yes",
+        "mission_impact": "Critical",
+        "ssvc_dimensions": {
+          "exploitation": "None",
+          "exposure": "Small",
+          "automatable": "Yes",
+          "mission_impact": "Critical"
+        }
+      },
+      "ssvc_decision": "Track",
+      "risk_interval_90": {
+        "risk_interval_90": [
+          3.1,
+          4.7
+        ],
+        "point_score": 3.9,
+        "dispersion_margin": 0.75,
+        "coverage_nominal": 0.9,
+        "method": "calibrated_residual_heuristic (inspired by conformal prediction)",
+        "uncertainty_widening_factors": [
+          "Absent / default EPSS telemetry: statistical exploitability based on baseline prior (+0.35)"
+        ]
+      },
+      "fair_expected_loss": {
+        "ale_mean": 0.0,
+        "ale_median": 0.0,
+        "ci_90": [
+          0.0,
+          0.0
+        ],
+        "ale_max": 0.0,
+        "loss_probability": 0.0,
+        "parameters": {
+          "simulations": 1000,
+          "seed": 42,
+          "threat_event_prob": 0.0001,
+          "loss_magnitude_min": 10000.0,
+          "loss_magnitude_mode": 50000.0,
+          "loss_magnitude_max": 300000.0,
+          "asset_criticality_factor": 2.0
+        },
+        "assumption_disclaimer": "illustrative, user-supplied assumptions (not actuarial advice)"
+      },
+      "xai_formula": {
+        "formula": "Score = (((S_CVSS * 0.35) + (S_EPSS * 0.30) + (S_Exposure * 0.20) + (S_Crit * 0.15)) * 1.00) * 10",
+        "weights_source": "default",
+        "weights": {
+          "cvss": 0.35,
+          "epss": 0.3,
+          "exposure": 0.2,
+          "criticality": 0.15
+        },
+        "s_cvss": 0.5,
+        "s_epss": 0.0,
+        "s_exposure": 0.3,
+        "s_crit": 1.0,
+        "s_code": 1.0,
+        "reachability_verdict": "not applicable (perimeter configuration finding)",
+        "backport_status": "standard",
+        "advisory_confidence": "n/a",
+        "final_score": 3.9
+      },
+      "rank": 2
+    }
+  ],
+  "prioritized_findings": [
+    {
+      "title": "Insecure Cookie Flag Configuration",
+      "source": "passive_cookies",
+      "severity": "Medium",
+      "cvss_score": 5.0,
+      "related_cves": [],
+      "description": "cookie-missing-secure: Cookie 'owasp-locale' missing Secure flag",
+      "evidence": "Set-Cookie attribute inspection: cookie-missing-secure: Cookie 'owasp-locale' missing Secure flag",
+      "remediation": "Set Secure, HttpOnly, and SameSite=Lax/Strict flags on all session cookies.",
+      "exposure_context": "Passive OSINT Discovery / Standard Web Ingress",
+      "kev": false,
+      "in_cisa_kev": false,
+      "epss": 0.0,
+      "epss_score": 0.0,
+      "epss_probability": 0.0,
+      "epss_percentile": "0.0%",
+      "reachability_verdict": "not applicable (perimeter configuration finding)",
+      "reachability_factor": 1.0,
+      "reachability_evidence": "Finding relates to network/protocol configuration rather than application code.",
+      "possibly_backported": false,
+      "backport_verdict": {
+        "is_backport_candidate": false,
+        "distro": null,
+        "upstream_version": "",
+        "package_release": null,
+        "possibly_backported": false,
+        "banner_only": false,
+        "adjusted_confidence": "high",
+        "explanation": "Standard upstream version string; no distribution backport packaging patterns detected."
+      },
+      "contextual_risk_score": 3.9,
+      "priority_level": "P4 - Low",
+      "mitre_attack": {
+        "technique_id": "T1596",
+        "technique_name": "Search Open Technical Databases",
+        "techniques": [
+          {
+            "technique_id": "T1596",
+            "technique_name": "Search Open Technical Databases",
+            "tactic_id": "TA0043",
+            "tactic_name": "Reconnaissance",
+            "url": "https://attack.mitre.org/techniques/T1596/",
+            "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+          },
+          {
+            "technique_id": "T1557",
+            "technique_name": "Adversary-in-the-Middle (MitM) / Weak Cryptography",
+            "tactic_id": "TA0006",
+            "tactic_name": "Credential Access",
+            "url": "https://attack.mitre.org/techniques/T1557/",
+            "mitigation": "Enforce HTTP Strict Transport Security (HSTS) with `preload`, secure cookies (`Secure; HttpOnly; SameSite=Strict`), and modern TLS 1.3."
+          }
+        ],
+        "primary": {
+          "technique_id": "T1596",
+          "technique_name": "Search Open Technical Databases",
+          "tactic_id": "TA0043",
+          "tactic_name": "Reconnaissance",
+          "url": "https://attack.mitre.org/techniques/T1596/",
+          "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+        }
+      },
+      "ssvc": {
+        "decision": "Track",
+        "ssvc_decision": "Track",
+        "decision_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+        "ssvc_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+        "rationale": "No active exploit and minimal/internal network footprint.",
+        "ssvc_rationale": "No active exploit and minimal/internal network footprint.",
+        "action_urgency": "Standard maintenance patch cycle",
+        "ssvc_action_urgency": "Standard maintenance patch cycle",
+        "exploitation": "None",
+        "exposure": "Small",
+        "automatable": "Yes",
+        "mission_impact": "Critical",
+        "ssvc_dimensions": {
+          "exploitation": "None",
+          "exposure": "Small",
+          "automatable": "Yes",
+          "mission_impact": "Critical"
+        }
+      },
+      "ssvc_decision": "Track",
+      "risk_interval_90": {
+        "risk_interval_90": [
+          3.1,
+          4.7
+        ],
+        "point_score": 3.9,
+        "dispersion_margin": 0.75,
+        "coverage_nominal": 0.9,
+        "method": "calibrated_residual_heuristic (inspired by conformal prediction)",
+        "uncertainty_widening_factors": [
+          "Absent / default EPSS telemetry: statistical exploitability based on baseline prior (+0.35)"
+        ]
+      },
+      "fair_expected_loss": {
+        "ale_mean": 0.0,
+        "ale_median": 0.0,
+        "ci_90": [
+          0.0,
+          0.0
+        ],
+        "ale_max": 0.0,
+        "loss_probability": 0.0,
+        "parameters": {
+          "simulations": 1000,
+          "seed": 42,
+          "threat_event_prob": 0.0001,
+          "loss_magnitude_min": 10000.0,
+          "loss_magnitude_mode": 50000.0,
+          "loss_magnitude_max": 300000.0,
+          "asset_criticality_factor": 2.0
+        },
+        "assumption_disclaimer": "illustrative, user-supplied assumptions (not actuarial advice)"
+      },
+      "xai_formula": {
+        "formula": "Score = (((S_CVSS * 0.35) + (S_EPSS * 0.30) + (S_Exposure * 0.20) + (S_Crit * 0.15)) * 1.00) * 10",
+        "weights_source": "default",
+        "weights": {
+          "cvss": 0.35,
+          "epss": 0.3,
+          "exposure": 0.2,
+          "criticality": 0.15
+        },
+        "s_cvss": 0.5,
+        "s_epss": 0.0,
+        "s_exposure": 0.3,
+        "s_crit": 1.0,
+        "s_code": 1.0,
+        "reachability_verdict": "not applicable (perimeter configuration finding)",
+        "backport_status": "standard",
+        "advisory_confidence": "n/a",
+        "final_score": 3.9
+      },
+      "rank": 1
+    },
+    {
+      "title": "Insecure Cookie Flag Configuration",
+      "source": "passive_cookies",
+      "severity": "Medium",
+      "cvss_score": 5.0,
+      "related_cves": [],
+      "description": "cookie-missing-httponly: Cookie 'owasp-locale' missing HttpOnly flag",
+      "evidence": "Set-Cookie attribute inspection: cookie-missing-httponly: Cookie 'owasp-locale' missing HttpOnly flag",
+      "remediation": "Set Secure, HttpOnly, and SameSite=Lax/Strict flags on all session cookies.",
+      "exposure_context": "Passive OSINT Discovery / Standard Web Ingress",
+      "kev": false,
+      "in_cisa_kev": false,
+      "epss": 0.0,
+      "epss_score": 0.0,
+      "epss_probability": 0.0,
+      "epss_percentile": "0.0%",
+      "reachability_verdict": "not applicable (perimeter configuration finding)",
+      "reachability_factor": 1.0,
+      "reachability_evidence": "Finding relates to network/protocol configuration rather than application code.",
+      "possibly_backported": false,
+      "backport_verdict": {
+        "is_backport_candidate": false,
+        "distro": null,
+        "upstream_version": "",
+        "package_release": null,
+        "possibly_backported": false,
+        "banner_only": false,
+        "adjusted_confidence": "high",
+        "explanation": "Standard upstream version string; no distribution backport packaging patterns detected."
+      },
+      "contextual_risk_score": 3.9,
+      "priority_level": "P4 - Low",
+      "mitre_attack": {
+        "technique_id": "T1596",
+        "technique_name": "Search Open Technical Databases",
+        "techniques": [
+          {
+            "technique_id": "T1596",
+            "technique_name": "Search Open Technical Databases",
+            "tactic_id": "TA0043",
+            "tactic_name": "Reconnaissance",
+            "url": "https://attack.mitre.org/techniques/T1596/",
+            "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+          },
+          {
+            "technique_id": "T1557",
+            "technique_name": "Adversary-in-the-Middle (MitM) / Weak Cryptography",
+            "tactic_id": "TA0006",
+            "tactic_name": "Credential Access",
+            "url": "https://attack.mitre.org/techniques/T1557/",
+            "mitigation": "Enforce HTTP Strict Transport Security (HSTS) with `preload`, secure cookies (`Secure; HttpOnly; SameSite=Strict`), and modern TLS 1.3."
+          }
+        ],
+        "primary": {
+          "technique_id": "T1596",
+          "technique_name": "Search Open Technical Databases",
+          "tactic_id": "TA0043",
+          "tactic_name": "Reconnaissance",
+          "url": "https://attack.mitre.org/techniques/T1596/",
+          "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+        }
+      },
+      "ssvc": {
+        "decision": "Track",
+        "ssvc_decision": "Track",
+        "decision_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+        "ssvc_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+        "rationale": "No active exploit and minimal/internal network footprint.",
+        "ssvc_rationale": "No active exploit and minimal/internal network footprint.",
+        "action_urgency": "Standard maintenance patch cycle",
+        "ssvc_action_urgency": "Standard maintenance patch cycle",
+        "exploitation": "None",
+        "exposure": "Small",
+        "automatable": "Yes",
+        "mission_impact": "Critical",
+        "ssvc_dimensions": {
+          "exploitation": "None",
+          "exposure": "Small",
+          "automatable": "Yes",
+          "mission_impact": "Critical"
+        }
+      },
+      "ssvc_decision": "Track",
+      "risk_interval_90": {
+        "risk_interval_90": [
+          3.1,
+          4.7
+        ],
+        "point_score": 3.9,
+        "dispersion_margin": 0.75,
+        "coverage_nominal": 0.9,
+        "method": "calibrated_residual_heuristic (inspired by conformal prediction)",
+        "uncertainty_widening_factors": [
+          "Absent / default EPSS telemetry: statistical exploitability based on baseline prior (+0.35)"
+        ]
+      },
+      "fair_expected_loss": {
+        "ale_mean": 0.0,
+        "ale_median": 0.0,
+        "ci_90": [
+          0.0,
+          0.0
+        ],
+        "ale_max": 0.0,
+        "loss_probability": 0.0,
+        "parameters": {
+          "simulations": 1000,
+          "seed": 42,
+          "threat_event_prob": 0.0001,
+          "loss_magnitude_min": 10000.0,
+          "loss_magnitude_mode": 50000.0,
+          "loss_magnitude_max": 300000.0,
+          "asset_criticality_factor": 2.0
+        },
+        "assumption_disclaimer": "illustrative, user-supplied assumptions (not actuarial advice)"
+      },
+      "xai_formula": {
+        "formula": "Score = (((S_CVSS * 0.35) + (S_EPSS * 0.30) + (S_Exposure * 0.20) + (S_Crit * 0.15)) * 1.00) * 10",
+        "weights_source": "default",
+        "weights": {
+          "cvss": 0.35,
+          "epss": 0.3,
+          "exposure": 0.2,
+          "criticality": 0.15
+        },
+        "s_cvss": 0.5,
+        "s_epss": 0.0,
+        "s_exposure": 0.3,
+        "s_crit": 1.0,
+        "s_code": 1.0,
+        "reachability_verdict": "not applicable (perimeter configuration finding)",
+        "backport_status": "standard",
+        "advisory_confidence": "n/a",
+        "final_score": 3.9
+      },
+      "rank": 2
+    }
+  ],
+  "compliance_governance": {
+    "score": 70.0,
+    "overall_readiness_score": 70.0,
+    "grade": "B",
+    "overall_grade": "B",
+    "grade_color": "#38bdf8",
+    "posture": "ACCEPTABLE (MINOR GAPS)",
+    "owasp_categories": {
+      "A01:2021": [],
+      "A02:2021": [],
+      "A03:2021": [],
+      "A04:2021": [],
+      "A05:2021": [
+        {
+          "title": "Insecure Cookie Flag Configuration",
+          "source": "passive_cookies",
+          "severity": "Medium",
+          "cvss_score": 5.0,
+          "related_cves": [],
+          "description": "cookie-missing-secure: Cookie 'owasp-locale' missing Secure flag",
+          "evidence": "Set-Cookie attribute inspection: cookie-missing-secure: Cookie 'owasp-locale' missing Secure flag",
+          "remediation": "Set Secure, HttpOnly, and SameSite=Lax/Strict flags on all session cookies.",
+          "exposure_context": "Passive OSINT Discovery / Standard Web Ingress",
+          "kev": false,
+          "in_cisa_kev": false,
+          "epss": 0.0,
+          "epss_score": 0.0,
+          "epss_probability": 0.0,
+          "epss_percentile": "0.0%",
+          "reachability_verdict": "not applicable (perimeter configuration finding)",
+          "reachability_factor": 1.0,
+          "reachability_evidence": "Finding relates to network/protocol configuration rather than application code.",
+          "possibly_backported": false,
+          "backport_verdict": {
+            "is_backport_candidate": false,
+            "distro": null,
+            "upstream_version": "",
+            "package_release": null,
+            "possibly_backported": false,
+            "banner_only": false,
+            "adjusted_confidence": "high",
+            "explanation": "Standard upstream version string; no distribution backport packaging patterns detected."
+          },
+          "contextual_risk_score": 3.9,
+          "priority_level": "P4 - Low",
+          "mitre_attack": {
+            "technique_id": "T1596",
+            "technique_name": "Search Open Technical Databases",
+            "techniques": [
+              {
+                "technique_id": "T1596",
+                "technique_name": "Search Open Technical Databases",
+                "tactic_id": "TA0043",
+                "tactic_name": "Reconnaissance",
+                "url": "https://attack.mitre.org/techniques/T1596/",
+                "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+              },
+              {
+                "technique_id": "T1557",
+                "technique_name": "Adversary-in-the-Middle (MitM) / Weak Cryptography",
+                "tactic_id": "TA0006",
+                "tactic_name": "Credential Access",
+                "url": "https://attack.mitre.org/techniques/T1557/",
+                "mitigation": "Enforce HTTP Strict Transport Security (HSTS) with `preload`, secure cookies (`Secure; HttpOnly; SameSite=Strict`), and modern TLS 1.3."
+              }
+            ],
+            "primary": {
+              "technique_id": "T1596",
+              "technique_name": "Search Open Technical Databases",
+              "tactic_id": "TA0043",
+              "tactic_name": "Reconnaissance",
+              "url": "https://attack.mitre.org/techniques/T1596/",
+              "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+            }
+          },
+          "ssvc": {
+            "decision": "Track",
+            "ssvc_decision": "Track",
+            "decision_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+            "ssvc_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+            "rationale": "No active exploit and minimal/internal network footprint.",
+            "ssvc_rationale": "No active exploit and minimal/internal network footprint.",
+            "action_urgency": "Standard maintenance patch cycle",
+            "ssvc_action_urgency": "Standard maintenance patch cycle",
+            "exploitation": "None",
+            "exposure": "Small",
+            "automatable": "Yes",
+            "mission_impact": "Critical",
+            "ssvc_dimensions": {
+              "exploitation": "None",
+              "exposure": "Small",
+              "automatable": "Yes",
+              "mission_impact": "Critical"
+            }
+          },
+          "ssvc_decision": "Track",
+          "risk_interval_90": {
+            "risk_interval_90": [
+              3.1,
+              4.7
+            ],
+            "point_score": 3.9,
+            "dispersion_margin": 0.75,
+            "coverage_nominal": 0.9,
+            "method": "calibrated_residual_heuristic (inspired by conformal prediction)",
+            "uncertainty_widening_factors": [
+              "Absent / default EPSS telemetry: statistical exploitability based on baseline prior (+0.35)"
+            ]
+          },
+          "fair_expected_loss": {
+            "ale_mean": 0.0,
+            "ale_median": 0.0,
+            "ci_90": [
+              0.0,
+              0.0
+            ],
+            "ale_max": 0.0,
+            "loss_probability": 0.0,
+            "parameters": {
+              "simulations": 1000,
+              "seed": 42,
+              "threat_event_prob": 0.0001,
+              "loss_magnitude_min": 10000.0,
+              "loss_magnitude_mode": 50000.0,
+              "loss_magnitude_max": 300000.0,
+              "asset_criticality_factor": 2.0
+            },
+            "assumption_disclaimer": "illustrative, user-supplied assumptions (not actuarial advice)"
+          },
+          "xai_formula": {
+            "formula": "Score = (((S_CVSS * 0.35) + (S_EPSS * 0.30) + (S_Exposure * 0.20) + (S_Crit * 0.15)) * 1.00) * 10",
+            "weights_source": "default",
+            "weights": {
+              "cvss": 0.35,
+              "epss": 0.3,
+              "exposure": 0.2,
+              "criticality": 0.15
+            },
+            "s_cvss": 0.5,
+            "s_epss": 0.0,
+            "s_exposure": 0.3,
+            "s_crit": 1.0,
+            "s_code": 1.0,
+            "reachability_verdict": "not applicable (perimeter configuration finding)",
+            "backport_status": "standard",
+            "advisory_confidence": "n/a",
+            "final_score": 3.9
+          },
+          "rank": 1
+        },
+        {
+          "title": "Insecure Cookie Flag Configuration",
+          "source": "passive_cookies",
+          "severity": "Medium",
+          "cvss_score": 5.0,
+          "related_cves": [],
+          "description": "cookie-missing-httponly: Cookie 'owasp-locale' missing HttpOnly flag",
+          "evidence": "Set-Cookie attribute inspection: cookie-missing-httponly: Cookie 'owasp-locale' missing HttpOnly flag",
+          "remediation": "Set Secure, HttpOnly, and SameSite=Lax/Strict flags on all session cookies.",
+          "exposure_context": "Passive OSINT Discovery / Standard Web Ingress",
+          "kev": false,
+          "in_cisa_kev": false,
+          "epss": 0.0,
+          "epss_score": 0.0,
+          "epss_probability": 0.0,
+          "epss_percentile": "0.0%",
+          "reachability_verdict": "not applicable (perimeter configuration finding)",
+          "reachability_factor": 1.0,
+          "reachability_evidence": "Finding relates to network/protocol configuration rather than application code.",
+          "possibly_backported": false,
+          "backport_verdict": {
+            "is_backport_candidate": false,
+            "distro": null,
+            "upstream_version": "",
+            "package_release": null,
+            "possibly_backported": false,
+            "banner_only": false,
+            "adjusted_confidence": "high",
+            "explanation": "Standard upstream version string; no distribution backport packaging patterns detected."
+          },
+          "contextual_risk_score": 3.9,
+          "priority_level": "P4 - Low",
+          "mitre_attack": {
+            "technique_id": "T1596",
+            "technique_name": "Search Open Technical Databases",
+            "techniques": [
+              {
+                "technique_id": "T1596",
+                "technique_name": "Search Open Technical Databases",
+                "tactic_id": "TA0043",
+                "tactic_name": "Reconnaissance",
+                "url": "https://attack.mitre.org/techniques/T1596/",
+                "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+              },
+              {
+                "technique_id": "T1557",
+                "technique_name": "Adversary-in-the-Middle (MitM) / Weak Cryptography",
+                "tactic_id": "TA0006",
+                "tactic_name": "Credential Access",
+                "url": "https://attack.mitre.org/techniques/T1557/",
+                "mitigation": "Enforce HTTP Strict Transport Security (HSTS) with `preload`, secure cookies (`Secure; HttpOnly; SameSite=Strict`), and modern TLS 1.3."
+              }
+            ],
+            "primary": {
+              "technique_id": "T1596",
+              "technique_name": "Search Open Technical Databases",
+              "tactic_id": "TA0043",
+              "tactic_name": "Reconnaissance",
+              "url": "https://attack.mitre.org/techniques/T1596/",
+              "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+            }
+          },
+          "ssvc": {
+            "decision": "Track",
+            "ssvc_decision": "Track",
+            "decision_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+            "ssvc_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+            "rationale": "No active exploit and minimal/internal network footprint.",
+            "ssvc_rationale": "No active exploit and minimal/internal network footprint.",
+            "action_urgency": "Standard maintenance patch cycle",
+            "ssvc_action_urgency": "Standard maintenance patch cycle",
+            "exploitation": "None",
+            "exposure": "Small",
+            "automatable": "Yes",
+            "mission_impact": "Critical",
+            "ssvc_dimensions": {
+              "exploitation": "None",
+              "exposure": "Small",
+              "automatable": "Yes",
+              "mission_impact": "Critical"
+            }
+          },
+          "ssvc_decision": "Track",
+          "risk_interval_90": {
+            "risk_interval_90": [
+              3.1,
+              4.7
+            ],
+            "point_score": 3.9,
+            "dispersion_margin": 0.75,
+            "coverage_nominal": 0.9,
+            "method": "calibrated_residual_heuristic (inspired by conformal prediction)",
+            "uncertainty_widening_factors": [
+              "Absent / default EPSS telemetry: statistical exploitability based on baseline prior (+0.35)"
+            ]
+          },
+          "fair_expected_loss": {
+            "ale_mean": 0.0,
+            "ale_median": 0.0,
+            "ci_90": [
+              0.0,
+              0.0
+            ],
+            "ale_max": 0.0,
+            "loss_probability": 0.0,
+            "parameters": {
+              "simulations": 1000,
+              "seed": 42,
+              "threat_event_prob": 0.0001,
+              "loss_magnitude_min": 10000.0,
+              "loss_magnitude_mode": 50000.0,
+              "loss_magnitude_max": 300000.0,
+              "asset_criticality_factor": 2.0
+            },
+            "assumption_disclaimer": "illustrative, user-supplied assumptions (not actuarial advice)"
+          },
+          "xai_formula": {
+            "formula": "Score = (((S_CVSS * 0.35) + (S_EPSS * 0.30) + (S_Exposure * 0.20) + (S_Crit * 0.15)) * 1.00) * 10",
+            "weights_source": "default",
+            "weights": {
+              "cvss": 0.35,
+              "epss": 0.3,
+              "exposure": 0.2,
+              "criticality": 0.15
+            },
+            "s_cvss": 0.5,
+            "s_epss": 0.0,
+            "s_exposure": 0.3,
+            "s_crit": 1.0,
+            "s_code": 1.0,
+            "reachability_verdict": "not applicable (perimeter configuration finding)",
+            "backport_status": "standard",
+            "advisory_confidence": "n/a",
+            "final_score": 3.9
+          },
+          "rank": 2
+        }
+      ],
+      "A06:2021": [],
+      "A07:2021": [
+        {
+          "title": "Insecure Cookie Flag Configuration",
+          "source": "passive_cookies",
+          "severity": "Medium",
+          "cvss_score": 5.0,
+          "related_cves": [],
+          "description": "cookie-missing-secure: Cookie 'owasp-locale' missing Secure flag",
+          "evidence": "Set-Cookie attribute inspection: cookie-missing-secure: Cookie 'owasp-locale' missing Secure flag",
+          "remediation": "Set Secure, HttpOnly, and SameSite=Lax/Strict flags on all session cookies.",
+          "exposure_context": "Passive OSINT Discovery / Standard Web Ingress",
+          "kev": false,
+          "in_cisa_kev": false,
+          "epss": 0.0,
+          "epss_score": 0.0,
+          "epss_probability": 0.0,
+          "epss_percentile": "0.0%",
+          "reachability_verdict": "not applicable (perimeter configuration finding)",
+          "reachability_factor": 1.0,
+          "reachability_evidence": "Finding relates to network/protocol configuration rather than application code.",
+          "possibly_backported": false,
+          "backport_verdict": {
+            "is_backport_candidate": false,
+            "distro": null,
+            "upstream_version": "",
+            "package_release": null,
+            "possibly_backported": false,
+            "banner_only": false,
+            "adjusted_confidence": "high",
+            "explanation": "Standard upstream version string; no distribution backport packaging patterns detected."
+          },
+          "contextual_risk_score": 3.9,
+          "priority_level": "P4 - Low",
+          "mitre_attack": {
+            "technique_id": "T1596",
+            "technique_name": "Search Open Technical Databases",
+            "techniques": [
+              {
+                "technique_id": "T1596",
+                "technique_name": "Search Open Technical Databases",
+                "tactic_id": "TA0043",
+                "tactic_name": "Reconnaissance",
+                "url": "https://attack.mitre.org/techniques/T1596/",
+                "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+              },
+              {
+                "technique_id": "T1557",
+                "technique_name": "Adversary-in-the-Middle (MitM) / Weak Cryptography",
+                "tactic_id": "TA0006",
+                "tactic_name": "Credential Access",
+                "url": "https://attack.mitre.org/techniques/T1557/",
+                "mitigation": "Enforce HTTP Strict Transport Security (HSTS) with `preload`, secure cookies (`Secure; HttpOnly; SameSite=Strict`), and modern TLS 1.3."
+              }
+            ],
+            "primary": {
+              "technique_id": "T1596",
+              "technique_name": "Search Open Technical Databases",
+              "tactic_id": "TA0043",
+              "tactic_name": "Reconnaissance",
+              "url": "https://attack.mitre.org/techniques/T1596/",
+              "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+            }
+          },
+          "ssvc": {
+            "decision": "Track",
+            "ssvc_decision": "Track",
+            "decision_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+            "ssvc_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+            "rationale": "No active exploit and minimal/internal network footprint.",
+            "ssvc_rationale": "No active exploit and minimal/internal network footprint.",
+            "action_urgency": "Standard maintenance patch cycle",
+            "ssvc_action_urgency": "Standard maintenance patch cycle",
+            "exploitation": "None",
+            "exposure": "Small",
+            "automatable": "Yes",
+            "mission_impact": "Critical",
+            "ssvc_dimensions": {
+              "exploitation": "None",
+              "exposure": "Small",
+              "automatable": "Yes",
+              "mission_impact": "Critical"
+            }
+          },
+          "ssvc_decision": "Track",
+          "risk_interval_90": {
+            "risk_interval_90": [
+              3.1,
+              4.7
+            ],
+            "point_score": 3.9,
+            "dispersion_margin": 0.75,
+            "coverage_nominal": 0.9,
+            "method": "calibrated_residual_heuristic (inspired by conformal prediction)",
+            "uncertainty_widening_factors": [
+              "Absent / default EPSS telemetry: statistical exploitability based on baseline prior (+0.35)"
+            ]
+          },
+          "fair_expected_loss": {
+            "ale_mean": 0.0,
+            "ale_median": 0.0,
+            "ci_90": [
+              0.0,
+              0.0
+            ],
+            "ale_max": 0.0,
+            "loss_probability": 0.0,
+            "parameters": {
+              "simulations": 1000,
+              "seed": 42,
+              "threat_event_prob": 0.0001,
+              "loss_magnitude_min": 10000.0,
+              "loss_magnitude_mode": 50000.0,
+              "loss_magnitude_max": 300000.0,
+              "asset_criticality_factor": 2.0
+            },
+            "assumption_disclaimer": "illustrative, user-supplied assumptions (not actuarial advice)"
+          },
+          "xai_formula": {
+            "formula": "Score = (((S_CVSS * 0.35) + (S_EPSS * 0.30) + (S_Exposure * 0.20) + (S_Crit * 0.15)) * 1.00) * 10",
+            "weights_source": "default",
+            "weights": {
+              "cvss": 0.35,
+              "epss": 0.3,
+              "exposure": 0.2,
+              "criticality": 0.15
+            },
+            "s_cvss": 0.5,
+            "s_epss": 0.0,
+            "s_exposure": 0.3,
+            "s_crit": 1.0,
+            "s_code": 1.0,
+            "reachability_verdict": "not applicable (perimeter configuration finding)",
+            "backport_status": "standard",
+            "advisory_confidence": "n/a",
+            "final_score": 3.9
+          },
+          "rank": 1
+        },
+        {
+          "title": "Insecure Cookie Flag Configuration",
+          "source": "passive_cookies",
+          "severity": "Medium",
+          "cvss_score": 5.0,
+          "related_cves": [],
+          "description": "cookie-missing-httponly: Cookie 'owasp-locale' missing HttpOnly flag",
+          "evidence": "Set-Cookie attribute inspection: cookie-missing-httponly: Cookie 'owasp-locale' missing HttpOnly flag",
+          "remediation": "Set Secure, HttpOnly, and SameSite=Lax/Strict flags on all session cookies.",
+          "exposure_context": "Passive OSINT Discovery / Standard Web Ingress",
+          "kev": false,
+          "in_cisa_kev": false,
+          "epss": 0.0,
+          "epss_score": 0.0,
+          "epss_probability": 0.0,
+          "epss_percentile": "0.0%",
+          "reachability_verdict": "not applicable (perimeter configuration finding)",
+          "reachability_factor": 1.0,
+          "reachability_evidence": "Finding relates to network/protocol configuration rather than application code.",
+          "possibly_backported": false,
+          "backport_verdict": {
+            "is_backport_candidate": false,
+            "distro": null,
+            "upstream_version": "",
+            "package_release": null,
+            "possibly_backported": false,
+            "banner_only": false,
+            "adjusted_confidence": "high",
+            "explanation": "Standard upstream version string; no distribution backport packaging patterns detected."
+          },
+          "contextual_risk_score": 3.9,
+          "priority_level": "P4 - Low",
+          "mitre_attack": {
+            "technique_id": "T1596",
+            "technique_name": "Search Open Technical Databases",
+            "techniques": [
+              {
+                "technique_id": "T1596",
+                "technique_name": "Search Open Technical Databases",
+                "tactic_id": "TA0043",
+                "tactic_name": "Reconnaissance",
+                "url": "https://attack.mitre.org/techniques/T1596/",
+                "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+              },
+              {
+                "technique_id": "T1557",
+                "technique_name": "Adversary-in-the-Middle (MitM) / Weak Cryptography",
+                "tactic_id": "TA0006",
+                "tactic_name": "Credential Access",
+                "url": "https://attack.mitre.org/techniques/T1557/",
+                "mitigation": "Enforce HTTP Strict Transport Security (HSTS) with `preload`, secure cookies (`Secure; HttpOnly; SameSite=Strict`), and modern TLS 1.3."
+              }
+            ],
+            "primary": {
+              "technique_id": "T1596",
+              "technique_name": "Search Open Technical Databases",
+              "tactic_id": "TA0043",
+              "tactic_name": "Reconnaissance",
+              "url": "https://attack.mitre.org/techniques/T1596/",
+              "mitigation": "Audit public Certificate Transparency logs and decommission dangling DNS records for subdomains."
+            }
+          },
+          "ssvc": {
+            "decision": "Track",
+            "ssvc_decision": "Track",
+            "decision_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+            "ssvc_path": "Exploitation=None -> Exposure=Small -> Automatable=Yes -> MissionImpact=Critical -> Track",
+            "rationale": "No active exploit and minimal/internal network footprint.",
+            "ssvc_rationale": "No active exploit and minimal/internal network footprint.",
+            "action_urgency": "Standard maintenance patch cycle",
+            "ssvc_action_urgency": "Standard maintenance patch cycle",
+            "exploitation": "None",
+            "exposure": "Small",
+            "automatable": "Yes",
+            "mission_impact": "Critical",
+            "ssvc_dimensions": {
+              "exploitation": "None",
+              "exposure": "Small",
+              "automatable": "Yes",
+              "mission_impact": "Critical"
+            }
+          },
+          "ssvc_decision": "Track",
+          "risk_interval_90": {
+            "risk_interval_90": [
+              3.1,
+              4.7
+            ],
+            "point_score": 3.9,
+            "dispersion_margin": 0.75,
+            "coverage_nominal": 0.9,
+            "method": "calibrated_residual_heuristic (inspired by conformal prediction)",
+            "uncertainty_widening_factors": [
+              "Absent / default EPSS telemetry: statistical exploitability based on baseline prior (+0.35)"
+            ]
+          },
+          "fair_expected_loss": {
+            "ale_mean": 0.0,
+            "ale_median": 0.0,
+            "ci_90": [
+              0.0,
+              0.0
+            ],
+            "ale_max": 0.0,
+            "loss_probability": 0.0,
+            "parameters": {
+              "simulations": 1000,
+              "seed": 42,
+              "threat_event_prob": 0.0001,
+              "loss_magnitude_min": 10000.0,
+              "loss_magnitude_mode": 50000.0,
+              "loss_magnitude_max": 300000.0,
+              "asset_criticality_factor": 2.0
+            },
+            "assumption_disclaimer": "illustrative, user-supplied assumptions (not actuarial advice)"
+          },
+          "xai_formula": {
+            "formula": "Score = (((S_CVSS * 0.35) + (S_EPSS * 0.30) + (S_Exposure * 0.20) + (S_Crit * 0.15)) * 1.00) * 10",
+            "weights_source": "default",
+            "weights": {
+              "cvss": 0.35,
+              "epss": 0.3,
+              "exposure": 0.2,
+              "criticality": 0.15
+            },
+            "s_cvss": 0.5,
+            "s_epss": 0.0,
+            "s_exposure": 0.3,
+            "s_crit": 1.0,
+            "s_code": 1.0,
+            "reachability_verdict": "not applicable (perimeter configuration finding)",
+            "backport_status": "standard",
+            "advisory_confidence": "n/a",
+            "final_score": 3.9
+          },
+          "rank": 2
+        }
+      ],
+      "A08:2021": [],
+      "A09:2021": [],
+      "A10:2021": []
+    },
+    "total_violations": 4,
+    "nist_functions": [
+      {
+        "id": "GV",
+        "name": "Govern",
+        "status": "Implemented",
+        "pct": 90,
+        "color": "#38bdf8"
+      },
+      {
+        "id": "ID",
+        "name": "Identify (Asset & Attack Surface)",
+        "status": "Audited",
+        "pct": 95,
+        "color": "#10b981"
+      },
+      {
+        "id": "PR",
+        "name": "Protect (Headers & Cryptography)",
+        "status": "Needs Remediation",
+        "pct": 70,
+        "color": "#38bdf8"
+      },
+      {
+        "id": "DE",
+        "name": "Detect (Vulnerability Intelligence)",
+        "status": "Active (NVD/KEV)",
+        "pct": 90,
+        "color": "#8b5cf6"
+      },
+      {
+        "id": "RS",
+        "name": "Respond (Automated Playbooks)",
+        "status": "Available",
+        "pct": 85,
+        "color": "#ec4899"
+      },
+      {
+        "id": "RC",
+        "name": "Recover",
+        "status": "Standard",
+        "pct": 80,
+        "color": "#64748b"
+      }
+    ],
+    "pci_dss_4": {
+      "name": "PCI-DSS v4.0",
+      "passing_controls": 10,
+      "total_controls": 12,
+      "percentage": 83.3
+    },
+    "nist_csf_2": {
+      "name": "NIST CSF 2.0",
+      "passing_controls": 9,
+      "total_controls": 10,
+      "percentage": 90.0
+    },
+    "soc2_type2": {
+      "name": "SOC 2 Type II",
+      "passing_controls": 6,
+      "total_controls": 8,
+      "percentage": 75.0
+    },
+    "iso_27001": {
+      "name": "ISO/IEC 27001:2022",
+      "passing_controls": 12,
+      "total_controls": 15,
+      "percentage": 80.0
+    }
+  },
+  "cyclonedx_sbom": {
+    "bomFormat": "CycloneDX",
+    "specVersion": "1.5",
+    "serialNumber": "urn:uuid:c4468461-cbb0-4e72-bada-a1baf1eff605",
+    "version": 1,
+    "metadata": {
+      "timestamp": "2026-11-20T13:13:48.331098+00:00",
+      "tools": [
+        {
+          "vendor": "AEGIS-AI",
+          "name": "Autonomous Attack Surface Defense & SBOM Analyzer",
+          "version": "2.0"
+        }
+      ],
+      "component": {
+        "type": "application",
+        "name": "owasp.org",
+        "version": "latest",
+        "description": "Attack surface target application: owasp.org"
+      },
+      "properties": [
+        {
+          "name": "aegis:discovery_mode",
+          "value": "passive_osint"
+        },
+        {
+          "name": "aegis:components_detected",
+          "value": "0"
+        }
+      ]
+    },
+    "components": [],
+    "dependencies": []
+  },
+  "attack_simulator": {
+    "target": "owasp.org",
+    "finding": "Insecure Cookie Flag Configuration",
+    "phases": [
+      {
+        "phase": "Phase 1: Reconnaissance",
+        "action": "Adversary queries public perimeter of owasp.org and observes Insecure Cookie Flag Configuration."
+      },
+      {
+        "phase": "Phase 2: Weaponization",
+        "action": "Adversary correlates publicly known exploit vectors or missing defense controls."
+      },
+      {
+        "phase": "Phase 3: Delivery & Exploitation",
+        "action": "Adversary issues crafted requests targeting exposed configuration or unpatched endpoint."
+      },
+      {
+        "phase": "Phase 4: Mitigation & Hardening",
+        "action": "Apply defensive configuration patch."
+      }
+    ],
+    "simulation_disclaimer": "ILLUSTRATIVE ONLY: This walkthrough models a theoretical adversary kill chain based on MITRE ATT&CK techniques. No exploit was executed against the target."
+  },
+  "radar_comparison": {
+    "cvss_average": 5.0,
+    "contextual_average": 3.9,
+    "epss_max": 0.0,
+    "cisa_kev_flagged_count": 0
+  },
+  "portfolio_fair_loss": {
+    "portfolio_ale_mean": 0.0,
+    "portfolio_ale_median": 0.0,
+    "portfolio_ci_90": [
+      0.0,
+      0.0
+    ],
+    "portfolio_ale_max": 0.0,
+    "findings_modeled": 2,
+    "simulations": 1000,
+    "seed": 42,
+    "assumption_disclaimer": "illustrative, user-supplied assumptions (not actuarial advice)"
+  },
+  "ssvc_summary": {
+    "Act": 0,
+    "Attend": 0,
+    "Track*": 0,
+    "Track": 2
+  },
+  "scoring_metadata": {
+    "weights_source": "default",
+    "active_weights": {
+      "cvss": 0.35,
+      "epss": 0.3,
+      "exposure": 0.2,
+      "criticality": 0.15
+    }
+  },
+  "operational_mode": "PASSIVE OSINT",
+  "mode_rationale": "Zero port probing mode: 'owasp.org' is not in allowlist and not ownership-verified. (Verify via /api/verify/start)"
+}

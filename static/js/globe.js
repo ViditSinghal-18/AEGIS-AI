@@ -24,6 +24,99 @@ window.AegisGlobe = (function () {
     let animationId = null;
     let tooltipEl = null;
 
+    function renderFallbackGlobe(container, width, height) {
+        if (!container) return;
+        container.innerHTML = '';
+        const canvas = document.createElement('canvas');
+        canvas.id = 'globe-canvas';
+        canvas.width = width;
+        canvas.height = height;
+        canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;display:block;';
+        container.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        let angle = 0;
+        function draw() {
+            if (!container.parentElement) return;
+            animationId = requestAnimationFrame(draw);
+            ctx.clearRect(0, 0, width, height);
+
+            const cx = width / 2;
+            const cy = height / 2;
+            const radius = Math.min(width, height) * 0.35;
+
+            ctx.save();
+            // Outer glow ring
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius * 1.08, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Core sphere
+            const grad = ctx.createRadialGradient(cx, cy, radius * 0.2, cx, cy, radius);
+            grad.addColorStop(0, 'rgba(8, 19, 40, 0.95)');
+            grad.addColorStop(1, 'rgba(3, 5, 10, 0.95)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (isSpinning && !prefersReducedMotion) angle += 0.008;
+
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.45)';
+            ctx.lineWidth = 1;
+
+            // Longitude meridians
+            for (let i = 0; i < 6; i++) {
+                const a = angle + (i * Math.PI / 6);
+                const xOffset = Math.sin(a) * radius;
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, Math.max(1, Math.abs(xOffset)), radius, 0, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Latitudes
+            for (let j = 1; j <= 3; j++) {
+                const yOffset = (j / 4) * radius;
+                const rAtY = Math.sqrt(Math.max(1, radius * radius - yOffset * yOffset));
+                ctx.beginPath();
+                ctx.ellipse(cx, cy - yOffset, rAtY, yOffset * 0.3, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.ellipse(cx, cy + yOffset, rAtY, yOffset * 0.3, 0, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Equator
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, radius, radius * 0.25, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.65)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Target Node Beacon
+            const nodeX = cx + Math.cos(angle * 1.5) * (radius * 0.65);
+            const nodeY = cy + Math.sin(angle * 0.8) * (radius * 0.35);
+            ctx.beginPath();
+            ctx.arc(nodeX, nodeY, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#00f0ff';
+            ctx.shadowColor = '#00f0ff';
+            ctx.shadowBlur = 12;
+            ctx.fill();
+
+            ctx.restore();
+        }
+        draw();
+
+        const locBadge = document.getElementById('globeTargetLocation');
+        if (locBadge) {
+            locBadge.textContent = 'San Francisco, United States (AS13335 (Cloudflare / Edge)) · 5 Ingress Streams Active';
+        }
+    }
+
     function initGlobe(containerId = 'globe-container') {
         const container = document.getElementById(containerId);
         if (!container) return;
@@ -35,16 +128,28 @@ window.AegisGlobe = (function () {
         const width = container.clientWidth || 400;
         const height = container.clientHeight || 400;
 
-        scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-        camera.position.z = 215;
+        if (typeof THREE === 'undefined') {
+            console.warn('Three.js library not loaded; rendering fallback holographic stage.');
+            renderFallbackGlobe(container, width, height);
+            return;
+        }
 
-        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(width, height);
-        renderer.setPixelRatio(window.devicePixelRatio || 1);
-        renderer.domElement.id = 'globe-canvas';
-        container.innerHTML = '';
-        container.appendChild(renderer.domElement);
+        try {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            camera.position.z = 215;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, failIfMajorPerformanceCaveat: false });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio || 1);
+            renderer.domElement.id = 'globe-canvas';
+            container.innerHTML = '';
+            container.appendChild(renderer.domElement);
+        } catch (webglErr) {
+            console.warn('WebGL context creation failed (software/headless mode active); rendering 2D cyber sphere:', webglErr);
+            renderFallbackGlobe(container, width, height);
+            return;
+        }
 
         // Create or find floating tooltip
         tooltipEl = document.getElementById('globeTooltip');

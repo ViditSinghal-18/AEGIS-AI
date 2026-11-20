@@ -1,0 +1,25 @@
+{
+  "target": "owasp.org",
+  "assets": [
+    {
+      "target": "owasp.org",
+      "port": 443,
+      "service": "https",
+      "product": "OWASP Foundation - The Open Source Foundation for Application SecurityOWASP Foundation",
+      "version": "",
+      "exposure": "Open tcp/443 service=https product=OWASP Foundation - The Open Source Foundation for Application SecurityOWASP Foundation version=n/a",
+      "cves": [],
+      "config_issues": [
+        "Open TCP/443 web service on the lab host.",
+        "cookie-missing-secure: Cookie 'owasp-locale' missing Secure flag",
+        "cookie-missing-httponly: Cookie 'owasp-locale' missing HttpOnly flag",
+        "version-disclosure-server: Server header discloses 'Vercel'",
+        "version-disclosure-x-powered-by: X-Powered-By discloses 'Next.js'"
+      ]
+    }
+  ],
+  "mode": "passive",
+  "notes": [
+    "Mode: PASSIVE (Public reconnaissance only \u2014 no active port scanning was performed)."
+  ]
+}

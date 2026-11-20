@@ -1,0 +1,298 @@
+{
+  "target": "owasp.org",
+  "scan_method": "passive-osint",
+  "ports": [
+    {
+      "port": 443,
+      "protocol": "tcp",
+      "state": "open",
+      "service": "https",
+      "product": "OWASP Foundation - The Open Source Foundation for Application SecurityOWASP Foundation",
+      "version": "",
+      "extra": "passive-web-observation"
+    },
+    {
+      "port": 80,
+      "protocol": "tcp",
+      "state": "open",
+      "service": "http",
+      "product": "",
+      "version": "",
+      "extra": "passive-shodan-internetdb"
+    }
+  ],
+  "http": {
+    "url": "https://owasp.org/",
+    "reachable": true,
+    "status_code": 200,
+    "title": "OWASP Foundation - The Open Source Foundation for Application SecurityOWASP Foundation",
+    "uses_tls": true,
+    "missing_security_headers": [],
+    "cookie_issues": [
+      "cookie-missing-secure: Cookie 'owasp-locale' missing Secure flag",
+      "cookie-missing-httponly: Cookie 'owasp-locale' missing HttpOnly flag"
+    ],
+    "cors_issues": [],
+    "version_disclosure_issues": [
+      "version-disclosure-server: Server header discloses 'Vercel'",
+      "version-disclosure-x-powered-by: X-Powered-By discloses 'Next.js'"
+    ],
+    "notes": [
+      "csp_raw:default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' https://remssssfmrgmyzqnpeas.supabase.co https://*.supabase.co https://owasp.org https://dependencytrack.org https://assets.ot.digital https://images.unsplash.com https://i.ytimg.com https://img.youtube.com https://*.googleusercontent.com data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://remssssfmrgmyzqnpeas.supabase.co wss://remssssfmrgmyzqnpeas.supabase.co; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://calendar.google.com; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com; frame-ancestors 'none'; upgrade-insecure-requests; report-uri /api/csp-report; report-to csp-endpoint"
+    ]
+  },
+  "tls": {
+    "skipped": false,
+    "reason": "Passive TLS inspection completed.",
+    "host": "owasp.org",
+    "grade": "Valid",
+    "raw": {
+      "reachable": true,
+      "protocol": "TLSv1.3",
+      "issuer": "Let's Encrypt",
+      "subject": "owasp.org",
+      "days_until_expiry": 80,
+      "issues": []
+    }
+  },
+  "mode": "passive",
+  "passive_meta": {
+    "dns": {
+      "domain": "owasp.org",
+      "A": [],
+      "MX": [],
+      "TXT": [
+        "owasp.org\ttext =",
+        "owasp.org\ttext =",
+        "owasp.org\ttext =",
+        "owasp.org\ttext =",
+        "owasp.org\ttext =",
+        "owasp.org\ttext =",
+        "owasp.org\ttext =",
+        "owasp.org\ttext =",
+        "owasp.org\ttext =",
+        "owasp.org\ttext =",
+        "\"v=spf1 include:_spf.google.com include:servers.mcsv.net include:amazonses.com -all\""
+      ],
+      "spf_present": true,
+      "dmarc_present": true,
+      "issues": []
+    },
+    "ct_subdomains": [
+      "admin.owasp.org",
+      "aghast.owasp.org",
+      "austin.owasp.org",
+      "blt.owasp.org",
+      "cloud.owasp.org",
+      "contact.owasp.org",
+      "copi.owasp.org",
+      "cornucopia.owasp.org",
+      "ctf.owasp.org",
+      "docs.owasp.org",
+      "dsomm.owasp.org",
+      "genai.owasp.org",
+      "giving.owasp.org",
+      "kerala.owasp.org",
+      "llm.owasp.org",
+      "name-virt-host.owasp.org",
+      "nest.owasp.org",
+      "ocms.owasp.org",
+      "pce.dev.owasp.org",
+      "prodsec.owasp.org",
+      "projectsummit.owasp.org",
+      "secureflag.owasp.org",
+      "support.docs.owasp.org",
+      "support.owasp.org",
+      "www.projectsummit.owasp.org"
+    ],
+    "ct_notice": "Subdomains discovered via public Certificate Transparency logs for mapping only (none were probed or scanned).",
+    "shodan": {
+      "ports": [
+        80,
+        443
+      ],
+      "cpes": [],
+      "tags": [
+        "pqc"
+      ],
+      "source": "shodan-internetdb"
+    },
+    "csp": {
+      "grade": "C",
+      "score": 70,
+      "is_present": true,
+      "weaknesses": [
+        "'unsafe-inline' enabled without cryptographic nonce/hash (allows arbitrary inline XSS)."
+      ],
+      "strengths": [
+        "object-src set to 'none' (blocks legacy Flash/Java plugin execution).",
+        "base-uri restricted to 'self'.",
+        "frame-ancestors defined ('none'), mitigating clickjacking."
+      ],
+      "parsed_directives": {
+        "default-src": [
+          "'self'"
+        ],
+        "script-src": [
+          "'self'",
+          "'unsafe-inline'"
+        ],
+        "style-src": [
+          "'self'",
+          "'unsafe-inline'",
+          "https://fonts.googleapis.com"
+        ],
+        "img-src": [
+          "'self'",
+          "https://remssssfmrgmyzqnpeas.supabase.co",
+          "https://*.supabase.co",
+          "https://owasp.org",
+          "https://dependencytrack.org",
+          "https://assets.ot.digital",
+          "https://images.unsplash.com",
+          "https://i.ytimg.com",
+          "https://img.youtube.com",
+          "https://*.googleusercontent.com",
+          "data:"
+        ],
+        "font-src": [
+          "'self'",
+          "https://fonts.gstatic.com"
+        ],
+        "connect-src": [
+          "'self'",
+          "https://remssssfmrgmyzqnpeas.supabase.co",
+          "wss://remssssfmrgmyzqnpeas.supabase.co"
+        ],
+        "frame-src": [
+          "'self'",
+          "https://www.youtube.com",
+          "https://www.youtube-nocookie.com",
+          "https://player.vimeo.com",
+          "https://calendar.google.com"
+        ],
+        "object-src": [
+          "'none'"
+        ],
+        "base-uri": [
+          "'self'"
+        ],
+        "form-action": [
+          "'self'",
+          "https://accounts.google.com"
+        ],
+        "frame-ancestors": [
+          "'none'"
+        ],
+        "upgrade-insecure-requests": [],
+        "report-uri": [
+          "/api/csp-report"
+        ],
+        "report-to": [
+          "csp-endpoint"
+        ]
+      },
+      "recommendations": [
+        "Remove 'unsafe-inline' and use cryptographic nonces: script-src 'nonce-<random>'"
+      ]
+    },
+    "email_security": {
+      "domain": "owasp.org",
+      "grade": "F",
+      "score": 0,
+      "spf_record": null,
+      "spf_qualifier": null,
+      "dmarc_record": null,
+      "dmarc_policy": "missing",
+      "dmarc_percentage": 100,
+      "mta_sts_enabled": false,
+      "mta_sts_mode": "none",
+      "tls_rpt_enabled": false,
+      "weaknesses": [
+        "Missing SPF (Sender Policy Framework) record: domain is vulnerable to direct address spoofing.",
+        "Missing DMARC record: recipient mail servers have no instructions on how to handle spoofed messages.",
+        "MTA-STS not enabled: inbound SMTP connections risk cleartext TLS downgrade via STARTTLS stripping."
+      ],
+      "strengths": [],
+      "recommendations": [
+        "Add DNS TXT record for owasp.org: 'v=spf1 mx -all'",
+        "Add DNS TXT record for _dmarc.owasp.org: 'v=DMARC1; p=reject; rua=mailto:dmarc@owasp.org;'",
+        "Deploy MTA-STS policy at https://mta-sts.owasp.org/.well-known/mta-sts.txt with mode 'enforce'.",
+        "Add DNS TXT record for _smtp._tls.owasp.org: 'v=TLSRPTv1; rua=mailto:tls-rpt@owasp.org;'"
+      ]
+    },
+    "dangling_dns": [
+      {
+        "subdomain": "admin.owasp.org",
+        "cname_target": "41e3b5a8b9f664cc.vercel-dns-016.com",
+        "provider_name": null,
+        "is_vulnerable": false,
+        "status_code": null,
+        "fingerprint_matched": null,
+        "evidence": "CNAME points to '41e3b5a8b9f664cc.vercel-dns-016.com' (not a cataloged vulnerable cloud provider pattern).",
+        "remediation": "None required."
+      },
+      {
+        "subdomain": "aghast.owasp.org",
+        "cname_target": "owasp-aghast.github.io",
+        "provider_name": "GitHub Pages",
+        "is_vulnerable": false,
+        "status_code": 200,
+        "fingerprint_matched": null,
+        "evidence": "CNAME points to GitHub Pages ('owasp-aghast.github.io'), but service responds with active content (no unallocated error fingerprint found).",
+        "remediation": "Ensure the cloud service binding is monitored and retained."
+      },
+      {
+        "subdomain": "austin.owasp.org",
+        "cname_target": null,
+        "provider_name": null,
+        "is_vulnerable": false,
+        "status_code": null,
+        "fingerprint_matched": null,
+        "evidence": "No CNAME record discovered for subdomain.",
+        "remediation": "None required."
+      },
+      {
+        "subdomain": "blt.owasp.org",
+        "cname_target": null,
+        "provider_name": null,
+        "is_vulnerable": false,
+        "status_code": null,
+        "fingerprint_matched": null,
+        "evidence": "No CNAME record discovered for subdomain.",
+        "remediation": "None required."
+      }
+    ],
+    "exposed_secrets": [],
+    "breach_propensity": {
+      "target": "owasp.org",
+      "overall_score": 74.8,
+      "posture_grade": "C",
+      "propensity_tier": "Elevated",
+      "component_scores": {
+        "email_security": 0.0,
+        "csp_quality": 70.0,
+        "tls_hygiene": 100.0,
+        "network_exposure": 95.0,
+        "header_hygiene": 100.0,
+        "penalties_applied": 0.0
+      },
+      "key_deficiencies": [
+        "Suboptimal email hygiene (0/100): risks domain impersonation in spearphishing.",
+        "Permissive CSP (70/100) containing bypassable directives."
+      ],
+      "positive_controls": [
+        "Public TLS certificate is valid with sufficient operational validity.",
+        "No sensitive administrative or database ports exposed directly to public WAN."
+      ],
+      "methodology": "Empirical multi-factor perimeter hygiene index (inspired by Liu et al. 2015)"
+    }
+  },
+  "notes": [
+    "Mode: PASSIVE (Public reconnaissance only \u2014 no active port scanning was performed).",
+    "External Posture Grade: C (74.8/100) \u2014 Breach Propensity: Elevated",
+    "Email Security Grade: F (0/100) \u2014 DMARC: missing",
+    "CSP Defense Grade: C (70/100)",
+    "Discovered 25 subdomains from Certificate Transparency logs."
+  ]
+}

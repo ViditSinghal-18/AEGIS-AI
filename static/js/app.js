@@ -9,25 +9,41 @@ window.AegisApp = (function () {
 
     let currentReport = null;
     let selectedFindingIndex = 0;
+    let dashboardInitialized = false;
 
     async function initDashboard() {
-        // 1. Initialize 3D Globe
-        AegisGlobe.initGlobe('globe-container');
+        if (dashboardInitialized) return;
+        dashboardInitialized = true;
 
-        // Initial default ingress telemetry pins while loading
-        AegisGlobe.plotRealTargetPins('owasp.org', {
-            lat: 37.7749,
-            lon: -122.4194,
-            city: 'San Francisco',
-            country: 'United States',
-            asn: 'AS13335 (Cloudflare Edge)'
-        });
+        // 1. Initialize 3D Globe with error guard
+        try {
+            if (window.AegisGlobe && typeof AegisGlobe.initGlobe === 'function') {
+                AegisGlobe.initGlobe('globe-container');
+                AegisGlobe.plotRealTargetPins('owasp.org', {
+                    lat: 37.7749,
+                    lon: -122.4194,
+                    city: 'San Francisco',
+                    country: 'United States',
+                    asn: 'AS13335 (Cloudflare Edge)'
+                });
+            }
+        } catch (globeErr) {
+            console.warn('Globe initialization error handled gracefully:', globeErr);
+        }
 
         // 2. Setup Navigation and Modals
-        setupEventListeners();
+        try {
+            setupEventListeners();
+        } catch (navErr) {
+            console.warn('Navigation setup error handled gracefully:', navErr);
+        }
 
         // 3. Load initial report or demo data
-        await loadInitialData();
+        try {
+            await loadInitialData();
+        } catch (dataErr) {
+            console.warn('Initial data load error handled gracefully:', dataErr);
+        }
     }
 
     async function loadInitialData() {
@@ -437,7 +453,15 @@ window.AegisApp = (function () {
     };
 })();
 
-// Start application when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+// Start application when DOM is ready or immediately if already loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        AegisApp.initDashboard();
+    });
+} else {
+    AegisApp.initDashboard();
+}
+
+window.addEventListener('load', () => {
     AegisApp.initDashboard();
 });
