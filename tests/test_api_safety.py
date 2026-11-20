@@ -173,6 +173,23 @@ class TestApiSafetyEndpoints(unittest.TestCase):
         self.assertEqual(res_empty.status_code, 200)
         self.assertTrue(res_empty.get_json().get("grounded"))
 
+    def test_prioritize_endpoint_disallows_arbitrary_source_path(self):
+        """Verify that client-supplied source_path is ignored to prevent arbitrary directory read."""
+        res = self.client.post("/api/scan/prioritize", json={
+            "findings": [],
+            "discovery_data": {"target": "test-host.local"},
+            "source_path": "/etc"
+        })
+        self.assertEqual(res.status_code, 200)
+        report = res.get_json()
+        self.assertIsInstance(report, dict)
+
+    def test_scan_rejects_missing_target(self):
+        """Verify that /api/scan requires a target and does not default to 127.0.0.1."""
+        res = self.client.post("/api/scan", json={"active": True})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("error", res.get_json())
+
 
 if __name__ == "__main__":
     unittest.main()

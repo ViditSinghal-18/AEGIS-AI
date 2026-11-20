@@ -5,6 +5,7 @@ or: pytest tests/test_safety.py
 """
 
 import unittest
+import config
 from discovery.safe_fetch import (
     SafeFetchError,
     is_ip_allowed_for_public_fetch,
@@ -144,6 +145,44 @@ class TestSafetyDefenses(unittest.TestCase):
         self.assertNotIn("</target_data>", sanitized)
         self.assertNotIn("```", sanitized)
         self.assertLessEqual(len(sanitized), 100)
+
+    def test_validate_target_input_blocks_unallowlisted_private_ips_and_metadata(self):
+        """Verify unallowlisted private, link-local and cloud metadata IPs are rejected as SSRF."""
+        ssrf_targets = [
+            "10.0.0.5",
+            "192.168.1.1",
+            "169.254.169.254",
+            "172.16.0.1",
+            "fd00:ec2::254",
+        ]
+        for target in ssrf_targets:
+            with self.assertRaises(ValidationError, msg=f"Target {target} should be rejected as SSRF"):
+                validate_target_input(target)
+
+    def test_public_deployment_excludes_loopback(self):
+        """Verify loopback is disallowed on public cloud deployments (RENDER/PORT)."""
+        import os
+        old_render = os.environ.get("RENDER")
+        try:
+            os.environ["RENDER"] = "true"
+            self.assertFalse(config.is_target_allowed_for_active_scan("127.0.0.1"))
+            self.assertFalse(config.is_target_allowed_for_active_scan("localhost"))
+            self.assertNotIn("127.0.0.1", config.load_allowlist())
+            self.assertNotIn("localhost", config.load_allowlist())
+
+            # Loopback input is blocked as SSRF on public cloud deployment
+            with self.assertRaises(ValidationError):
+                validate_target_input("127.0.0.1")
+
+            # Active scanning on public domains is forced to PASSIVE OSINT
+            mode, can_active, _ = determine_scan_mode("example.com", requested_active=True)
+            self.assertEqual(mode, "PASSIVE OSINT")
+            self.assertFalse(can_active)
+        finally:
+            if old_render is not None:
+                os.environ["RENDER"] = old_render
+            else:
+                os.environ.pop("RENDER", None)
 
 
 if __name__ == "__main__":

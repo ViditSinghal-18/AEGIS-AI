@@ -347,7 +347,9 @@ def trigger_scan():
         return jsonify({"success": False, "error": "Request payload must be application/json."}), 415
 
     req_data = request.get_json() or {}
-    raw_target = req_data.get("target") if "target" in req_data else "127.0.0.1"
+    raw_target = req_data.get("target")
+    if not raw_target:
+        return jsonify({"success": False, "error": "Target parameter is required."}), 400
 
     # 2. Input Validation
     try:
@@ -555,8 +557,8 @@ def api_scan_stage_prioritize():
     data = request.get_json() or {}
     findings = data.get("findings", [])
     discovery_data = data.get("discovery_data", {"target": "unknown"})
-    source_path = data.get("source_path")
-    report = prioritize_findings(findings, discovery_data, source_path=source_path)
+    # Client-supplied source_path is strictly disallowed to prevent arbitrary server directory traversal
+    report = prioritize_findings(findings, discovery_data, source_path=None)
     return jsonify(report)
 
 # ==============================================================================

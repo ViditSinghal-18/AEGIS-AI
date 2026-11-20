@@ -65,18 +65,36 @@ def validate_target_input(raw: Any) -> str:
     if not normalized:
         raise ValidationError("Target could not be resolved to a valid hostname or IP address.")
 
+    is_ip = False
     # Check if target is a valid IP address
     try:
         ip = ipaddress.ip_address(normalized)
-        return ip.compressed
+        is_ip = True
+        target_str = ip.compressed
     except ValueError:
-        pass
+        target_str = normalized
+        # Validate hostname syntax
+        if not _HOSTNAME_RE.match(normalized):
+            raise ValidationError(f"Invalid hostname format: '{normalized}'. Must conform to standard domain naming rules.")
 
-    # Validate hostname syntax
-    if not _HOSTNAME_RE.match(normalized):
-        raise ValidationError(f"Invalid hostname format: '{normalized}'. Must conform to standard domain naming rules.")
+    # SSRF Guard:
+    # If the target is NOT explicitly allowed for active scanning in allowlist/verified store,
+    # run resolve_and_validate_hostname() to block loopback, private subnets, cloud metadata,
+    # and DNS rebinding to internal IPs.
+    if not is_target_allowed_for_active_scan(target_str):
+        from discovery.safe_fetch import resolve_and_validate_hostname, SafeFetchError
+        try:
+            resolve_and_validate_hostname(target_str)
+        except SafeFetchError as sfe:
+            err_msg = str(sfe)
+            if "DNS resolution failed" in err_msg:
+                if is_ip or target_str.lower() in {"localhost", "localhost.localdomain"} or target_str.endswith(".local") or target_str.endswith(".internal"):
+                    raise ValidationError(f"Target rejected (SSRF boundary violation): '{target_str}' is an internal address.")
+                # Domain is syntactically valid but could not be resolved by current DNS (e.g. offline unit testing)
+            else:
+                raise ValidationError(f"Target rejected (SSRF boundary violation): {sfe}")
 
-    return normalized
+    return target_str
 
 
 def determine_scan_mode(target: str, requested_active: bool = False) -> Tuple[str, bool, str]:
@@ -88,6 +106,21 @@ def determine_scan_mode(target: str, requested_active: bool = False) -> Tuple[st
         (mode_name: str, can_active: bool, rationale: str)
     """
     normalized = validate_target_input(target)
+
+    # Disable active mode entirely on public cloud deployments (Render, etc.)
+    if getattr(config, "is_public_deployment", lambda: False)():
+        if requested_active:
+            return (
+                "PASSIVE OSINT",
+                False,
+                "Active port scanning is disabled on public cloud hosting to prevent infrastructure abuse."
+            )
+        return (
+            "PASSIVE OSINT",
+            False,
+            "Passive OSINT mode active. Active port scanning is disabled on public cloud hosting."
+        )
+
     can_active = is_target_allowed_for_active_scan(normalized)
 
     if can_active and requested_active:

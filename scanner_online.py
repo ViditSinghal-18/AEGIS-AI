@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 import requests
 import urllib3
 
-from config import SAFE_FETCH_TIMEOUT
-from discovery.safe_fetch import safe_fetch, SafeFetchError
+from config import SAFE_FETCH_TIMEOUT, is_target_allowed_for_active_scan
+from discovery.safe_fetch import safe_fetch, SafeFetchError, resolve_and_validate_hostname
 from security import validate_target_input, determine_scan_mode
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -219,11 +219,12 @@ def assess_website(target_input):
     redirect_chain = [target_url]
     
     try:
+        allow_loopback = bool(is_target_allowed_for_active_scan(hostname))
         resp = safe_fetch(
             target_url,
             method="GET",
             timeout=SAFE_FETCH_TIMEOUT,
-            allow_loopback_for_testing=is_private,
+            allow_loopback_for_testing=allow_loopback,
         )
         status_code = resp.status_code
         headers_received = dict(resp.headers)
@@ -250,13 +251,21 @@ def assess_website(target_input):
         })
         results["score"] = max(0, results["score"] - 25)
 
-    # 3. SSL/TLS Audit
+    # 3. SSL/TLS Audit (with SSRF protection & pinned IP)
     if parsed.scheme == "https" or port == 443:
         try:
+            # Enforce SSRF validation and resolve to pinned IP
+            target_ip = None
+            if is_target_allowed_for_active_scan(hostname):
+                target_ip = ip_addr if (ip_addr and not ip_addr.startswith("Unresolved")) else hostname
+            else:
+                validated_ips = resolve_and_validate_hostname(hostname)
+                target_ip = validated_ips[0]
+
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with socket.create_connection((hostname, port or 443), timeout=5) as sock:
+            with socket.create_connection((target_ip, port or 443), timeout=5) as sock:
                 with ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
                     cert = ssock.getpeercert(binary_form=False)
                     cipher = ssock.cipher()

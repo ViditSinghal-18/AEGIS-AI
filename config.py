@@ -157,10 +157,21 @@ def normalize_host(raw: str) -> str:
 _normalize_host = normalize_host
 
 
+def is_public_deployment() -> bool:
+    """Return True if running in a public cloud hosting environment (Render, etc.)."""
+    return bool(
+        os.environ.get("RENDER")
+        or os.environ.get("AEGIS_PUBLIC_ENV")
+        or os.environ.get("AEGIS_DISABLE_ACTIVE_SCAN")
+    )
+
+
 def load_allowlist() -> set[str]:
     """Read targets.allowlist and return normalized allowed targets."""
+    is_public = is_public_deployment()
     if not ALLOWLIST_PATH.exists():
-        # Fallback to local loopback if file doesn't exist
+        if is_public:
+            return set()
         return {"localhost", "127.0.0.1", "::1"}
     
     allowed: set[str] = set()
@@ -169,6 +180,9 @@ def load_allowlist() -> set[str]:
         if line:
             norm = normalize_host(line)
             if norm:
+                # Strip loopback and private entries on public cloud deployments
+                if is_public and norm in {"localhost", "127.0.0.1", "::1", "0.0.0.0"}:
+                    continue
                 allowed.add(norm)
     return allowed
 
@@ -189,12 +203,24 @@ def is_target_allowed_for_active_scan(target: str) -> bool:
     if not normalized:
         return False
 
+    is_public = is_public_deployment()
+    if is_public:
+        # Loopback and private IPs are strictly prohibited on public deployments
+        if normalized in {"localhost", "127.0.0.1", "::1", "0.0.0.0"}:
+            return False
+        try:
+            ip_obj = ipaddress.ip_address(normalized)
+            if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_reserved:
+                return False
+        except ValueError:
+            pass
+
     # Check allowlist
     try:
         if normalized in load_allowlist():
             return True
     except Exception:
-        if normalized in {"localhost", "127.0.0.1", "::1"}:
+        if not is_public and normalized in {"localhost", "127.0.0.1", "::1"}:
             return True
 
     # Check domain ownership verification store
