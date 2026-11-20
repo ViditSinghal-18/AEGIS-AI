@@ -49,5 +49,5 @@ USER aegis
 # Expose HTTP port
 EXPOSE 5000
 
-# Launch AEGIS application via production WSGI server
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "app:app"]
+# Launch AEGIS application via production WSGI server (adapts dynamically to $PORT on Render/Cloud)
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 120 app:app"]
