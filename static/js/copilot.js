@@ -40,9 +40,12 @@ window.AegisCopilot = (function () {
         const drawer = document.getElementById('copilotDrawer');
         const fab = document.getElementById('copilotFab');
         if (drawer) {
-            if (drawer.style.display === 'none') {
+            const isHidden = drawer.style.display === 'none' || window.getComputedStyle(drawer).display === 'none';
+            if (isHidden) {
                 drawer.style.display = 'flex';
                 if (fab) fab.style.display = 'none';
+                const input = document.getElementById('copilotInput');
+                if (input) input.focus();
             } else {
                 drawer.style.display = 'none';
                 if (fab) fab.style.display = 'flex';

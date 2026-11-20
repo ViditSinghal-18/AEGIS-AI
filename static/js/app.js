@@ -79,10 +79,23 @@ window.AegisApp = (function () {
         AegisUtils.safeSetText('operationalModeBadge', data.operational_mode || data.mode || 'PASSIVE OSINT');
 
         const findings = data.findings || data.prioritized_findings || [];
-        const critCount = findings.filter(f => (f.priority_level || '').includes('P1') || f.severity === 'Critical').length;
-        const highCount = findings.filter(f => (f.priority_level || '').includes('P2') || f.severity === 'High').length;
-        const medCount = findings.filter(f => (f.priority_level || '').includes('P3') || f.severity === 'Medium').length;
-        const lowCount = findings.filter(f => (f.priority_level || '').includes('P4') || f.severity === 'Low').length;
+        function getFindingPriority(f) {
+            const p = f.priority_level || '';
+            if (p.includes('P1')) return 'P1';
+            if (p.includes('P2')) return 'P2';
+            if (p.includes('P3')) return 'P3';
+            if (p.includes('P4')) return 'P4';
+            const s = (f.severity || '').toLowerCase();
+            if (s === 'critical') return 'P1';
+            if (s === 'high') return 'P2';
+            if (s === 'medium') return 'P3';
+            return 'P4';
+        }
+
+        const critCount = findings.filter(f => getFindingPriority(f) === 'P1').length;
+        const highCount = findings.filter(f => getFindingPriority(f) === 'P2').length;
+        const medCount = findings.filter(f => getFindingPriority(f) === 'P3').length;
+        const lowCount = findings.filter(f => getFindingPriority(f) === 'P4').length;
 
         AegisUtils.safeSetText('statTotalFindings', findings.length);
         AegisUtils.safeSetText('statCritCount', critCount);
@@ -225,6 +238,11 @@ window.AegisApp = (function () {
     let currentRemediationBundle = null;
     let currentRemediationTab = 'nginx';
 
+    function sanitizeTargetInput(val) {
+        if (!val) return '';
+        return val.replace(/^[a-zA-Z]+:\/\//, '').replace(/\/.*$/, '').trim();
+    }
+
     async function triggerScan(targetInput) {
         let target = targetInput || (document.getElementById('scanTargetInput') ? document.getElementById('scanTargetInput').value.trim() : '');
         if (!target) {
@@ -233,7 +251,7 @@ window.AegisApp = (function () {
         }
 
         // Clean protocol prefix and trailing slashes if user pasted full URL (e.g. http://domain.com/ -> domain.com)
-        target = target.replace(/^[a-zA-Z]+:\/\//, '').replace(/\/.*$/, '').trim();
+        target = sanitizeTargetInput(target);
         const inputEl = document.getElementById('scanTargetInput');
         if (inputEl) inputEl.value = target;
 
@@ -286,8 +304,20 @@ window.AegisApp = (function () {
             inputScan.onkeydown = (e) => {
                 if (e.key === 'Enter') triggerScan();
             };
-            inputScan.addEventListener('change', updateActiveModeState);
-            inputScan.addEventListener('blur', updateActiveModeState);
+            inputScan.addEventListener('input', () => {
+                const raw = inputScan.value;
+                if (raw.includes('://') || raw.endsWith('/')) {
+                    inputScan.value = sanitizeTargetInput(raw);
+                }
+            });
+            inputScan.addEventListener('change', () => {
+                inputScan.value = sanitizeTargetInput(inputScan.value);
+                updateActiveModeState();
+            });
+            inputScan.addEventListener('blur', () => {
+                inputScan.value = sanitizeTargetInput(inputScan.value);
+                updateActiveModeState();
+            });
         }
 
         // Domain Verification Modal Trigger

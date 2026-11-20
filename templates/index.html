@@ -16,11 +16,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Modular Stylesheet -->
-    <link rel="stylesheet" href="/static/css/styles.css?v=2.2">
+    <link rel="stylesheet" href="/static/css/styles.css?v=2.3">
 
     <!-- Bundled Vendor Libraries -->
-    <script src="/static/js/three.min.js?v=2.2"></script>
-    <script src="/static/js/chart.min.js?v=2.2"></script>
+    <script src="/static/js/three.min.js?v=2.3"></script>
+    <script src="/static/js/chart.min.js?v=2.3"></script>
 </head>
 <body>
 
@@ -297,13 +297,13 @@
     </main>
 
     <!-- FLOATING LAUNCHER FAB (shown when copilot dock is closed) -->
-    <button class="copilot-fab" id="copilotFab" onclick="AegisCopilot.toggleCopilot()" aria-label="Open Aegis Copilot">
+    <button class="copilot-fab" id="copilotFab" onclick="AegisCopilot.toggleCopilot()" aria-label="Open Aegis Copilot" style="display: flex;">
         <span style="font-size: 1.2rem;">🤖</span>
         <span>Aegis Copilot</span>
     </button>
 
     <!-- AEGIS COPILOT INTERACTIVE CHAT DOCK -->
-    <div id="copilotDrawer" class="copilot-drawer">
+    <div id="copilotDrawer" class="copilot-drawer" style="display: none;">
         <div class="copilot-header">
             <div class="copilot-header-info">
                 <span class="copilot-header-icon">🤖</span>
@@ -392,13 +392,13 @@
     <div id="toastContainer" style="position: fixed; bottom: 20px; right: 20px; z-index: 999999;"></div>
 
     <!-- Modular Application JavaScript Files -->
-    <script src="/static/js/utils.js?v=2.2"></script>
-    <script src="/static/js/globe.js?v=2.2"></script>
-    <script src="/static/js/charts.js?v=2.2"></script>
-    <script src="/static/js/telemetry.js?v=2.2"></script>
-    <script src="/static/js/verification.js?v=2.2"></script>
-    <script src="/static/js/copilot.js?v=2.2"></script>
-    <script src="/static/js/app.js?v=2.2"></script>
+    <script src="/static/js/utils.js?v=2.3"></script>
+    <script src="/static/js/globe.js?v=2.3"></script>
+    <script src="/static/js/charts.js?v=2.3"></script>
+    <script src="/static/js/telemetry.js?v=2.3"></script>
+    <script src="/static/js/verification.js?v=2.3"></script>
+    <script src="/static/js/copilot.js?v=2.3"></script>
+    <script src="/static/js/app.js?v=2.3"></script>
 
 </body>
 </html>

@@ -377,6 +377,10 @@ def trigger_scan():
 
             unified_report = convert_to_prioritized_report(audit_result)
             unified_report["operational_mode"] = mode_name
+            if audit_result.get("geo_telemetry"):
+                unified_report["geo_telemetry"] = audit_result["geo_telemetry"]
+            if audit_result.get("resolved_ip"):
+                unified_report["resolved_ip"] = audit_result["resolved_ip"]
             safe_save_json(REPORT_FILE, unified_report)
 
             return jsonify({
@@ -473,6 +477,10 @@ def trigger_scan_online():
         prioritized_report = prioritize_findings(findings, passive_recon)
         prioritized_report["operational_mode"] = mode_name
         prioritized_report["mode_rationale"] = mode_rationale
+        if audit_result.get("geo_telemetry"):
+            prioritized_report["geo_telemetry"] = audit_result["geo_telemetry"]
+        if audit_result.get("resolved_ip"):
+            prioritized_report["resolved_ip"] = audit_result["resolved_ip"]
 
         # Step D: Persistence & History Archiving
         write_json("prioritized_report.json", prioritized_report, target=target)

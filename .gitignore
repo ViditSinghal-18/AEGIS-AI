@@ -38,11 +38,13 @@ explanation.json
 dashboard.html
 data/verified_targets.json
 data/history/
+data/**/history/
 data/*
 !data/sample/
 !data/sample/**
 !data/owasp.org/
 !data/owasp.org/**
+data/owasp.org/history/
 !data/cve_symbols.yaml
 reports/*.json
 !reports/sample_*.json
