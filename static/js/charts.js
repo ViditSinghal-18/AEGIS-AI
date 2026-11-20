@@ -20,11 +20,24 @@ window.AegisCharts = (function () {
         let excludedCount = 0;
 
         (findings || []).forEach((f, idx) => {
-            const cvss = parseFloat(f.cvss_score || f.cvss_base_score || 0);
-            const epss = parseFloat(f.epss_probability || (f.threat_intel ? f.threat_intel.epss_score : 0));
+            let cvss = parseFloat(f.cvss_score || f.cvss_base_score || 0);
+            let epss = parseFloat(f.epss_probability || (f.threat_intel ? f.threat_intel.epss_score : 0));
             const score = parseFloat(f.contextual_risk_score || 5.0);
 
-            if (cvss > 0 && epss >= 0) {
+            // Fallback for perimeter findings where CVSS is implicit
+            if (cvss <= 0) {
+                const sev = (f.severity || f.priority_level || '').toLowerCase();
+                if (sev.includes('crit') || sev.includes('p1')) cvss = 9.0;
+                else if (sev.includes('high') || sev.includes('p2')) cvss = 7.5;
+                else if (sev.includes('med') || sev.includes('p3')) cvss = 5.0;
+                else if (sev.includes('low') || sev.includes('p4')) cvss = 3.0;
+            }
+
+            if (epss <= 0 && f.threat_intel && f.threat_intel.epss_percent) {
+                epss = parseFloat(f.threat_intel.epss_percent) / 100.0;
+            }
+
+            if (cvss > 0) {
                 validPoints.push({
                     x: cvss,
                     y: epss * 100, // percentage for display
@@ -128,7 +141,15 @@ window.AegisCharts = (function () {
             radarChartInstance.destroy();
         }
 
-        const cvss = parseFloat(finding ? (finding.cvss_score || 5.0) : 5.0);
+        let cvss = parseFloat(finding ? (finding.cvss_score || finding.cvss_base_score || 0) : 5.0);
+        if (cvss <= 0) {
+            const sev = (finding && (finding.severity || finding.priority_level) ? (finding.severity || finding.priority_level) : '').toLowerCase();
+            if (sev.includes('crit') || sev.includes('p1')) cvss = 9.0;
+            else if (sev.includes('high') || sev.includes('p2')) cvss = 7.5;
+            else if (sev.includes('med') || sev.includes('p3')) cvss = 5.0;
+            else if (sev.includes('low') || sev.includes('p4')) cvss = 3.0;
+            else cvss = 5.0;
+        }
         const epssScore = parseFloat(finding ? ((finding.epss_probability || 0.005) * 100) : 10.0);
         const reachability = parseFloat(finding ? (finding.environmental_reachability_score || (finding.exposure_context && finding.exposure_context.includes('Direct') ? 9.5 : 5.0)) : 5.0);
         const criticality = 8.5;

@@ -32,7 +32,9 @@ window.AegisApp = (function () {
 
     async function loadInitialData() {
         try {
-            const resp = await fetch('/api/report');
+            const inputTarget = document.getElementById('scanTargetInput') ? document.getElementById('scanTargetInput').value.trim() : '';
+            const targetParam = inputTarget ? `?target=${encodeURIComponent(inputTarget)}` : '';
+            const resp = await fetch(`/api/report${targetParam}`);
             if (resp.ok) {
                 const data = await resp.json();
                 applyReportData(data);
@@ -213,6 +215,10 @@ window.AegisApp = (function () {
             AegisUtils.showToast('Please enter a target domain or IP.', 'warning');
             return;
         }
+
+        // Open live audit terminal when a scan is initiated
+        const term = document.getElementById('auditTerminal');
+        if (term) term.classList.add('active');
 
         const chkActive = document.getElementById('chkActiveScan');
         const isActive = chkActive && chkActive.checked && !chkActive.disabled;

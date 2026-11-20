@@ -37,11 +37,12 @@ window.AegisGlobe = (function () {
 
         scene = new THREE.Scene();
         camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-        camera.position.z = 230;
+        camera.position.z = 215;
 
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(width, height);
         renderer.setPixelRatio(window.devicePixelRatio || 1);
+        renderer.domElement.id = 'globe-canvas';
         container.innerHTML = '';
         container.appendChild(renderer.domElement);
 
@@ -75,9 +76,9 @@ window.AegisGlobe = (function () {
         // 1. Dark Core Sphere
         const sphereGeo = new THREE.SphereGeometry(75, 48, 48);
         const sphereMat = new THREE.MeshBasicMaterial({
-            color: 0x050c1e,
+            color: 0x081328,
             transparent: true,
-            opacity: 0.94,
+            opacity: 0.90,
             wireframe: false
         });
         const coreSphere = new THREE.Mesh(sphereGeo, sphereMat);
@@ -89,7 +90,7 @@ window.AegisGlobe = (function () {
             color: 0x00f0ff,
             wireframe: true,
             transparent: true,
-            opacity: 0.16
+            opacity: 0.38
         });
         const wireSphere = new THREE.Mesh(wireGeo, wireMat);
         globeGroup.add(wireSphere);
@@ -112,24 +113,35 @@ window.AegisGlobe = (function () {
         particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         const particleMat = new THREE.PointsMaterial({
             color: 0x38bdf8,
-            size: 1.5,
+            size: 2.2,
             transparent: true,
-            opacity: 0.65
+            opacity: 0.85
         });
         const points = new THREE.Points(particleGeo, particleMat);
         globeGroup.add(points);
 
-        // 4. Subtle Outer Atmosphere Glow Ring
-        const ringGeo = new THREE.RingGeometry(78, 86, 64);
+        // 4. Subtle Outer Atmosphere Glow Rings
+        const ringGeo = new THREE.RingGeometry(78, 88, 64);
         const ringMat = new THREE.MeshBasicMaterial({
             color: 0x00f0ff,
             side: THREE.DoubleSide,
             transparent: true,
-            opacity: 0.08
+            opacity: 0.30
         });
         const ringMesh = new THREE.Mesh(ringGeo, ringMat);
         ringMesh.rotation.x = Math.PI / 2.5;
         globeGroup.add(ringMesh);
+
+        const ringGeo2 = new THREE.RingGeometry(80, 84, 64);
+        const ringMat2 = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.22
+        });
+        const ringMesh2 = new THREE.Mesh(ringGeo2, ringMat2);
+        ringMesh2.rotation.x = Math.PI / 1.8;
+        globeGroup.add(ringMesh2);
 
         // 5. Interactive Mouse Orbit Controls
         let isDragging = false;
