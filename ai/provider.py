@@ -202,10 +202,13 @@ def call_ollama(prompt: str, context: str, model: str) -> Optional[str]:
 
 
 def call_free_ai(prompt: str, context: str, model: str = "openai") -> Optional[str]:
-    """Call public free OpenAI-compatible endpoint with zero API key required."""
+    """Call public free OpenAI-compatible endpoint if explicitly configured with private endpoint."""
+    base_url = os.getenv("AEGIS_LLM_BASE_URL", "").rstrip("/")
+    if not base_url or "pollinations" in base_url:
+        # Enforce data privacy: never leak vulnerability context to unauthenticated public endpoints
+        return None
     try:
         import requests
-        base_url = os.getenv("AEGIS_LLM_BASE_URL", "https://text.pollinations.ai/openai").rstrip("/")
         model_name = os.getenv("AEGIS_LLM_MODEL", "openai")
         url = f"{base_url}/chat/completions"
         payload = {

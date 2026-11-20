@@ -38,7 +38,17 @@ window.AegisApp = (function () {
             console.warn('Navigation setup error handled gracefully:', navErr);
         }
 
-        // 3. Load initial report or demo data
+        // 3. Early Copilot Initialization (ensures welcome message & prompt pills render immediately)
+        try {
+            if (window.AegisCopilot && typeof AegisCopilot.initCopilot === 'function') {
+                const initTarget = document.getElementById('scanTargetInput') ? document.getElementById('scanTargetInput').value.trim() : 'owasp.org';
+                AegisCopilot.initCopilot(initTarget);
+            }
+        } catch (copilotErr) {
+            console.warn('Copilot early initialization error handled gracefully:', copilotErr);
+        }
+
+        // 4. Load initial report or demo data
         try {
             await loadInitialData();
         } catch (dataErr) {

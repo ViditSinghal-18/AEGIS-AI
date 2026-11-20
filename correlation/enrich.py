@@ -182,11 +182,15 @@ def enrich_cves(cves: list[CveRecord], notes: list[str] | None = None) -> list[C
 
 def enrich_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Enrich an array of finding dictionaries with CISA KEV and EPSS intelligence."""
-    if not findings:
-        return findings
+    if not findings or not isinstance(findings, list):
+        return []
+
+    valid_findings = [f for f in findings if isinstance(f, dict)]
+    if not valid_findings:
+        return []
 
     cve_ids: list[str] = []
-    for f in findings:
+    for f in valid_findings:
         for cve in f.get("related_cves", []):
             if cve and cve not in cve_ids:
                 cve_ids.append(cve)
@@ -204,7 +208,7 @@ def enrich_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
         except Exception:
             pass
 
-    for f in findings:
+    for f in valid_findings:
         f_cves = f.get("related_cves", [])
         is_kev = bool(f.get("in_cisa_kev") or f.get("kev") or any(c in kev_catalog for c in f_cves))
         existing_epss = float(f.get("epss_probability") or f.get("epss") or 0.0)
@@ -221,7 +225,7 @@ def enrich_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
             f["epss_percentile"] = f"{round(max_epss * 100, 1)}%"
         else:
             f["epss_percentile"] = "0.0%"
-    return findings
+    return valid_findings
 
 
 load_cisa_kev_catalog = _load_cisa_kev_catalog

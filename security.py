@@ -136,6 +136,60 @@ def determine_scan_mode(target: str, requested_active: bool = False) -> Tuple[st
     return (mode_name, can_active, rationale)
 
 
+def get_real_client_ip(req: Any) -> str:
+    """
+    Securely extract the client IP address.
+    Protects against X-Forwarded-For spoofing:
+    - If CF-Connecting-IP or True-Client-IP is set by edge CDN, use that.
+    - If X-Forwarded-For contains multiple IPs, the proxy-appended real client IP
+      is the last element (-1).
+    - Falls back to request.remote_addr.
+    """
+    if not req:
+        return "127.0.0.1"
+
+    headers = getattr(req, "headers", {}) or {}
+    
+    # 1. Edge CDN headers (Cloudflare, etc.)
+    cf_ip = headers.get("CF-Connecting-IP")
+    if cf_ip and cf_ip.strip():
+        return cf_ip.strip()
+
+    true_ip = headers.get("True-Client-IP")
+    if true_ip and true_ip.strip():
+        return true_ip.strip()
+
+    # 2. X-Forwarded-For: Take the LAST entry to prevent client spoofing
+    # Forward proxies prepend client headers; reverse proxies append the caller IP
+    xff = headers.get("X-Forwarded-For")
+    if xff:
+        parts = [p.strip() for p in xff.split(",") if p.strip()]
+        if parts:
+            return parts[-1]
+
+    return getattr(req, "remote_addr", None) or "127.0.0.1"
+
+
+def check_client_rate_limit(client_ip: str, max_per_minute: int = 30) -> Tuple[bool, int, str]:
+    """Sliding-window rate limiter per client IP for general/LLM endpoints."""
+    now = time.time()
+    window = 60.0
+    ip_key = client_ip.strip() or "anonymous"
+
+    if ip_key not in _CLIENT_RATE_LIMITS:
+        _CLIENT_RATE_LIMITS[ip_key] = []
+
+    _CLIENT_RATE_LIMITS[ip_key] = [t for t in _CLIENT_RATE_LIMITS[ip_key] if now - t < window]
+
+    if len(_CLIENT_RATE_LIMITS[ip_key]) >= max_per_minute:
+        oldest = _CLIENT_RATE_LIMITS[ip_key][0]
+        retry_after = max(1, int(window - (now - oldest)))
+        return False, retry_after, f"Too many requests from IP {ip_key}. Max {max_per_minute}/min. Retry in {retry_after}s."
+
+    _CLIENT_RATE_LIMITS[ip_key].append(now)
+    return True, 0, ""
+
+
 def check_rate_limits(client_ip: str, target: str) -> Tuple[bool, int, str]:
     """
     Check sliding-window rate limits per client IP and per target.

@@ -90,7 +90,7 @@ def _call_openai_compatible(
 ) -> LLMResult:
     import requests as _requests  # stdlib-free import, only needed here
 
-    base_url = os.getenv(_BASE_URL_ENV, _DEFAULT_OPENAI_BASE).rstrip("/")
+    base_url = (os.getenv(_BASE_URL_ENV) or os.getenv("AEGIS_LLM_ENDPOINT") or _DEFAULT_OPENAI_BASE).rstrip("/")
     api_key = os.getenv(_API_KEY_ENV, "").strip()
     model_default = os.getenv(_MODEL_ENV, "").strip()
     model_large = os.getenv(_MODEL_LARGE_ENV, "").strip()
@@ -402,7 +402,7 @@ def describe() -> str:
         model = os.getenv(_MODEL_ENV, "openai")
         return f"Free AI ({model}): {base}"
     if prov == "openai_compatible":
-        base = os.getenv(_BASE_URL_ENV, _DEFAULT_OPENAI_BASE)
+        base = os.getenv(_BASE_URL_ENV) or os.getenv("AEGIS_LLM_ENDPOINT") or _DEFAULT_OPENAI_BASE
         model = os.getenv(_MODEL_ENV, "<model not set>")
         # Derive a friendly name from the base URL
         if "groq" in base:

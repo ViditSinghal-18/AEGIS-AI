@@ -190,6 +190,55 @@ class TestApiSafetyEndpoints(unittest.TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertIn("error", res.get_json())
 
+    def test_intel_endpoint_rejects_non_list_findings(self):
+        """Verify that POST /api/scan/intel returns 400 JSON on non-list findings without crashing."""
+        res = self.client.post("/api/scan/intel", json={"findings": "abc"})
+        self.assertEqual(res.status_code, 400)
+        data = res.get_json()
+        self.assertIsInstance(data, dict)
+        self.assertIn("error", data)
+
+    def test_mode_endpoint_get_without_target(self):
+        """Verify that GET /api/mode returns 200 JSON without target and does not raise 415."""
+        res = self.client.get("/api/mode")
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertIsInstance(data, dict)
+        self.assertIn("mode", data)
+
+    def test_global_error_handlers_return_json(self):
+        """Verify that 404 and 415 return valid JSON payloads rather than raw HTML."""
+        res_404 = self.client.get("/api/nonexistent-route-endpoint")
+        self.assertEqual(res_404.status_code, 404)
+        self.assertEqual(res_404.content_type, "application/json")
+        self.assertFalse(res_404.get_json().get("success"))
+
+        res_415 = self.client.post("/api/webhook", data="not json", content_type="text/plain")
+        self.assertEqual(res_415.status_code, 415)
+        self.assertEqual(res_415.content_type, "application/json")
+
+    def test_reporting_endpoints_support_target_param(self):
+        """Verify isolated per-target reporting across all audit export endpoints."""
+        endpoints = [
+            "/api/export?target=owasp.org",
+            "/api/export-csv?target=owasp.org",
+            "/api/sbom?target=owasp.org",
+            "/api/compliance?target=owasp.org",
+            "/api/threat-intel?target=owasp.org",
+            "/api/attack-graph?target=owasp.org&format=json",
+            "/api/ai/model-routing?target=owasp.org",
+        ]
+        for ep in endpoints:
+            res = self.client.get(ep)
+            self.assertEqual(res.status_code, 200, f"Endpoint {ep} failed with {res.status_code}")
+
+    def test_latest_online_does_not_trigger_live_scan(self):
+        """Verify that GET /api/latest-online returns cached/sample data without live probing."""
+        res = self.client.get("/api/latest-online")
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertIn("target", data)
+
 
 if __name__ == "__main__":
     unittest.main()

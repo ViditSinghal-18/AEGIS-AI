@@ -327,15 +327,23 @@ window.AegisGlobe = (function () {
         }
         animate();
 
-        // Responsive Resize
-        window.addEventListener('resize', () => {
-            if (!container) return;
+        // Responsive Resize with ResizeObserver & Window Resize
+        const handleResize = () => {
+            if (!container || !renderer || !camera) return;
             const w = container.clientWidth || 400;
             const h = container.clientHeight || 400;
-            camera.aspect = w / h;
-            camera.updateProjectionMatrix();
-            renderer.setSize(w, h);
-        });
+            if (w > 0 && h > 0) {
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        if (window.ResizeObserver) {
+            const ro = new ResizeObserver(handleResize);
+            ro.observe(container);
+        }
     }
 
     function latLonToVector3(lat, lon, radius = 76.5) {

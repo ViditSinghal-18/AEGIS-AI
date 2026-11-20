@@ -76,7 +76,7 @@ OSV_QUERY_API = os.getenv("OSV_QUERY_API", "https://api.osv.dev/v1/query")
 
 # AI Copilot Backend (AEGIS Provider-Neutral Layer)
 AEGIS_LLM_PROVIDER = os.getenv("AEGIS_LLM_PROVIDER", os.getenv("LLM_PROVIDER", "none")).lower()
-AEGIS_LLM_BASE_URL = os.getenv("AEGIS_LLM_BASE_URL", "https://api.groq.com/openai/v1").strip()
+AEGIS_LLM_BASE_URL = os.getenv("AEGIS_LLM_BASE_URL", os.getenv("AEGIS_LLM_ENDPOINT", "https://api.groq.com/openai/v1")).strip()
 AEGIS_LLM_API_KEY = os.getenv("AEGIS_LLM_API_KEY", "").strip()
 AEGIS_LLM_MODEL = os.getenv("AEGIS_LLM_MODEL", "").strip()
 AEGIS_LLM_MODEL_LARGE = os.getenv("AEGIS_LLM_MODEL_LARGE", "").strip()

@@ -7,6 +7,7 @@ import csv
 import io
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 from flask import Flask, render_template, jsonify, send_file, request, Response, send_from_directory
 
 from config import (
@@ -22,6 +23,8 @@ from scanner_online import assess_website, convert_to_prioritized_report
 from security import (
     ValidationError,
     check_rate_limits,
+    check_client_rate_limit,
+    get_real_client_ip,
     determine_scan_mode,
     sanitize_for_prompt,
     validate_target_input,
@@ -202,9 +205,8 @@ def view_dashboard():
 def get_inventory():
     return jsonify(FLEET_INVENTORY)
 
-@app.route("/api/report", methods=["GET"])
-def get_report():
-    target = request.args.get("target")
+def get_report_data(target: str | None = None) -> dict[str, Any] | None:
+    """Load scan report with strict per-target isolation, falling back gracefully."""
     data = None
     if target:
         try:
@@ -219,8 +221,9 @@ def get_report():
                 with open(REPORT_FILE, "r", encoding="utf-8") as f:
                     candidate = json.load(f)
                     if candidate.get("findings") or candidate.get("prioritized_findings"):
-                        data = candidate
-                        has_findings = True
+                        if not target or candidate.get("target") == target:
+                            data = candidate
+                            has_findings = True
             except Exception:
                 pass
 
@@ -275,6 +278,13 @@ def get_report():
                 "datacenter": "Edge Ingress Gateway",
                 "round_trip_latency_ms": 18.0
             }
+    return data
+
+@app.route("/api/report", methods=["GET"])
+def get_report():
+    target = request.args.get("target")
+    data = get_report_data(target)
+    if data:
         return jsonify(data)
     return jsonify({"error": "No scan report available. Run an assessment first."}), 404
 
@@ -319,11 +329,16 @@ def api_verify_list():
 
 @app.route("/api/mode", methods=["GET", "POST"])
 def api_get_mode():
-    raw_target = request.args.get("target") or (request.get_json() or {}).get("target", "")
+    raw_target = request.args.get("target")
+    if not raw_target and request.is_json:
+        raw_target = (request.get_json(silent=True) or {}).get("target", "")
+
+    from config import is_public_deployment
+    default_target = "example.com" if is_public_deployment() else "localhost"
     try:
-        norm = validate_target_input(raw_target) if raw_target else "localhost"
+        norm = validate_target_input(raw_target) if raw_target else default_target
     except ValidationError:
-        norm = "localhost"
+        norm = default_target
 
     mode, can_active, rationale = determine_scan_mode(norm, requested_active=False)
     return jsonify({
@@ -346,7 +361,7 @@ def trigger_scan():
     if not request.is_json:
         return jsonify({"success": False, "error": "Request payload must be application/json."}), 415
 
-    req_data = request.get_json() or {}
+    req_data = request.get_json(silent=True) or {}
     raw_target = req_data.get("target")
     if not raw_target:
         return jsonify({"success": False, "error": "Target parameter is required."}), 400
@@ -357,8 +372,8 @@ def trigger_scan():
     except ValidationError as ve:
         return jsonify({"success": False, "error": str(ve)}), 400
 
-    # 3. Rate Limiting
-    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr).split(",")[0].strip()
+    # 3. Rate Limiting (Spoofing-Resistant)
+    client_ip = get_real_client_ip(request)
     allowed, retry_after, rate_err = check_rate_limits(client_ip, target)
     if not allowed:
         resp = jsonify({"success": False, "error": rate_err, "retry_after": retry_after})
@@ -454,7 +469,7 @@ def trigger_scan_online():
     except ValidationError as ve:
         return jsonify({"success": False, "error": str(ve)}), 400
 
-    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr).split(",")[0].strip()
+    client_ip = get_real_client_ip(request)
     allowed, retry_after, rate_err = check_rate_limits(client_ip, target)
     if not allowed:
         resp = jsonify({"success": False, "error": rate_err, "retry_after": retry_after})
@@ -507,6 +522,10 @@ def trigger_scan_online():
 
 @app.route("/api/scan/dns", methods=["GET", "POST"])
 def api_scan_stage_dns():
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=30)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
     target = request.args.get("target") or (request.get_json(silent=True) or {}).get("target", "")
     try:
         norm = validate_target_input(target)
@@ -517,6 +536,10 @@ def api_scan_stage_dns():
 
 @app.route("/api/scan/tls", methods=["GET", "POST"])
 def api_scan_stage_tls():
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=30)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
     target = request.args.get("target") or (request.get_json(silent=True) or {}).get("target", "")
     try:
         norm = validate_target_input(target)
@@ -527,6 +550,10 @@ def api_scan_stage_tls():
 
 @app.route("/api/scan/headers", methods=["GET", "POST"])
 def api_scan_stage_headers():
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=30)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
     target = request.args.get("target") or (request.get_json(silent=True) or {}).get("target", "")
     try:
         norm = validate_target_input(target)
@@ -537,6 +564,10 @@ def api_scan_stage_headers():
 
 @app.route("/api/scan/ct", methods=["GET", "POST"])
 def api_scan_stage_ct():
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=30)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
     target = request.args.get("target") or (request.get_json(silent=True) or {}).get("target", "")
     try:
         norm = validate_target_input(target)
@@ -547,18 +578,24 @@ def api_scan_stage_ct():
 
 @app.route("/api/scan/intel", methods=["POST"])
 def api_scan_stage_intel():
-    data = request.get_json() or {}
-    findings = data.get("findings", [])
-    enriched = enrich_findings(findings)
+    data = request.get_json(silent=True) or {}
+    findings = data.get("findings")
+    if findings is not None and not isinstance(findings, list):
+        return jsonify({"error": "findings must be a list of vulnerability objects."}), 400
+    findings_list = findings if isinstance(findings, list) else []
+    enriched = enrich_findings(findings_list)
     return jsonify({"enriched_findings": enriched})
 
 @app.route("/api/scan/prioritize", methods=["POST"])
 def api_scan_stage_prioritize():
-    data = request.get_json() or {}
-    findings = data.get("findings", [])
+    data = request.get_json(silent=True) or {}
+    findings = data.get("findings")
+    if findings is not None and not isinstance(findings, list):
+        return jsonify({"error": "findings must be a list of vulnerability objects."}), 400
+    findings_list = findings if isinstance(findings, list) else []
     discovery_data = data.get("discovery_data", {"target": "unknown"})
     # Client-supplied source_path is strictly disallowed to prevent arbitrary server directory traversal
-    report = prioritize_findings(findings, discovery_data, source_path=None)
+    report = prioritize_findings(findings_list, discovery_data, source_path=None)
     return jsonify(report)
 
 # ==============================================================================
@@ -604,6 +641,10 @@ def api_scan_diff():
 
 @app.route("/api/remediation", methods=["GET", "POST"])
 def api_remediation():
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=30)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
     target = request.args.get("target") or (request.get_json(silent=True) or {}).get("target", "example.com")
     bundle = generate_remediation_bundle(target)
     return jsonify(bundle)
@@ -612,35 +653,21 @@ def api_remediation():
 def api_webhook_send():
     if not request.is_json:
         return jsonify({"error": "JSON body required"}), 415
-    body = request.get_json() or {}
+    body = request.get_json(silent=True) or {}
     webhook_url = body.get("webhook_url", "")
     target = body.get("target")
-    try:
-        report = read_json("prioritized_report.json", target=target)
-    except Exception:
-        if os.path.exists(REPORT_FILE):
-            with open(REPORT_FILE, "r", encoding="utf-8") as f:
-                report = json.load(f)
-        else:
-            return jsonify({"error": "No report data available"}), 404
+    report = get_report_data(target)
+    if not report:
+        return jsonify({"error": "No report data available"}), 404
     ok, msg = send_webhook_alert(webhook_url, report)
     return jsonify({"success": ok, "message": msg}), (200 if ok else 400)
 
 @app.route("/api/export/<fmt>", methods=["GET"])
 def export_multi_format(fmt: str):
     target = request.args.get("target")
-    data = None
-    try:
-        data = read_json("prioritized_report.json", target=target)
-    except Exception:
-        if os.path.exists(REPORT_FILE):
-            with open(REPORT_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        elif os.path.exists(SAMPLE_REPORT_FILE):
-            with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        else:
-            return jsonify({"error": "No scan data available for export"}), 404
+    data = get_report_data(target)
+    if not data:
+        return jsonify({"error": "No scan data available for export"}), 404
 
     fmt_lower = fmt.lower()
     if fmt_lower == "json":
@@ -687,53 +714,48 @@ def get_latest_online():
                 return jsonify(sample)
         except Exception:
             pass
-    # Fallback to live audit of owasp.org
-    demo = assess_website("owasp.org")
-    safe_save_json(ONLINE_REPORT_FILE, demo)
-    return jsonify(demo)
+    return jsonify({
+        "target": "example.com",
+        "findings": [],
+        "score": 90,
+        "grade": "A",
+        "mode": "passive",
+        "summary": {"total_issues": 0, "posture_status": "Hardened"}
+    })
 
 @app.route("/api/export", methods=["GET"])
 def export_report():
-    if os.path.exists(REPORT_FILE):
-        return send_file(REPORT_FILE, as_attachment=True, download_name="audit_assessment_report.json")
-    return jsonify({"error": "File not found"}), 404
+    target = request.args.get("target")
+    data = get_report_data(target)
+    if data:
+        filename = f"audit_assessment_report_{target}.json" if target else "audit_assessment_report.json"
+        return Response(
+            json.dumps(data, indent=2),
+            mimetype="application/json",
+            headers={"Content-Disposition": f"attachment;filename={filename}"}
+        )
+    return jsonify({"error": "No scan report available for export."}), 404
 
 @app.route("/api/export-csv", methods=["GET"])
 def export_csv():
-    data = None
-    if os.path.exists(REPORT_FILE):
-        with open(REPORT_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    elif os.path.exists(SAMPLE_REPORT_FILE):
-        with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
+    target = request.args.get("target")
+    data = get_report_data(target)
     if not data:
         return jsonify({"error": "No report data to export"}), 404
 
     csv_str = generate_csv_report(data)
+    filename = f"aegis_vulnerability_triage_{target}.csv" if target else "aegis_vulnerability_triage.csv"
     return Response(
         csv_str,
         mimetype="text/csv",
-        headers={"Content-Disposition": "attachment;filename=aegis_vulnerability_triage.csv"}
+        headers={"Content-Disposition": f"attachment;filename={filename}"}
     )
 
 @app.route("/api/sbom", methods=["GET"])
 def get_cyclonedx_sbom():
     """Returns official CycloneDX v1.5 Software Bill of Materials (SBOM) JSON."""
-    data = None
     target = request.args.get("target")
-    if os.path.exists(REPORT_FILE):
-        try:
-            with open(REPORT_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            pass
-    if not data and os.path.exists(SAMPLE_REPORT_FILE):
-        try:
-            with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            pass
+    data = get_report_data(target)
 
     sbom = (data or {}).get("cyclonedx_sbom")
     if not sbom:
@@ -745,28 +767,18 @@ def get_cyclonedx_sbom():
                     comps.append({"name": f["affected_component"], "version": "detected"})
         sbom = generate_cyclonedx_sbom(comps, target=target or (data or {}).get("target", "target.site"))
 
+    filename = f"aegis_cyclonedx_sbom_{target}.json" if target else "aegis_cyclonedx_sbom.json"
     return Response(
         json.dumps(sbom, indent=2),
         mimetype="application/vnd.cyclonedx+json",
-        headers={"Content-Disposition": "attachment;filename=aegis_cyclonedx_sbom.json"}
+        headers={"Content-Disposition": f"attachment;filename={filename}"}
     )
 
 @app.route("/api/compliance", methods=["GET"])
 def get_compliance():
     """Returns multi-framework governance audit scores."""
-    data = None
-    if os.path.exists(REPORT_FILE):
-        try:
-            with open(REPORT_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            pass
-    if not data and os.path.exists(SAMPLE_REPORT_FILE):
-        try:
-            with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            pass
+    target = request.args.get("target")
+    data = get_report_data(target)
 
     comp = (data or {}).get("compliance_governance")
     if not comp:
@@ -781,13 +793,8 @@ def get_compliance():
 @app.route("/api/threat-intel", methods=["GET"])
 def get_threat_intel():
     """Returns threat actor and adversary TTP mappings."""
-    data = None
-    if os.path.exists(REPORT_FILE):
-        try:
-            with open(REPORT_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            pass
+    target = request.args.get("target")
+    data = get_report_data(target)
     return jsonify((data or {}).get("threat_actor_attribution", []))
 
 @app.route("/api/cisa-kev", methods=["GET"])
@@ -903,7 +910,15 @@ def agent_chat():
     Powered by configured LLM provider (Anthropic, Gemini, Bedrock, Ollama) with grounding checks,
     or our verified offline deterministic rule-based reasoner.
     """
-    req_data = request.get_json() or {}
+    if not verify_api_token(request.headers):
+        return jsonify({"success": False, "error": "Unauthorized: valid AEGIS API token required"}), 401
+
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=20)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
+
+    req_data = request.get_json(silent=True) or {}
     user_msg = req_data.get("message", "").strip()
 
     if not user_msg:
@@ -914,24 +929,9 @@ def agent_chat():
             "grounded": True
         })
 
-    # Load current telemetry context
-    current_data = {}
+    # Load current telemetry context with per-target isolation
     target = req_data.get("target")
-    try:
-        current_data = read_json("prioritized_report.json", target=target)
-    except Exception:
-        if os.path.exists(REPORT_FILE):
-            try:
-                with open(REPORT_FILE, "r", encoding="utf-8") as f:
-                    current_data = json.load(f)
-            except Exception:
-                pass
-        elif os.path.exists(SAMPLE_REPORT_FILE):
-            try:
-                with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
-                    current_data = json.load(f)
-            except Exception:
-                pass
+    current_data = get_report_data(target) or {}
 
     # Quick website scan if the message is specifically asking to audit a domain
     import re
@@ -940,7 +940,6 @@ def agent_chat():
         raw_matched = domain_match.group(1).strip()
         try:
             matched_domain = validate_target_input(raw_matched)
-            client_ip = request.headers.get("X-Forwarded-For", request.remote_addr or "127.0.0.1").split(",")[0].strip()
             allowed, _, rate_err = check_rate_limits(client_ip, matched_domain)
             if not allowed:
                 return jsonify({
@@ -995,13 +994,7 @@ def agent_chat():
 def api_ai_compare_rankings():
     """Compares deterministic mathematical ranking against AI re-ranking with Spearman rho."""
     target = request.args.get("target")
-    data = None
-    try:
-        data = read_json("prioritized_report.json", target=target)
-    except Exception:
-        if os.path.exists(REPORT_FILE):
-            with open(REPORT_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
+    data = get_report_data(target)
     findings = (data or {}).get("findings", (data or {}).get("prioritized_findings", []))
     res = compare_rankings(findings)
     return jsonify(res)
@@ -1010,30 +1003,19 @@ def api_ai_compare_rankings():
 @app.route("/api/attack-graph", methods=["GET"])
 def view_attack_graph():
     """Render interactive Cyber Attack Surface Network Graph."""
-    data = None
-    if os.path.exists(REPORT_FILE):
-        try:
-            with open(REPORT_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            pass
-    if not data and os.path.exists(SAMPLE_REPORT_FILE):
-        try:
-            with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            pass
+    target_param = request.args.get("target")
+    data = get_report_data(target_param)
 
     if not data:
         data = {
-            "target": "target.local",
+            "target": target_param or "target.local",
             "findings": [],
             "discovered_assets": [{"port": 80, "service": "http"}, {"port": 443, "service": "https"}],
             "subdomains": [],
             "resolved_ip": "127.0.0.1",
         }
 
-    target = data.get("target", "Target Host")
+    target = data.get("target", target_param or "Target Host")
     findings = data.get("findings", data.get("prioritized_findings", []))
     ports = data.get("discovered_assets", data.get("ports", []))
     subdomains = data.get("subdomains", data.get("passive_meta", {}).get("ct_subdomains", []))
@@ -1061,19 +1043,8 @@ def view_attack_graph():
 def get_model_routing():
     """Inspect model routing across template, small, and large LLM tiers."""
     from decision_patterns.model_routing import FindingRouter
-    data = None
-    if os.path.exists(REPORT_FILE):
-        try:
-            with open(REPORT_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            pass
-    if not data and os.path.exists(SAMPLE_REPORT_FILE):
-        try:
-            with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            pass
+    target = request.args.get("target")
+    data = get_report_data(target)
 
     findings = (data or {}).get("findings", (data or {}).get("prioritized_findings", []))
     router = FindingRouter()
@@ -1092,7 +1063,7 @@ def get_model_routing():
         })
 
     return jsonify({
-        "target": (data or {}).get("target", "Unknown"),
+        "target": (data or {}).get("target", target or "Unknown"),
         "total_findings": len(findings),
         "tier_distribution": tier_counts,
         "routed_findings": routed_results,
@@ -1102,6 +1073,44 @@ def get_model_routing():
             "estimated_token_reduction_pct": 67.7
         }
     })
+
+# ==============================================================================
+# Global JSON Error Handlers (Prevents Raw HTML Responses)
+# ==============================================================================
+
+@app.errorhandler(400)
+def handle_bad_request(e):
+    return jsonify({"success": False, "error": str(getattr(e, "description", e))}), 400
+
+@app.errorhandler(401)
+def handle_unauthorized(e):
+    return jsonify({"success": False, "error": str(getattr(e, "description", e))}), 401
+
+@app.errorhandler(403)
+def handle_forbidden(e):
+    return jsonify({"success": False, "error": str(getattr(e, "description", e))}), 403
+
+@app.errorhandler(404)
+def handle_not_found(e):
+    if request.path.startswith("/api/"):
+        return jsonify({"success": False, "error": "API endpoint not found."}), 404
+    return jsonify({"success": False, "error": "Resource not found."}), 404
+
+@app.errorhandler(405)
+def handle_method_not_allowed(e):
+    return jsonify({"success": False, "error": "Method Not Allowed"}), 405
+
+@app.errorhandler(415)
+def handle_unsupported_media_type(e):
+    return jsonify({"success": False, "error": "Unsupported Media Type: expected application/json."}), 415
+
+@app.errorhandler(429)
+def handle_rate_limit_exceeded(e):
+    return jsonify({"success": False, "error": "Rate limit exceeded. Please retry later."}), 429
+
+@app.errorhandler(500)
+def handle_server_error(e):
+    return jsonify({"success": False, "error": "Internal Server Error occurred during processing."}), 500
 
 if __name__ == "__main__":
     from config import DEBUG, HOST, PORT
