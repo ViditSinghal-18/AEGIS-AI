@@ -110,15 +110,15 @@ window.AegisApp = (function () {
         AegisUtils.safeSetText('statComplianceScore', `${readiness}%`);
         AegisUtils.safeSetText('statComplianceGrade', `Grade ${grade}`);
 
-        // Plot 3D Globe Pins & Ingress Connectivity from real geo data
-        const geo = data.geo_telemetry || (data.report && data.report.geo_telemetry) || {
-            lat: 37.7749,
-            lon: -122.4194,
-            city: 'Cloud Perimeter',
-            country: 'Global',
-            asn: 'AS Anycast Ingress'
-        };
-        AegisGlobe.plotRealTargetPins(target, geo, data.subdomains || []);
+        // Plot 3D Globe Pins & Ingress Connectivity from real geo data (no fabricated coordinates)
+        const geo = data.geo_telemetry || (data.report && data.report.geo_telemetry);
+        if (geo && geo.coordinates_available !== false && geo.lat !== null && geo.lon !== null) {
+            AegisGlobe.plotRealTargetPins(target, geo, data.subdomains || []);
+            AegisUtils.safeSetText('globeTargetLocation', `${geo.city || 'Edge'}, ${geo.country || 'Global'}`);
+        } else {
+            AegisGlobe.plotRealTargetPins(target, null, data.subdomains || []);
+            AegisUtils.safeSetText('globeTargetLocation', 'Coordinates Unavailable (Anycast / Internal)');
+        }
 
         // Render Charts
         AegisCharts.renderExposureMatrix(findings, 'riskMatrixChart', (selectedF, idx) => {

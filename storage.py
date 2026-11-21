@@ -18,15 +18,17 @@ from config import DATA_DIR
 _UNSAFE_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
-def target_data_dir(target: str) -> Path:
+def target_data_dir(target: str, create: bool = False) -> Path:
     """Return the per-target data directory: data/<safe_target>/.
 
     The target name is sanitised so it is safe as a directory component on
     both Windows and Unix without altering its readability.
+    Directories are created on disk only when create=True (writes).
     """
     safe = _UNSAFE_CHARS.sub("_", target).strip("._") or "unknown"
     d = DATA_DIR / safe
-    d.mkdir(parents=True, exist_ok=True)
+    if create:
+        d.mkdir(parents=True, exist_ok=True)
     return d
 
 HISTORY_DIR = DATA_DIR / "history"
@@ -39,7 +41,7 @@ def write_json(name: str, payload: Any, target: str | None = None) -> Path:
     otherwise it falls back to the legacy flat ``data/`` location so that
     the dashboard can still read single-target runs without changes.
     """
-    base = target_data_dir(target) if target else DATA_DIR
+    base = target_data_dir(target, create=True) if target else DATA_DIR
     base.mkdir(parents=True, exist_ok=True)
     path = base / name
     if hasattr(payload, "to_dict"):
@@ -52,14 +54,25 @@ def write_json(name: str, payload: Any, target: str | None = None) -> Path:
     return path
 
 
-def read_json(name: str, target: str | None = None) -> dict[str, Any]:
-    """Read a JSON file from the per-target or legacy flat data directory."""
+def read_json(name: str, target: str | None = None, allow_legacy_fallback: bool = True) -> dict[str, Any]:
+    """Read a JSON file from the per-target or legacy flat data directory.
+
+    When allow_legacy_fallback=False, target isolation is strictly enforced
+    and missing target files raise FileNotFoundError instead of leaking another
+    tenant's report from the legacy flat data/ directory.
+    """
     # Prefer per-target path when caller supplies a target
     if target:
-        path = target_data_dir(target) / name
+        path = target_data_dir(target, create=False) / name
         if path.exists():
             return json.loads(path.read_text(encoding="utf-8"))
-    # Fallback to legacy flat location
+        if not allow_legacy_fallback:
+            raise FileNotFoundError(f"Missing {name} for target '{target}'.")
+
+    # Fallback to legacy flat location only if permitted
+    if not allow_legacy_fallback and target:
+        raise FileNotFoundError(f"Missing report for target '{target}'.")
+
     path = DATA_DIR / name
     if not path.exists():
         raise FileNotFoundError(f"Missing {path}. Run the previous pipeline stage first.")
@@ -68,7 +81,7 @@ def read_json(name: str, target: str | None = None) -> dict[str, Any]:
 
 def save_run_history(target: str, report_data: dict[str, Any]) -> Path:
     """Save a timestamped copy of a prioritized report under data/<target>/history/."""
-    history_dir = target_data_dir(target) / "history"
+    history_dir = target_data_dir(target, create=True) / "history"
     history_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"run_{timestamp}.json"
@@ -84,12 +97,11 @@ def save_run_history(target: str, report_data: dict[str, Any]) -> Path:
 def list_run_history(target: str | None = None) -> list[Path]:
     """List archived historical scan reports sorted from newest to oldest.
 
-    When *target* is supplied, only that target's history is returned.
-    Otherwise the legacy flat ``data/history/`` directory is scanned for
-    backwards compatibility.
+    When *target* is supplied, only that target's history is returned without creating
+    unnecessary directories on disk.
     """
     if target:
-        history_dir = target_data_dir(target) / "history"
+        history_dir = target_data_dir(target, create=False) / "history"
     else:
         history_dir = HISTORY_DIR
     if not history_dir.exists():

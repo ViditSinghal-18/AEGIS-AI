@@ -138,26 +138,26 @@ def determine_scan_mode(target: str, requested_active: bool = False) -> Tuple[st
 
 def get_real_client_ip(req: Any) -> str:
     """
-    Securely extract the client IP address.
-    Protects against X-Forwarded-For spoofing:
-    - If CF-Connecting-IP or True-Client-IP is set by edge CDN, use that.
-    - If X-Forwarded-For contains multiple IPs, the proxy-appended real client IP
-      is the last element (-1).
+    Securely extract the client IP address behind reverse proxies (Render, AWS, etc.).
+    Protects against IP spoofing:
+    - Only trusts CF-Connecting-IP / True-Client-IP if TRUST_CLOUDFLARE_PROXIES is enabled.
+    - If X-Forwarded-For contains multiple IPs, uses the last entry (the proxy-appended hop).
     - Falls back to request.remote_addr.
     """
     if not req:
         return "127.0.0.1"
 
     headers = getattr(req, "headers", {}) or {}
-    
-    # 1. Edge CDN headers (Cloudflare, etc.)
-    cf_ip = headers.get("CF-Connecting-IP")
-    if cf_ip and cf_ip.strip():
-        return cf_ip.strip()
 
-    true_ip = headers.get("True-Client-IP")
-    if true_ip and true_ip.strip():
-        return true_ip.strip()
+    # 1. Edge CDN headers (Cloudflare, etc.) - only if explicitly trusted
+    if getattr(config, "TRUST_CLOUDFLARE_PROXIES", False):
+        cf_ip = headers.get("CF-Connecting-IP")
+        if cf_ip and cf_ip.strip():
+            return cf_ip.strip()
+
+        true_ip = headers.get("True-Client-IP")
+        if true_ip and true_ip.strip():
+            return true_ip.strip()
 
     # 2. X-Forwarded-For: Take the LAST entry to prevent client spoofing
     # Forward proxies prepend client headers; reverse proxies append the caller IP

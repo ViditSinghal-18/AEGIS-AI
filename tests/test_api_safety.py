@@ -120,7 +120,7 @@ class TestApiSafetyEndpoints(unittest.TestCase):
         from storage import save_run_history, target_data_dir
         import shutil
         import time
-        test_tgt = "hist-test-host.local"
+        test_tgt = "hist-test-host.example"
         try:
             rep1 = {"target": test_tgt, "findings": [{"title": "Old Flaw", "related_cves": []}], "overall_risk_score": 60.0}
             rep2 = {"target": test_tgt, "findings": [{"title": "Old Flaw", "related_cves": []}, {"title": "New Flaw", "related_cves": []}], "overall_risk_score": 80.0}

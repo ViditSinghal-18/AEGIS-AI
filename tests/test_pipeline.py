@@ -106,15 +106,29 @@ class TestActiveScannerGate:
 
 class TestThreatEnrichment:
     def test_cisa_kev_catalog_contains_known_cves(self):
-        kev = load_cisa_kev_catalog()
-        assert isinstance(kev, set)
-        assert "CVE-2021-44228" in kev or len(kev) > 0
+        with patch("correlation.enrich.requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {
+                "vulnerabilities": [{"cveID": "CVE-2021-44228", "vendorProject": "Apache", "product": "Log4j"}]
+            }
+            mock_resp.raise_for_status = MagicMock()
+            mock_get.return_value.__enter__.return_value = mock_resp
+            kev = load_cisa_kev_catalog()
+            assert isinstance(kev, set)
+            assert "CVE-2021-44228" in kev or len(kev) > 0
 
     def test_epss_enrichment(self):
         sample_findings = [
             {"title": "Sample Flaw", "related_cves": ["CVE-2021-44228"], "cvss_score": 10.0}
         ]
-        enriched = enrich_findings(sample_findings)
+        with patch("correlation.enrich.requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {
+                "data": [{"cve": "CVE-2021-44228", "epss": "0.975", "percentile": "0.999"}]
+            }
+            mock_resp.raise_for_status = MagicMock()
+            mock_get.return_value.__enter__.return_value = mock_resp
+            enriched = enrich_findings(sample_findings)
         assert len(enriched) == 1
         assert "epss_probability" in enriched[0]
         assert "in_cisa_kev" in enriched[0]

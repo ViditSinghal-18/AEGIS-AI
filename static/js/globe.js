@@ -370,14 +370,14 @@ window.AegisGlobe = (function () {
         arcPulseBeads = [];
 
         // 2. Resolve safe target coordinates
-        const safeTarget = targetName || 'target.domain';
-        let lat = 37.7749;
-        let lon = -122.4194;
-        let city = 'San Francisco';
-        let country = 'United States';
-        let asn = 'AS13335 (Cloudflare / Edge Transit)';
+        const safeTarget = targetName || '';
+        let lat = null;
+        let lon = null;
+        let city = '';
+        let country = '';
+        let asn = '';
 
-        if (geoData && geoData.lat !== null && geoData.lat !== undefined && !isNaN(parseFloat(geoData.lat))) {
+        if (geoData && geoData.coordinates_available !== false && geoData.lat !== null && geoData.lat !== undefined && !isNaN(parseFloat(geoData.lat))) {
             lat = parseFloat(geoData.lat);
             lon = parseFloat(geoData.lon);
             city = geoData.city || 'Edge Location';
@@ -389,6 +389,11 @@ window.AegisGlobe = (function () {
             lat = 39.0438; lon = -77.4874; city = 'Ashburn'; country = 'United States'; asn = 'AS16509 (Amazon AWS)';
         } else if (safeTarget.includes('microsoft') || safeTarget.includes('azure')) {
             lat = 47.674; lon = -122.121; city = 'Redmond'; country = 'United States'; asn = 'AS8075 (Microsoft)';
+        }
+
+        if (lat === null || lon === null) {
+            // Geolocation not available or private/internal - do not plot fabricated pins
+            return;
         }
 
         const radius = 76.5;

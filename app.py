@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from flask import Flask, render_template, jsonify, send_file, request, Response, send_from_directory
 
 from config import (
+    AEGIS_API_TOKEN,
     CORS_ORIGIN,
     DATA_DIR,
     DEBUG,
@@ -186,7 +187,7 @@ def load_dynamic_inventory() -> list[dict[str, Any]]:
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", api_token=AEGIS_API_TOKEN)
 
 @app.route("/favicon.ico")
 def favicon():
@@ -219,7 +220,7 @@ def view_dashboard():
     if os.path.exists(dash_path):
         with open(dash_path, "r", encoding="utf-8") as f:
             return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
-    return render_template("index.html")
+    return render_template("index.html", api_token=AEGIS_API_TOKEN)
 
 @app.route("/api/inventory", methods=["GET"])
 def get_inventory():
@@ -231,7 +232,7 @@ def get_report_data(target: str | None = None) -> dict[str, Any] | None:
     if target:
         try:
             norm_target = validate_target_input(target)
-            data = read_json("prioritized_report.json", target=norm_target)
+            data = read_json("prioritized_report.json", target=norm_target, allow_legacy_fallback=False)
         except Exception:
             pass
 
@@ -240,7 +241,7 @@ def get_report_data(target: str | None = None) -> dict[str, Any] | None:
             try:
                 with open(REPORT_FILE, "r", encoding="utf-8") as f:
                     candidate = json.load(f)
-                    if candidate.get("target") == target:
+                    if candidate.get("target") == (norm_target if 'norm_target' in locals() else target):
                         data = candidate
             except Exception:
                 pass
@@ -250,16 +251,9 @@ def get_report_data(target: str | None = None) -> dict[str, Any] | None:
         if not data:
             return None
     else:
-        # Bare /api/report request with no target parameter: return latest scan or sample data
-        if os.path.exists(REPORT_FILE):
-            try:
-                with open(REPORT_FILE, "r", encoding="utf-8") as f:
-                    candidate = json.load(f)
-                    if candidate.get("findings") or candidate.get("prioritized_findings"):
-                        data = candidate
-            except Exception:
-                pass
-        if not data and os.path.exists(SAMPLE_REPORT_FILE):
+        # Bare /api/report request with no target parameter: return sample benchmark data only.
+        # Never return another user's live scan from global REPORT_FILE!
+        if os.path.exists(SAMPLE_REPORT_FILE):
             try:
                 with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -325,15 +319,22 @@ def get_report_data(target: str | None = None) -> dict[str, Any] | None:
                 }
 
     return data
-    return data
 
 @app.route("/api/report", methods=["GET"])
 def get_report():
-    target = request.args.get("target")
+    raw_target = request.args.get("target")
+    target = None
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
     data = get_report_data(target)
     if data:
         return jsonify(data)
-    return jsonify({"error": "No scan report available. Run an assessment first."}), 404
+    if target:
+        return jsonify({"success": False, "error": f"No scan report found for target '{target}'. Run an audit first."}), 404
+    return jsonify({"success": False, "error": "No scan report available. Run an audit first."}), 404
 
 # ==============================================================================
 # Domain Ownership Verification Endpoints
@@ -625,6 +626,12 @@ def api_scan_stage_ct():
 
 @app.route("/api/scan/intel", methods=["POST"])
 def api_scan_stage_intel():
+    if not verify_api_token(request.headers):
+        return jsonify({"success": False, "error": "Unauthorized: valid AEGIS API token required"}), 401
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=30)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
     data = request.get_json(silent=True) or {}
     findings = data.get("findings")
     if findings is not None and not isinstance(findings, list):
@@ -635,6 +642,12 @@ def api_scan_stage_intel():
 
 @app.route("/api/scan/prioritize", methods=["POST"])
 def api_scan_stage_prioritize():
+    if not verify_api_token(request.headers):
+        return jsonify({"success": False, "error": "Unauthorized: valid AEGIS API token required"}), 401
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=30)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
     data = request.get_json(silent=True) or {}
     findings = data.get("findings")
     if findings is not None and not isinstance(findings, list):
@@ -651,7 +664,19 @@ def api_scan_stage_prioritize():
 
 @app.route("/api/scan/history", methods=["GET"])
 def api_scan_history():
-    target = request.args.get("target", "").strip()
+    if not verify_api_token(request.headers):
+        return jsonify({"success": False, "error": "Unauthorized: valid AEGIS API token required"}), 401
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=60)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
+    raw_target = request.args.get("target", "").strip()
+    target = ""
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
     history_paths = list_run_history(target)
     serialized_history = []
     for p in history_paths:
@@ -668,7 +693,19 @@ def api_scan_history():
 
 @app.route("/api/scan/diff", methods=["GET", "POST"])
 def api_scan_diff():
-    target = request.args.get("target") or (request.get_json(silent=True) or {}).get("target", "")
+    if not verify_api_token(request.headers):
+        return jsonify({"success": False, "error": "Unauthorized: valid AEGIS API token required"}), 401
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=60)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
+    raw_target = request.args.get("target") or (request.get_json(silent=True) or {}).get("target", "")
+    target = ""
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
     history_paths = list_run_history(target)
     if len(history_paths) < 2:
         return jsonify({
@@ -692,17 +729,33 @@ def api_remediation():
     allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=30)
     if not allowed:
         return jsonify({"error": rate_err, "retry_after": retry_after}), 429
-    target = request.args.get("target") or (request.get_json(silent=True) or {}).get("target", "example.com")
+    raw_target = request.args.get("target") or (request.get_json(silent=True) or {}).get("target", "example.com")
+    try:
+        target = validate_target_input(raw_target)
+    except ValidationError:
+        target = "example.com"
     bundle = generate_remediation_bundle(target)
     return jsonify(bundle)
 
 @app.route("/api/webhook", methods=["POST"])
 def api_webhook_send():
+    if not verify_api_token(request.headers):
+        return jsonify({"success": False, "error": "Unauthorized: valid AEGIS API token required"}), 401
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=10)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
     if not request.is_json:
         return jsonify({"error": "JSON body required"}), 415
     body = request.get_json(silent=True) or {}
     webhook_url = body.get("webhook_url", "")
-    target = body.get("target")
+    raw_target = body.get("target")
+    target = None
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
     report = get_report_data(target)
     if not report:
         return jsonify({"error": "No report data available"}), 404
@@ -711,7 +764,13 @@ def api_webhook_send():
 
 @app.route("/api/export/<fmt>", methods=["GET"])
 def export_multi_format(fmt: str):
-    target = request.args.get("target")
+    raw_target = request.args.get("target")
+    target = None
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
     data = get_report_data(target)
     if not data:
         return jsonify({"error": "No scan data available for export"}), 404
@@ -747,12 +806,23 @@ def export_multi_format(fmt: str):
 
 @app.route("/api/latest-online", methods=["GET"])
 def get_latest_online():
-    if os.path.exists(ONLINE_REPORT_FILE):
+    raw_target = request.args.get("target")
+    if raw_target:
         try:
-            with open(ONLINE_REPORT_FILE, "r", encoding="utf-8") as f:
-                return jsonify(json.load(f))
-        except Exception:
-            pass
+            norm_target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+        from storage import target_data_dir
+        target_online_path = target_data_dir(norm_target, create=False) / "online_report.json"
+        if target_online_path.exists():
+            try:
+                with open(target_online_path, "r", encoding="utf-8") as f:
+                    return jsonify(json.load(f))
+            except Exception:
+                pass
+        return jsonify({"error": f"No online report found for target '{norm_target}'"}), 404
+
+    # Bare request without target parameter: return sample report only to prevent cross-tenant leaks
     if os.path.exists(SAMPLE_REPORT_FILE):
         try:
             with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
@@ -761,18 +831,17 @@ def get_latest_online():
                 return jsonify(sample)
         except Exception:
             pass
-    return jsonify({
-        "target": "example.com",
-        "findings": [],
-        "score": 90,
-        "grade": "A",
-        "mode": "passive",
-        "summary": {"total_issues": 0, "posture_status": "Hardened"}
-    })
+    return jsonify({"error": "No online scan reports available."}), 404
 
 @app.route("/api/export", methods=["GET"])
 def export_report():
-    target = request.args.get("target")
+    raw_target = request.args.get("target")
+    target = None
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
     data = get_report_data(target)
     if data:
         return Response(
@@ -784,7 +853,13 @@ def export_report():
 
 @app.route("/api/export-csv", methods=["GET"])
 def export_csv():
-    target = request.args.get("target")
+    raw_target = request.args.get("target")
+    target = None
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
     data = get_report_data(target)
     if not data:
         return jsonify({"error": "No report data to export"}), 404
@@ -799,8 +874,16 @@ def export_csv():
 @app.route("/api/sbom", methods=["GET"])
 def get_cyclonedx_sbom():
     """Returns official CycloneDX v1.5 Software Bill of Materials (SBOM) JSON."""
-    target = request.args.get("target")
+    raw_target = request.args.get("target")
+    target = None
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
     data = get_report_data(target)
+    if target and not data:
+        return jsonify({"success": False, "error": f"No scan report found for target '{target}'."}), 404
 
     sbom = (data or {}).get("cyclonedx_sbom")
     if not sbom:
@@ -821,8 +904,16 @@ def get_cyclonedx_sbom():
 @app.route("/api/compliance", methods=["GET"])
 def get_compliance():
     """Returns multi-framework governance audit scores."""
-    target = request.args.get("target")
+    raw_target = request.args.get("target")
+    target = None
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
     data = get_report_data(target)
+    if target and not data:
+        return jsonify({"success": False, "error": f"No scan report found for target '{target}'."}), 404
 
     comp = (data or {}).get("compliance_governance")
     if not comp:
@@ -837,8 +928,16 @@ def get_compliance():
 @app.route("/api/threat-intel", methods=["GET"])
 def get_threat_intel():
     """Returns threat actor and adversary TTP mappings."""
-    target = request.args.get("target")
+    raw_target = request.args.get("target")
+    target = None
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
     data = get_report_data(target)
+    if target and not data:
+        return jsonify({"success": False, "error": f"No scan report found for target '{target}'."}), 404
     return jsonify((data or {}).get("threat_actor_attribution", []))
 
 @app.route("/api/cisa-kev", methods=["GET"])
@@ -876,7 +975,19 @@ def get_cisa_kev_status():
 @app.route("/api/drift", methods=["GET"])
 def get_exposure_drift():
     """Returns comparative drift metrics between latest two scans if available."""
-    target = request.args.get("target", "").strip()
+    if not verify_api_token(request.headers):
+        return jsonify({"success": False, "error": "Unauthorized: valid AEGIS API token required"}), 401
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=60)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
+    raw_target = request.args.get("target", "").strip()
+    target = ""
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
     history_paths = list_run_history(target)
     if len(history_paths) >= 2:
         try:
@@ -906,12 +1017,24 @@ def get_exposure_drift():
 @app.route("/api/analytics/patch-lifetime", methods=["GET"])
 def api_patch_lifetime_analytics():
     """Compute Kaplan-Meier patch lifetime analytics and MTTR from historical scans."""
+    if not verify_api_token(request.headers):
+        return jsonify({"success": False, "error": "Unauthorized: valid AEGIS API token required"}), 401
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=60)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
     from analytics.patch_lifetime import calculate_patch_analytics
     from analytics.drift_detector import load_history
-    target = request.args.get("target", "").strip() or "default"
+    raw_target = request.args.get("target", "").strip()
+    target = ""
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
     
     # 1. Try versioned history storage first
-    hist_data = load_history(target=target)
+    hist_data = load_history(target=target or "default")
     snapshots = hist_data.get("snapshots", [])
     
     # 2. If snapshots are empty, populate from individual history files
@@ -940,9 +1063,21 @@ def api_patch_lifetime_analytics():
 @app.route("/api/analytics/drift", methods=["GET"])
 def api_cusum_drift_analytics():
     """Evaluate longitudinal exposure scores for statistical drift using two-sided CUSUM."""
+    if not verify_api_token(request.headers):
+        return jsonify({"success": False, "error": "Unauthorized: valid AEGIS API token required"}), 401
+    client_ip = get_real_client_ip(request)
+    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=60)
+    if not allowed:
+        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
     from analytics.drift_detector import CusumDriftDetector, load_history
-    target = request.args.get("target", "").strip() or "default"
-    hist_data = load_history(target=target)
+    raw_target = request.args.get("target", "").strip()
+    target = ""
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+    hist_data = load_history(target=target or "default")
     snapshots = hist_data.get("snapshots", [])
 
     if not snapshots and target:
@@ -1068,7 +1203,16 @@ def api_ai_compare_rankings():
 def view_attack_graph():
     """Render interactive Cyber Attack Surface Network Graph."""
     target_param = request.args.get("target")
+    if target_param:
+        try:
+            target_param = validate_target_input(target_param)
+        except ValidationError as e:
+            if request.path.startswith("/api/") or request.args.get("format") == "json":
+                return jsonify({"success": False, "error": str(e)}), 400
     data = get_report_data(target_param)
+
+    if target_param and not data and (request.path.startswith("/api/") or request.args.get("format") == "json"):
+        return jsonify({"success": False, "error": f"No scan report found for target '{target_param}'."}), 404
 
     if not data:
         data = {
@@ -1107,8 +1251,16 @@ def view_attack_graph():
 def get_model_routing():
     """Inspect model routing across template, small, and large LLM tiers."""
     from decision_patterns.model_routing import FindingRouter
-    target = request.args.get("target")
+    raw_target = request.args.get("target")
+    target = None
+    if raw_target:
+        try:
+            target = validate_target_input(raw_target)
+        except ValidationError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
     data = get_report_data(target)
+    if target and not data:
+        return jsonify({"success": False, "error": f"No scan report found for target '{target}'."}), 404
 
     findings = (data or {}).get("findings", (data or {}).get("prioritized_findings", []))
     router = FindingRouter()

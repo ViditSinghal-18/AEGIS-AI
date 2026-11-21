@@ -79,12 +79,53 @@ window.AegisUtils = (function () {
         return '#64748b';
     }
 
+    function getApiToken() {
+        const meta = document.querySelector('meta[name="aegis-token"]');
+        if (meta && meta.content) return meta.content.trim();
+        if (window.AEGIS_API_TOKEN) return String(window.AEGIS_API_TOKEN).trim();
+        return '';
+    }
+
     return {
         escapeHtml,
         safeSetText,
         safeSetHtml,
         showToast,
         formatTimestamp,
-        getSeverityColor
+        getSeverityColor,
+        getApiToken
     };
 })();
+
+// Global fetch authorization interceptor: attaches X-Aegis-Token header for /api/ requests
+(function () {
+    const origFetch = window.fetch;
+    window.fetch = function (input, init) {
+        init = init || {};
+        let url = '';
+        if (typeof input === 'string') {
+            url = input;
+        } else if (input && input.url) {
+            url = input.url;
+        }
+        const token = window.AegisUtils && typeof window.AegisUtils.getApiToken === 'function' ? window.AegisUtils.getApiToken() : '';
+        if (token && url && url.startsWith('/api/')) {
+            init.headers = init.headers || {};
+            if (init.headers instanceof Headers) {
+                if (!init.headers.has('X-Aegis-Token')) {
+                    init.headers.set('X-Aegis-Token', token);
+                }
+            } else if (Array.isArray(init.headers)) {
+                if (!init.headers.some(h => (h[0] || '').toLowerCase() === 'x-aegis-token')) {
+                    init.headers.push(['X-Aegis-Token', token]);
+                }
+            } else {
+                if (!init.headers['X-Aegis-Token'] && !init.headers['x-aegis-token']) {
+                    init.headers['X-Aegis-Token'] = token;
+                }
+            }
+        }
+        return origFetch.call(this, input, init);
+    };
+})();
+

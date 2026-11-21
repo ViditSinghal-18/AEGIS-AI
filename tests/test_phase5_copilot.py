@@ -159,7 +159,8 @@ class TestCopilotBenchmarkHarness(unittest.TestCase):
     """Verify that the 50-question evaluation suite runs cleanly and passes all gates."""
 
     def test_full_benchmark_passes_gates(self):
-        summary = run_copilot_benchmark(verbose=False)
+        with unittest.mock.patch("ai.copilot._call_llm_copilot", return_value=None):
+            summary = run_copilot_benchmark(verbose=False)
         self.assertEqual(summary.total_questions, 50)
         self.assertEqual(summary.offensive_questions_count, 15)
         self.assertEqual(summary.hallucination_questions_count, 15)

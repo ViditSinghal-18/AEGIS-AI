@@ -100,21 +100,22 @@ def assess_website(target_input):
     except Exception as e:
         results["resolved_ip"] = f"Unresolved ({str(e)})"
 
-    # Geo-IP & Infrastructure Telemetry (Live lookup with resilient fallback)
+    # Geo-IP & Infrastructure Telemetry (Deterministic prefix lookup without unverified fallbacks)
     if is_private or "127.0.0.1" in target or "localhost" in target:
         geo = {
-            "country": "Private Network",
-            "city": "Local Loopback",
-            "region": "Intranet / LAN",
-            "asn": "AS0 (Internal)",
-            "lat": 0.0,
-            "lon": 0.0,
-            "datacenter": "Localhost Sandbox Container",
-            "round_trip_latency_ms": 0.5
+            "country": "Local / Internal Network",
+            "city": "Private Subnet",
+            "region": "Perimeter Ingress",
+            "asn": "RFC 1918 / Loopback",
+            "lat": None,
+            "lon": None,
+            "datacenter": "Internal Origin",
+            "round_trip_latency_ms": 0.5,
+            "coordinates_available": False,
         }
     else:
-        # Privacy-Preserving Offline Telemetry Mapping (zero plain HTTP or third-party IP leakage)
-        lat, lon, city, country, asn = 37.7749, -122.4194, "San Francisco", "United States", "AS13335 (Cloudflare / Edge)"
+        # Privacy-preserving prefix mapping; unknown IPs explicitly report coordinates unavailable
+        lat, lon, city, country, asn = None, None, "Edge Location", "Global", "Anycast Transit"
         if ip_addr and not ip_addr.startswith("Unresolved"):
             if ip_addr.startswith("142.") or ip_addr.startswith("172.217.") or ip_addr.startswith("216.58."):
                 lat, lon, city, country, asn = 37.422, -122.084, "Mountain View", "United States", "AS15169 (Google LLC)"
@@ -139,7 +140,8 @@ def assess_website(target_input):
             "lat": lat,
             "lon": lon,
             "datacenter": "Edge Ingress Gateway",
-            "round_trip_latency_ms": 18.0
+            "round_trip_latency_ms": 18.0 if lat else 0.0,
+            "coordinates_available": bool(lat is not None and lon is not None),
         }
     results["geo_telemetry"] = geo
 

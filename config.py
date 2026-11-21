@@ -29,12 +29,6 @@ IS_VERCEL = bool(os.getenv("VERCEL") == "1" or os.getenv("AWS_LAMBDA_FUNCTION_NA
 DEBUG = os.getenv("AEGIS_DEBUG", "false").lower() in ("true", "1", "yes") and not IS_VERCEL
 PORT = int(os.getenv("PORT", os.getenv("AEGIS_PORT", "5000")))
 HOST = os.getenv("HOST", os.getenv("AEGIS_HOST", "0.0.0.0"))
-_ENV_SECRET = os.getenv("SECRET_KEY", "").strip()
-SECRET_KEY = _ENV_SECRET if _ENV_SECRET else secrets.token_hex(32)
-
-# Optional access control token for scan endpoints
-AEGIS_API_TOKEN = os.getenv("AEGIS_API_TOKEN", "").strip()
-
 # Path configuration with Serverless (/tmp) auto-detection
 if IS_VERCEL:
     DATA_DIR = Path("/tmp/aegis_data")
@@ -42,6 +36,35 @@ else:
     DATA_DIR = Path(os.getenv("AEGIS_DATA_DIR", str(ROOT / "data")))
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+def _load_or_generate_secret_key(storage_dir: Path) -> str:
+    """Load or generate a consistent SECRET_KEY shared across all Gunicorn workers."""
+    env_secret = os.getenv("SECRET_KEY", "").strip()
+    if env_secret and env_secret != "aegis-defense-local-dev-key":
+        return env_secret
+    secret_file = storage_dir / ".secret_key"
+    try:
+        if secret_file.exists():
+            content = secret_file.read_text(encoding="utf-8").strip()
+            if content and content != "aegis-defense-local-dev-key" and content != "test":
+                return content
+        key = secrets.token_hex(32)
+        secret_file.write_text(key, encoding="utf-8")
+        try:
+            os.chmod(secret_file, 0o600)
+        except Exception:
+            pass
+        return key
+    except Exception:
+        return secrets.token_hex(32)
+
+SECRET_KEY = _load_or_generate_secret_key(DATA_DIR)
+
+# Optional access control token for scan endpoints and administrative APIs
+AEGIS_API_TOKEN = os.getenv("AEGIS_API_TOKEN", "").strip()
+
+# Proxy and CDN trust settings
+TRUST_CLOUDFLARE_PROXIES = os.getenv("TRUST_CLOUDFLARE_PROXIES", "false").lower() in ("true", "1", "yes")
 SAMPLE_DATA_DIR = ROOT / "data" / "sample"
 ALLOWLIST_PATH = ROOT / "targets.allowlist"
 
@@ -94,8 +117,8 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", AEGIS_LLM_API_KEY).strip()
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", AEGIS_LLM_PROVIDER).lower()
 
-# CORS
-CORS_ORIGIN = os.getenv("CORS_ORIGIN", "*")
+# CORS (Restricted origin; empty defaults to same-origin / matched-host)
+CORS_ORIGIN = os.getenv("CORS_ORIGIN", "").strip()
 
 # Contextual Risk Prioritization Weights (sum = 1.0)
 SCORING_WEIGHTS_SOURCE = os.getenv("SCORING_WEIGHTS_SOURCE", "default").lower()  # default | calibrated
@@ -160,11 +183,24 @@ _normalize_host = normalize_host
 
 
 def is_public_deployment() -> bool:
-    """Return True if running in a public cloud hosting environment (Render, etc.)."""
+    """Return True if running in a public cloud hosting environment (Render, Railway, Fly, Heroku, Cloud Run, etc.)."""
     return bool(
         os.environ.get("RENDER")
         or os.environ.get("AEGIS_PUBLIC_ENV")
+        or os.environ.get("AEGIS_PUBLIC_DEPLOYMENT")
         or os.environ.get("AEGIS_DISABLE_ACTIVE_SCAN")
+        or os.environ.get("RAILWAY_ENVIRONMENT")
+        or os.environ.get("FLY_APP_NAME")
+        or os.environ.get("DYNO")
+        or os.environ.get("K_SERVICE")
+        or os.environ.get("VERCEL")
+        or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+        or os.environ.get("AWS_EXECUTION_ENV")
+        or os.environ.get("WEBSITE_SITE_NAME")
+        or (os.environ.get("ENVIRONMENT", "").lower() == "production")
+        or (os.environ.get("NODE_ENV", "").lower() == "production")
+        or (os.environ.get("FLASK_ENV", "").lower() == "production")
+        or (bool(os.environ.get("PORT")) and not DEBUG and HOST == "0.0.0.0")
     )
 
 
