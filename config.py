@@ -10,6 +10,7 @@ from __future__ import annotations
 import ipaddress
 import os
 import re
+import secrets
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -28,7 +29,8 @@ IS_VERCEL = bool(os.getenv("VERCEL") == "1" or os.getenv("AWS_LAMBDA_FUNCTION_NA
 DEBUG = os.getenv("AEGIS_DEBUG", "false").lower() in ("true", "1", "yes") and not IS_VERCEL
 PORT = int(os.getenv("PORT", os.getenv("AEGIS_PORT", "5000")))
 HOST = os.getenv("HOST", os.getenv("AEGIS_HOST", "0.0.0.0"))
-SECRET_KEY = os.getenv("SECRET_KEY", "aegis-defense-default-key-change-in-prod")
+_ENV_SECRET = os.getenv("SECRET_KEY", "").strip()
+SECRET_KEY = _ENV_SECRET if _ENV_SECRET else secrets.token_hex(32)
 
 # Optional access control token for scan endpoints
 AEGIS_API_TOKEN = os.getenv("AEGIS_API_TOKEN", "").strip()

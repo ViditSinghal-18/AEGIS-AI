@@ -31,7 +31,7 @@
     <!-- TOP STICKY COMMAND BAR                     -->
     <!-- ========================================== -->
     <header role="banner">
-        <div class="brand-box" onclick="location.reload()" style="cursor: pointer;">
+        <div class="brand-box" id="brandBox" style="cursor: pointer;">
             <div class="brand-icon">
                 <img src="/static/favicon.svg" alt="AEGIS-AI Cyber Shield" width="26" height="26" style="display: block; filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.65));">
             </div>
@@ -49,7 +49,7 @@
         <!-- Target Selector & Scan Launcher -->
         <div class="target-bar">
             <span style="font-size: 0.9rem; margin-left: 6px;" aria-hidden="true">🎯</span>
-            <input type="text" id="scanTargetInput" class="target-input mono" value="owasp.org" placeholder="Host / URL (e.g. owasp.org)" aria-label="Target domain or IP address">
+            <input type="text" id="scanTargetInput" class="target-input mono" value="" placeholder="Host or domain (e.g. example.com)" aria-label="Target domain or IP address">
             <label id="activeScanToggleContainer" title="Active TCP port & service probing (requires verified domain ownership or allowlist)" style="display: flex; align-items: center; gap: 5px; font-size: 0.74rem; color: #94a3b8; margin: 0 4px; cursor: pointer; user-select: none;">
                 <input type="checkbox" id="chkActiveScan" style="accent-color: #00f0ff; cursor: pointer;">
                 <span id="activeScanLabel">Active</span>
@@ -65,7 +65,7 @@
             <button class="btn-hud" id="btnOpenVerification" title="Verify Domain Ownership to Unlock Active Mode">
                 🔑 Verify Ownership
             </button>
-            <button class="btn-hud mono" onclick="AegisApp.toggleCommandPalette()" title="Press Ctrl+K">
+            <button class="btn-hud mono" id="btnTogglePalette" title="Press Ctrl+K">
                 ⌨️ <span style="font-size: 0.7rem; background: rgba(255,255,255,0.1); padding: 1px 4px; border-radius: 4px;">Ctrl+K</span>
             </button>
             <button class="btn-hud" id="btnExportCsv" title="Download CSV">
@@ -77,13 +77,13 @@
             <button class="btn-hud" id="btnExportSbom" title="CycloneDX v1.5 SBOM">
                 📦 SBOM
             </button>
-            <button class="btn-hud" onclick="window.open('/attack-graph', '_blank')" title="View Interactive Cyber Attack Surface Topology Network Graph">
+            <button class="btn-hud" id="btnOpenAttackGraph" title="View Interactive Cyber Attack Surface Topology Network Graph">
                 🕸️ Attack Graph
             </button>
-            <button class="btn-hud" onclick="AegisCopilot.toggleCopilot()" title="Toggle Aegis Copilot">
+            <button class="btn-hud" id="btnHeaderCopilot" title="Toggle Aegis Copilot">
                 🤖 Copilot
             </button>
-            <button class="btn-hud" onclick="document.getElementById('auditTerminal').classList.toggle('active')" title="Toggle Live Console">
+            <button class="btn-hud" id="btnHeaderTerminal" title="Toggle Live Console">
                 💻 Terminal
             </button>
 
@@ -113,7 +113,7 @@
                     <span class="terminal-status-badge" id="terminalStatusBadge">
                         <span class="pulse-indicator"></span> STANDBY
                     </span>
-                    <button class="terminal-toggle-btn" onclick="document.getElementById('auditTerminal').classList.toggle('active')" title="Toggle Console">_</button>
+                    <button class="terminal-toggle-btn" id="btnTerminalMinimize" title="Toggle Console">_</button>
                 </div>
             </div>
             <div class="terminal-body" id="terminalLogs">
@@ -131,13 +131,13 @@
                     <div class="hud-badge">
                         <span class="hud-badge-title">Enterprise Threat Posture</span>
                         <div class="hud-badge-val">
-                            <span id="statComplianceScore" style="color: var(--cyan);">75.0%</span>
-                            <span class="unit" id="statComplianceGrade">Grade B</span>
+                            <span id="statComplianceScore" style="color: var(--cyan);">--%</span>
+                            <span class="unit" id="statComplianceGrade">Awaiting Scan</span>
                         </div>
                     </div>
 
                     <div class="hud-controls">
-                        <button class="btn-hud" id="btnToggleGlobeSpin" onclick="AegisGlobe.toggleSpin()">
+                        <button class="btn-hud" id="btnToggleGlobeSpin">
                             🔄 <span>Toggle Spin</span>
                         </button>
                     </div>
@@ -147,11 +147,11 @@
                     <div class="hud-telemetry-feed mono">
                         <div class="hud-telemetry-item">
                             <span style="color: var(--cyan);">●</span>
-                            <span>Target: <strong id="targetDisplay" style="color: #fff;">owasp.org</strong></span>
+                            <span>Target: <strong id="targetDisplay" style="color: #fff;">None Selected</strong></span>
                         </div>
                         <div class="hud-telemetry-item">
                             <span style="color: var(--emerald);">●</span>
-                            <span>Location: <strong id="globeTargetLocation" style="color: #fff;">Resolving coordinates...</strong></span>
+                            <span>Location: <strong id="globeTargetLocation" style="color: #fff;">Awaiting Target</strong></span>
                         </div>
                         <div class="hud-telemetry-item">
                             <span style="color: var(--amber);">●</span>
@@ -210,7 +210,7 @@
             <div class="glass-panel" style="padding: 18px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <h3 style="font-size: 1rem; font-weight: 700; color: #fff;">Blind CVSS vs. AEGIS Contextual</h3>
-                    <button class="btn btn-secondary btn-sm" onclick="AegisCharts.renderThreatRadar(currentReport ? currentReport.findings[0] : null, false)">Reset</button>
+                    <button class="btn btn-secondary btn-sm" id="btnResetThreatRadar">Reset</button>
                 </div>
                 <div style="height: 280px; position: relative;">
                     <canvas id="threatRadarChart"></canvas>
@@ -237,7 +237,7 @@
                             </tr>
                         </thead>
                         <tbody id="findingsTableBody">
-                            <tr><td colspan="7" style="padding: 20px; text-align: center; color: #64748b;">Loading telemetry findings...</td></tr>
+                            <tr><td colspan="7" style="padding: 20px; text-align: center; color: #64748b;">Awaiting scan telemetry. Enter a target above and click "Run Audit".</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -247,7 +247,7 @@
             <div class="glass-panel" style="padding: 18px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <h3 style="font-size: 1rem; font-weight: 700; color: #fff;" id="selectedFindingTitle">Finding Triage Dossier</h3>
-                    <span class="badge" id="selectedFindingScore" style="background: rgba(0,240,255,0.15); color: #00f0ff; font-weight: 700;">8.5 / 10</span>
+                    <span class="badge" id="selectedFindingScore" style="background: rgba(0,240,255,0.15); color: #00f0ff; font-weight: 700;">-- / 10</span>
                 </div>
                 <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 8px;" id="selectedFindingDesc">Select a row to inspect evidence and virtual patch.</div>
                 
@@ -270,26 +270,26 @@
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;">
                 <div class="compliance-card" style="background: rgba(5,8,17,0.7); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 6px;">
                     <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">PCI-DSS 4.0</div>
-                    <div style="font-size: 22px; font-weight: 800; color: #00f0ff; margin: 4px 0;" id="compPciScore">75%</div>
-                    <div style="font-size: 0.75rem; color: #64748b;" id="compPciPass">3/4 Controls Passed</div>
+                    <div style="font-size: 22px; font-weight: 800; color: #00f0ff; margin: 4px 0;" id="compPciScore">--%</div>
+                    <div style="font-size: 0.75rem; color: #64748b;" id="compPciPass">Awaiting Target</div>
                 </div>
 
                 <div class="compliance-card" style="background: rgba(5,8,17,0.7); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 6px;">
                     <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">NIST CSF 2.0</div>
-                    <div style="font-size: 22px; font-weight: 800; color: #10b981; margin: 4px 0;" id="compNistScore">80%</div>
-                    <div style="font-size: 0.75rem; color: #64748b;" id="compNistPass">4/5 Controls Passed</div>
+                    <div style="font-size: 22px; font-weight: 800; color: #10b981; margin: 4px 0;" id="compNistScore">--%</div>
+                    <div style="font-size: 0.75rem; color: #64748b;" id="compNistPass">Awaiting Target</div>
                 </div>
 
                 <div class="compliance-card" style="background: rgba(5,8,17,0.7); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 6px;">
                     <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">ISO/IEC 27001:2022</div>
-                    <div style="font-size: 22px; font-weight: 800; color: #38bdf8; margin: 4px 0;" id="compIsoScore">75%</div>
-                    <div style="font-size: 0.75rem; color: #64748b;" id="compIsoPass">3/4 Controls Passed</div>
+                    <div style="font-size: 22px; font-weight: 800; color: #38bdf8; margin: 4px 0;" id="compIsoScore">--%</div>
+                    <div style="font-size: 0.75rem; color: #64748b;" id="compIsoPass">Awaiting Target</div>
                 </div>
 
                 <div class="compliance-card" style="background: rgba(5,8,17,0.7); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 6px;">
                     <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">SOC 2 Type II</div>
-                    <div style="font-size: 22px; font-weight: 800; color: #f59e0b; margin: 4px 0;" id="compSoc2Score">75%</div>
-                    <div style="font-size: 0.75rem; color: #64748b;" id="compSoc2Pass">3/4 Controls Passed</div>
+                    <div style="font-size: 22px; font-weight: 800; color: #f59e0b; margin: 4px 0;" id="compSoc2Score">--%</div>
+                    <div style="font-size: 0.75rem; color: #64748b;" id="compSoc2Pass">Awaiting Target</div>
                 </div>
             </div>
         </div>
@@ -297,7 +297,7 @@
     </main>
 
     <!-- FLOATING LAUNCHER FAB (shown when copilot dock is closed) -->
-    <button class="copilot-fab" id="copilotFab" onclick="AegisCopilot.toggleCopilot()" aria-label="Open Aegis Copilot" style="display: flex;">
+    <button class="copilot-fab" id="copilotFab" aria-label="Open Aegis Copilot" style="display: flex;">
         <span style="font-size: 1.2rem;">🤖</span>
         <span>Aegis Copilot</span>
     </button>
@@ -316,16 +316,16 @@
                 </div>
             </div>
             <div class="copilot-header-actions">
-                <button class="copilot-control-btn" onclick="AegisCopilot.minimizeCopilot()" title="Minimize" aria-label="Minimize Copilot">_</button>
-                <button class="copilot-control-btn" onclick="AegisCopilot.toggleCopilot()" title="Close" aria-label="Close Copilot">&times;</button>
+                <button class="copilot-control-btn" id="btnCopilotMinimize" title="Minimize" aria-label="Minimize Copilot">_</button>
+                <button class="copilot-control-btn" id="btnCopilotClose" title="Close" aria-label="Close Copilot">&times;</button>
             </div>
         </div>
         <div class="copilot-messages" id="copilotMessages"></div>
-        <div class="copilot-chips">
-            <button class="chip" onclick="AegisCopilot.sendMessage('Summarize top findings')">🛡️ Summary</button>
-            <button class="chip" onclick="AegisCopilot.sendMessage('What is our NIST compliance readiness?')">📋 Compliance</button>
-            <button class="chip" onclick="AegisCopilot.sendMessage('Provide Nginx virtual patch')">🛠️ Patch Config</button>
-            <button class="chip" onclick="AegisCopilot.sendMessage('Explain risk scoring formula')">📐 Scoring Formula</button>
+        <div class="copilot-chips" id="copilotChips">
+            <button class="chip" data-prompt="Summarize top findings">🛡️ Summary</button>
+            <button class="chip" data-prompt="What is our NIST compliance readiness?">📋 Compliance</button>
+            <button class="chip" data-prompt="Provide Nginx virtual patch">🛠️ Patch Config</button>
+            <button class="chip" data-prompt="Explain risk scoring formula">📐 Scoring Formula</button>
         </div>
         <div class="copilot-input-bar">
             <input type="text" id="copilotInput" placeholder="Ask Aegis Copilot..." aria-label="Copilot input prompt">
@@ -338,7 +338,7 @@
         <div class="modal-box">
             <div class="modal-header">
                 <h3>Domain Ownership Verification</h3>
-                <button class="modal-close" onclick="document.getElementById('verificationModal').style.display='none'">&times;</button>
+                <button class="modal-close" id="btnCloseVerificationModal">&times;</button>
             </div>
             <div id="verificationModalBody" style="padding: 16px;"></div>
         </div>
@@ -352,19 +352,19 @@
                     <h3 id="remediationModalTitle">🛠️ Security Remediation &amp; Virtual Patching</h3>
                     <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;" id="remediationModalSubtitle">Production hardening rules &amp; configurations</div>
                 </div>
-                <button class="modal-close" onclick="document.getElementById('remediationModal').style.display='none'">&times;</button>
+                <button class="modal-close" id="btnCloseRemediationModal">&times;</button>
             </div>
             <div id="remediationModalBody" style="padding: 16px;">
                 <div style="display: flex; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 12px; flex-wrap: wrap;" id="remediationTabs">
-                    <button class="btn btn-sm btn-primary tab-btn" onclick="AegisApp.switchRemediationTab('nginx', this)">Nginx</button>
-                    <button class="btn btn-sm btn-secondary tab-btn" onclick="AegisApp.switchRemediationTab('apache', this)">Apache</button>
-                    <button class="btn btn-sm btn-secondary tab-btn" onclick="AegisApp.switchRemediationTab('caddy', this)">Caddy</button>
-                    <button class="btn btn-sm btn-secondary tab-btn" onclick="AegisApp.switchRemediationTab('helmet', this)">Helmet (Node.js)</button>
-                    <button class="btn btn-sm btn-secondary tab-btn" onclick="AegisApp.switchRemediationTab('waf', this)">WAF Rules</button>
+                    <button class="btn btn-sm btn-primary tab-btn" data-tab="nginx">Nginx</button>
+                    <button class="btn btn-sm btn-secondary tab-btn" data-tab="apache">Apache</button>
+                    <button class="btn btn-sm btn-secondary tab-btn" data-tab="caddy">Caddy</button>
+                    <button class="btn btn-sm btn-secondary tab-btn" data-tab="helmet">Helmet (Node.js)</button>
+                    <button class="btn btn-sm btn-secondary tab-btn" data-tab="waf">WAF Rules</button>
                 </div>
                 <div style="position: relative;">
                     <div style="display: flex; justify-content: flex-end; margin-bottom: 6px;">
-                        <button class="btn btn-secondary btn-sm" onclick="AegisApp.copyCurrentRemediation()">📋 Copy Configuration</button>
+                        <button class="btn btn-secondary btn-sm" id="btnCopyRemediation">📋 Copy Configuration</button>
                     </div>
                     <pre id="remediationCodeDisplay" style="background: #030712; border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 6px; padding: 14px; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 0.8rem; color: #38bdf8; max-height: 320px; overflow: auto; white-space: pre-wrap; line-height: 1.5;"></pre>
                 </div>
@@ -378,13 +378,13 @@
         <div class="modal-box" style="max-width: 500px;">
             <input type="text" id="paletteSearchInput" placeholder="Type a command or jump to section..." style="width: 100%; background: #030712; border: 1px solid #00f0ff; color: #fff; padding: 12px; border-radius: 4px; font-size: 0.9rem;">
             <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 6px;" id="paletteResults">
-                <div class="palette-item" onclick="AegisApp.toggleCommandPalette();window.open('/attack-graph', '_blank');">🕸️ Open Attack Surface Topology Graph</div>
-                <div class="palette-item" onclick="AegisApp.toggleCommandPalette();fetch('/api/ai/model-routing').then(r=>r.json()).then(d=>alert('Model Routing Analysis:\n• Zero-Cost Template Tier: ' + d.savings_summary.template_zero_cost_pct + '%\n• Estimated Token Reduction: ' + d.savings_summary.estimated_token_reduction_pct + '%\n• Architecture: ' + d.savings_summary.model_routing_pattern));">⚡ Inspect Model Routing Architecture</div>
-                <div class="palette-item" onclick="document.getElementById('auditTerminal').classList.add('active');AegisApp.toggleCommandPalette();">💻 Open Telemetry Terminal</div>
-                <div class="palette-item" onclick="AegisApp.toggleCommandPalette();document.getElementById('btnExportHtml').click();">📑 Generate CISO Executive Report</div>
-                <div class="palette-item" onclick="AegisApp.toggleCommandPalette();document.getElementById('btnExportCsv').click();">📥 Download Vulnerability CSV</div>
-                <div class="palette-item" onclick="AegisApp.toggleCommandPalette();document.getElementById('btnExportSbom').click();">📦 Download CycloneDX v1.5 SBOM</div>
-                <div class="palette-item" onclick="AegisApp.toggleCommandPalette();document.getElementById('btnOpenVerification').click();">🔑 Verify Domain Ownership</div>
+                <div class="palette-item" data-action="attack-graph">🕸️ Open Attack Surface Topology Graph</div>
+                <div class="palette-item" data-action="model-routing">⚡ Inspect Model Routing Architecture</div>
+                <div class="palette-item" data-action="terminal">💻 Open Telemetry Terminal</div>
+                <div class="palette-item" data-action="ciso">📑 Generate CISO Executive Report</div>
+                <div class="palette-item" data-action="csv">📥 Download Vulnerability CSV</div>
+                <div class="palette-item" data-action="sbom">📦 Download CycloneDX v1.5 SBOM</div>
+                <div class="palette-item" data-action="verify">🔑 Verify Domain Ownership</div>
             </div>
         </div>
     </div>

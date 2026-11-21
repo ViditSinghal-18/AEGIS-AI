@@ -1,0 +1,17 @@
+# ==============================================================================
+# AEGIS-AI Development & Test Dependencies
+# Install with: pip install -r requirements-dev.txt
+# ==============================================================================
+-r requirements.txt
+
+# Testing & Quality Assurance
+pytest>=7.4.0
+flake8>=6.1.0
+pip-audit>=2.7.0
+pytest-github-actions-annotate-failures>=0.2.0
+
+# Extended Analytics & Optional SDKs
+scikit-learn>=1.3.0
+streamlit>=1.30.0
+boto3>=1.34.0
+strands-agents>=1.0.0

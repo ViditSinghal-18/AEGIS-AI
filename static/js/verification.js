@@ -50,7 +50,7 @@ window.AegisVerification = (function () {
                 <div style="font-size:0.8rem;color:#cbd5e1;margin-bottom:6px;">Add this TXT record at your DNS registrar:</div>
                 <div style="display:flex;align-items:center;background:#030712;padding:6px 10px;border-radius:4px;font-family:monospace;font-size:0.8rem;">
                     <span style="flex:1;overflow:hidden;text-overflow:ellipsis;">${AegisUtils.escapeHtml(instructions.dns_txt_record.host)} TXT "${AegisUtils.escapeHtml(instructions.dns_txt_record.value)}"</span>
-                    <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${instructions.dns_txt_record.value}');AegisUtils.showToast('Token copied!','success');" style="margin-left:8px;padding:3px 8px;">Copy</button>
+                    <button class="btn btn-secondary btn-sm" id="btnCopyDnsToken" style="margin-left:8px;padding:3px 8px;">Copy</button>
                 </div>
             </div>
 
@@ -63,10 +63,30 @@ window.AegisVerification = (function () {
             </div>
 
             <div style="display:flex;justify-content:flex-end;gap:10px;">
-                <button class="btn btn-secondary" onclick="document.getElementById('verificationModal').style.display='none';">Cancel</button>
+                <button class="btn btn-secondary" id="btnCancelVerification">Cancel</button>
                 <button class="btn btn-primary" id="btnVerifyCheck">Verify Ownership Now</button>
             </div>
         `;
+
+        const tokenVal = instructions.dns_txt_record ? instructions.dns_txt_record.value : '';
+        const btnCopy = document.getElementById('btnCopyDnsToken');
+        if (btnCopy) {
+            btnCopy.addEventListener('click', () => {
+                navigator.clipboard.writeText(tokenVal).then(() => {
+                    AegisUtils.showToast('Token copied!', 'success');
+                }).catch(() => {
+                    AegisUtils.showToast('Failed to copy token.', 'error');
+                });
+            });
+        }
+
+        const btnCancel = document.getElementById('btnCancelVerification');
+        if (btnCancel) {
+            btnCancel.addEventListener('click', () => {
+                const modal = document.getElementById('verificationModal');
+                if (modal) modal.style.display = 'none';
+            });
+        }
 
         document.getElementById('btnVerifyCheck').addEventListener('click', checkVerification);
     }

@@ -8,13 +8,15 @@ window.AegisCopilot = (function () {
     'use strict';
 
     let currentTarget = '';
+    let copilotEventsBound = false;
 
     function initCopilot(target = '') {
         currentTarget = target;
         const sendBtn = document.getElementById('btnCopilotSend');
         const inputEl = document.getElementById('copilotInput');
 
-        if (sendBtn && inputEl) {
+        if (sendBtn && inputEl && !copilotEventsBound) {
+            copilotEventsBound = true;
             sendBtn.onclick = () => sendMessage();
             inputEl.onkeydown = (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -22,6 +24,39 @@ window.AegisCopilot = (function () {
                     sendMessage();
                 }
             };
+
+            const fab = document.getElementById('copilotFab');
+            if (fab) fab.addEventListener('click', toggleCopilot);
+
+            const btnMin = document.getElementById('btnCopilotMinimize');
+            if (btnMin) btnMin.addEventListener('click', minimizeCopilot);
+
+            const btnClose = document.getElementById('btnCopilotClose');
+            if (btnClose) btnClose.addEventListener('click', toggleCopilot);
+
+            const chips = document.getElementById('copilotChips');
+            if (chips) {
+                chips.addEventListener('click', (e) => {
+                    const chip = e.target.closest('.chip');
+                    if (chip && chip.dataset.prompt) {
+                        sendMessage(chip.dataset.prompt);
+                    }
+                });
+            }
+
+            const container = document.getElementById('copilotMessages');
+            if (container) {
+                container.addEventListener('click', (e) => {
+                    const copyBtn = e.target.closest('.btn-copilot-copy');
+                    if (copyBtn) {
+                        const pre = copyBtn.closest('.copilot-code-block')?.querySelector('pre');
+                        if (pre) {
+                            navigator.clipboard.writeText(pre.innerText);
+                            AegisUtils.showToast('Copied to clipboard!', 'success');
+                        }
+                    }
+                });
+            }
         }
 
         // Add welcome message if container is empty
@@ -141,7 +176,7 @@ window.AegisCopilot = (function () {
             return `<div class="copilot-code-block" style="background:#030712;border:1px solid rgba(255,255,255,0.1);border-radius:6px;margin:8px 0;overflow:hidden;">
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 10px;background:rgba(255,255,255,0.03);border-bottom:1px solid rgba(255,255,255,0.06);">
                     ${langLabel}
-                    <button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:0.7rem;" onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText);AegisUtils.showToast('Copied to clipboard!','success');">📋 Copy</button>
+                    <button class="btn btn-secondary btn-sm btn-copilot-copy" style="padding:2px 6px;font-size:0.7rem;">📋 Copy</button>
                 </div>
                 <pre style="margin:0;padding:8px 12px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:#38bdf8;line-height:1.45;"><code>${code.trim()}</code></pre>
             </div>`;

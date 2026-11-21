@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import csv
 import io
 from datetime import datetime, timezone
@@ -98,7 +99,7 @@ def apply_security_headers(response):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
+        "script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
         "img-src 'self' data: https:; "
@@ -120,49 +121,68 @@ def apply_security_headers(response):
 
     return response
 
-# In-memory fleet inventory for multi-asset monitoring
-FLEET_INVENTORY = [
-    {
-        "id": "AST-001",
-        "name": "OWASP Juice Shop (Sandbox)",
-        "target": "127.0.0.1",
-        "port": "3000",
-        "stack": "Node.js / Express 4.17",
-        "risk": "High Exposure (P2)",
-        "type": "Internal Container",
-        "status": "Active"
-    },
-    {
-        "id": "AST-002",
-        "name": "Perimeter Public Gateway",
-        "target": "owasp.org",
-        "port": "443",
-        "stack": "Cloudflare / TLS 1.3",
-        "risk": "Hardened (Grade A)",
-        "type": "Public Web App",
-        "status": "Active"
-    },
-    {
-        "id": "AST-003",
-        "name": "Legacy Staging Microservice",
-        "target": "example.com",
-        "port": "80, 443",
-        "stack": "Nginx / Express",
-        "risk": "Moderate Risk (Grade D)",
-        "type": "Cloud Service",
-        "status": "Audited"
-    },
-    {
-        "id": "AST-004",
-        "name": "DevSecOps CI/CD Registry",
-        "target": "localhost",
-        "port": "8080",
-        "stack": "Docker Registry / Go",
-        "risk": "Low (P4)",
-        "type": "Build Pipeline",
-        "status": "Idle"
-    }
-]
+def make_content_disposition(base_name: str, target: str | None, ext: str) -> str:
+    """Safely format Content-Disposition header, strictly stripping quotes, semicolons, and CRLF."""
+    safe_target = re.sub(r'[^a-zA-Z0-9_.-]', '_', target or '').strip("._")
+    filename = f"{base_name}_{safe_target}.{ext}" if safe_target else f"{base_name}.{ext}"
+    return f'attachment; filename="{filename}"'
+
+def load_dynamic_inventory() -> list[dict[str, Any]]:
+    """Dynamically aggregate real verified targets and completed scans in DATA_DIR."""
+    inventory = []
+    seen = set()
+
+    # 1. Verified targets
+    try:
+        verified = load_verified_targets()
+        for domain in verified:
+            seen.add(domain)
+            rep = get_report_data(domain)
+            score = (rep or {}).get("overall_risk_score", (rep or {}).get("score", "Awaiting Scan"))
+            findings = (rep or {}).get("findings", (rep or {}).get("prioritized_findings", []))
+            inventory.append({
+                "id": f"AST-{len(inventory)+1:03d}",
+                "name": domain,
+                "target": domain,
+                "port": "443, 80",
+                "stack": "Production Ingress",
+                "risk": f"{score}/100" if isinstance(score, (int, float)) else str(score),
+                "type": "Verified Domain",
+                "status": "Verified Active",
+                "findings_count": len(findings),
+            })
+    except Exception:
+        pass
+
+    # 2. Scanned target directories in DATA_DIR
+    try:
+        if DATA_DIR.exists():
+            for d in sorted(DATA_DIR.iterdir(), key=lambda p: p.name):
+                if d.is_dir() and d.name not in ("cache", "sample", "history") and not d.name.startswith("."):
+                    target_name = d.name
+                    if target_name in seen:
+                        continue
+                    seen.add(target_name)
+                    rep = get_report_data(target_name)
+                    if rep:
+                        score = rep.get("overall_risk_score", rep.get("score", "Audited"))
+                        findings = rep.get("findings", rep.get("prioritized_findings", []))
+                        mode = rep.get("operational_mode") or rep.get("mode") or "Passive OSINT"
+                        inventory.append({
+                            "id": f"AST-{len(inventory)+1:03d}",
+                            "name": target_name,
+                            "target": target_name,
+                            "port": "443, 80",
+                            "stack": rep.get("server_fingerprint", {}).get("cloud_cdn_waf", "Perimeter Ingress"),
+                            "risk": f"{score}/100" if isinstance(score, (int, float)) else str(score),
+                            "type": "Audited Asset",
+                            "status": mode,
+                            "findings_count": len(findings),
+                        })
+    except Exception:
+        pass
+
+    return inventory
 
 @app.route("/")
 def index():
@@ -203,48 +223,47 @@ def view_dashboard():
 
 @app.route("/api/inventory", methods=["GET"])
 def get_inventory():
-    return jsonify(FLEET_INVENTORY)
+    return jsonify(load_dynamic_inventory())
 
 def get_report_data(target: str | None = None) -> dict[str, Any] | None:
-    """Load scan report with strict per-target isolation, falling back gracefully."""
+    """Load scan report with strict per-target isolation, never cross-contaminating targets."""
     data = None
     if target:
         try:
-            data = read_json("prioritized_report.json", target=target)
+            norm_target = validate_target_input(target)
+            data = read_json("prioritized_report.json", target=norm_target)
         except Exception:
             pass
 
-    has_findings = bool(data and (data.get("findings") or data.get("prioritized_findings")))
-    if not has_findings:
+        # If report file on disk exists for this specific target, check REPORT_FILE as fallback
+        if not data and os.path.exists(REPORT_FILE):
+            try:
+                with open(REPORT_FILE, "r", encoding="utf-8") as f:
+                    candidate = json.load(f)
+                    if candidate.get("target") == target:
+                        data = candidate
+            except Exception:
+                pass
+
+        # When a specific target was requested and not found, strictly return None (404)
+        # Never fall back to owasp.org or sample data for a different target!
+        if not data:
+            return None
+    else:
+        # Bare /api/report request with no target parameter: return latest scan or sample data
         if os.path.exists(REPORT_FILE):
             try:
                 with open(REPORT_FILE, "r", encoding="utf-8") as f:
                     candidate = json.load(f)
                     if candidate.get("findings") or candidate.get("prioritized_findings"):
-                        if not target or candidate.get("target") == target:
-                            data = candidate
-                            has_findings = True
+                        data = candidate
             except Exception:
                 pass
-
-    if not has_findings:
-        for fallback_target in ("owasp.org", "test-host.local", "api.enterprise.corp"):
-            try:
-                candidate = read_json("prioritized_report.json", target=fallback_target)
-                if candidate and (candidate.get("findings") or candidate.get("prioritized_findings")):
-                    data = candidate
-                    has_findings = True
-                    break
-            except Exception:
-                pass
-
-    if not has_findings:
-        if os.path.exists(SAMPLE_REPORT_FILE):
+        if not data and os.path.exists(SAMPLE_REPORT_FILE):
             try:
                 with open(SAMPLE_REPORT_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                data["sample_data"] = True
-                has_findings = True
+                    data["sample_data"] = True
             except Exception:
                 pass
 
@@ -253,31 +272,59 @@ def get_report_data(target: str | None = None) -> dict[str, Any] | None:
         data["findings"] = findings
         data["prioritized_findings"] = findings
         if not data.get("target"):
-            data["target"] = target or "owasp.org"
+            data["target"] = target or "target.local"
 
-        # Guarantee geo_telemetry is populated with real/fallback coordinates for the 3D globe
-        if not data.get("geo_telemetry") or data.get("geo_telemetry", {}).get("lat") is None:
+        # Check geo telemetry without inventing fake San Francisco coordinates
+        geo = data.get("geo_telemetry")
+        if not geo:
             resolved_ip = data.get("resolved_ip", "")
             target_name = data.get("target", "")
-            lat, lon, city, country, asn = 37.7749, -122.4194, "San Francisco", "United States", "AS13335 (Cloudflare / Edge)"
-            if "google" in target_name or resolved_ip.startswith("142.") or resolved_ip.startswith("172.217.") or resolved_ip.startswith("216.58."):
-                lat, lon, city, country, asn = 37.422, -122.084, "Mountain View", "United States", "AS15169 (Google LLC)"
-            elif "amazon" in target_name or "aws" in target_name or resolved_ip.startswith("52.") or resolved_ip.startswith("54."):
-                lat, lon, city, country, asn = 39.0438, -77.4874, "Ashburn", "United States", "AS16509 (Amazon AWS)"
-            elif "microsoft" in target_name or "azure" in target_name or resolved_ip.startswith("20.") or resolved_ip.startswith("40."):
-                lat, lon, city, country, asn = 47.674, -122.121, "Redmond", "United States", "AS8075 (Microsoft Azure)"
-            elif "github" in target_name or resolved_ip.startswith("140.82."):
-                lat, lon, city, country, asn = 37.7749, -122.4194, "San Francisco", "United States", "AS36459 (GitHub)"
-            data["geo_telemetry"] = {
-                "country": country,
-                "city": city,
-                "region": "Perimeter Ingress",
-                "asn": asn,
-                "lat": lat,
-                "lon": lon,
-                "datacenter": "Edge Ingress Gateway",
-                "round_trip_latency_ms": 18.0
-            }
+            is_internal = (
+                not resolved_ip
+                or resolved_ip.startswith("127.")
+                or resolved_ip.startswith("10.")
+                or resolved_ip.startswith("192.168.")
+                or target_name in ("localhost", "127.0.0.1")
+            )
+            if is_internal:
+                data["geo_telemetry"] = {
+                    "country": "Local / Internal Network",
+                    "city": "Private Subnet",
+                    "region": "Perimeter Ingress",
+                    "asn": "RFC 1918 / Loopback",
+                    "lat": None,
+                    "lon": None,
+                    "datacenter": "Internal Origin",
+                    "round_trip_latency_ms": 0.5,
+                    "coordinates_available": False,
+                }
+            else:
+                # Only populate real prefix-based coordinates if known, else mark coordinates unavailable
+                lat, lon, city, country, asn = None, None, "Edge Location", "Global", "Anycast Transit"
+                if "google" in target_name or resolved_ip.startswith("142.") or resolved_ip.startswith("172.217.") or resolved_ip.startswith("216.58."):
+                    lat, lon, city, country, asn = 37.422, -122.084, "Mountain View", "United States", "AS15169 (Google LLC)"
+                elif "amazon" in target_name or "aws" in target_name or resolved_ip.startswith("52.") or resolved_ip.startswith("54.") or resolved_ip.startswith("3."):
+                    lat, lon, city, country, asn = 39.0438, -77.4874, "Ashburn", "United States", "AS16509 (Amazon AWS)"
+                elif "microsoft" in target_name or "azure" in target_name or resolved_ip.startswith("20.") or resolved_ip.startswith("40."):
+                    lat, lon, city, country, asn = 47.674, -122.121, "Redmond", "United States", "AS8075 (Microsoft Azure)"
+                elif "github" in target_name or resolved_ip.startswith("140.82."):
+                    lat, lon, city, country, asn = 37.7749, -122.4194, "San Francisco", "United States", "AS36459 (GitHub)"
+                elif resolved_ip.startswith("104.16.") or resolved_ip.startswith("104.17.") or resolved_ip.startswith("172.67."):
+                    lat, lon, city, country, asn = 37.7749, -122.4194, "San Francisco", "United States", "AS13335 (Cloudflare Edge)"
+
+                data["geo_telemetry"] = {
+                    "country": country,
+                    "city": city,
+                    "region": "Perimeter Ingress",
+                    "asn": asn,
+                    "lat": lat,
+                    "lon": lon,
+                    "datacenter": "Edge Ingress Gateway",
+                    "round_trip_latency_ms": 18.0 if lat else 0.0,
+                    "coordinates_available": bool(lat is not None and lon is not None),
+                }
+
+    return data
     return data
 
 @app.route("/api/report", methods=["GET"])
@@ -612,7 +659,7 @@ def api_scan_history():
         ts = m.group(1) if m else str(p.stat().st_mtime)
         serialized_history.append({
             "filename": p.name,
-            "path": str(p),
+            "scan_id": p.stem,
             "timestamp": ts,
             "mtime": p.stat().st_mtime,
             "size": p.stat().st_size,
@@ -677,7 +724,7 @@ def export_multi_format(fmt: str):
         return Response(
             csv_str,
             mimetype="text/csv",
-            headers={"Content-Disposition": f"attachment;filename=aegis_{target or 'report'}.csv"}
+            headers={"Content-Disposition": make_content_disposition("aegis_vulnerabilities", target, "csv")}
         )
     elif fmt_lower == "html":
         html_str = generate_html_report(data)
@@ -693,7 +740,7 @@ def export_multi_format(fmt: str):
         return Response(
             json.dumps(sbom, indent=2),
             mimetype="application/vnd.cyclonedx+json",
-            headers={"Content-Disposition": f"attachment;filename=aegis_{target or 'report'}_cyclonedx.json"}
+            headers={"Content-Disposition": make_content_disposition("aegis_cyclonedx_sbom", target, "json")}
         )
     else:
         return jsonify({"error": f"Unsupported format '{fmt}'. Use json, csv, html, cef, ecs, or cyclonedx."}), 400
@@ -728,11 +775,10 @@ def export_report():
     target = request.args.get("target")
     data = get_report_data(target)
     if data:
-        filename = f"audit_assessment_report_{target}.json" if target else "audit_assessment_report.json"
         return Response(
             json.dumps(data, indent=2),
             mimetype="application/json",
-            headers={"Content-Disposition": f"attachment;filename={filename}"}
+            headers={"Content-Disposition": make_content_disposition("audit_assessment_report", target, "json")}
         )
     return jsonify({"error": "No scan report available for export."}), 404
 
@@ -744,11 +790,10 @@ def export_csv():
         return jsonify({"error": "No report data to export"}), 404
 
     csv_str = generate_csv_report(data)
-    filename = f"aegis_vulnerability_triage_{target}.csv" if target else "aegis_vulnerability_triage.csv"
     return Response(
         csv_str,
         mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment;filename={filename}"}
+        headers={"Content-Disposition": make_content_disposition("aegis_vulnerability_triage", target, "csv")}
     )
 
 @app.route("/api/sbom", methods=["GET"])
@@ -767,11 +812,10 @@ def get_cyclonedx_sbom():
                     comps.append({"name": f["affected_component"], "version": "detected"})
         sbom = generate_cyclonedx_sbom(comps, target=target or (data or {}).get("target", "target.site"))
 
-    filename = f"aegis_cyclonedx_sbom_{target}.json" if target else "aegis_cyclonedx_sbom.json"
     return Response(
         json.dumps(sbom, indent=2),
         mimetype="application/vnd.cyclonedx+json",
-        headers={"Content-Disposition": f"attachment;filename={filename}"}
+        headers={"Content-Disposition": make_content_disposition("aegis_cyclonedx_sbom", target, "json")}
     )
 
 @app.route("/api/compliance", methods=["GET"])
@@ -799,12 +843,32 @@ def get_threat_intel():
 
 @app.route("/api/cisa-kev", methods=["GET"])
 def get_cisa_kev_status():
-    """Returns CISA KEV catalog sync metadata and active federal binding directives."""
+    """Returns real CISA KEV catalog sync metadata and active federal binding directives."""
+    from correlation.enrich import KEV_CACHE_FILE
+    count = 0
+    updated_at_iso = None
+    status = "OFFLINE"
+    if KEV_CACHE_FILE.exists():
+        try:
+            cached = json.loads(KEV_CACHE_FILE.read_text(encoding="utf-8"))
+            count = cached.get("count", len(cached.get("cve_ids", [])))
+            ts = cached.get("updated_at")
+            if ts:
+                updated_at_iso = datetime.fromtimestamp(float(ts), timezone.utc).isoformat()
+            now = time.time()
+            if ts and (now - float(ts)) < 172800:
+                status = "ONLINE"
+            else:
+                status = "DEGRADED"
+        except Exception:
+            status = "ERROR"
+
     return jsonify({
-        "status": "ONLINE",
+        "status": status,
         "authority": "Cybersecurity & Infrastructure Security Agency (CISA)",
         "directive": "BOD 22-01 (Binding Operational Directive)",
-        "active_catalog_version": "2026.10.31",
+        "known_exploited_vulnerabilities_count": count,
+        "last_sync_timestamp": updated_at_iso,
         "sync_mode": "Live Feed + Operational Cache",
         "authority_url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
     })
@@ -1113,6 +1177,5 @@ def handle_server_error(e):
     return jsonify({"success": False, "error": "Internal Server Error occurred during processing."}), 500
 
 if __name__ == "__main__":
-    from config import DEBUG, HOST, PORT
     print(f"[+] Starting AEGIS-AI Enterprise Security Operations Portal on http://{HOST}:{PORT}")
     app.run(host=HOST, port=PORT, debug=DEBUG)

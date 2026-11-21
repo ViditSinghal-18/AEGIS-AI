@@ -23,9 +23,16 @@ from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, classification_report
+
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import accuracy_score, classification_report
+    _SKLEARN_AVAILABLE = True
+except ImportError:
+    _SKLEARN_AVAILABLE = False
+    TfidfVectorizer = None
+    LogisticRegression = None
 
 logger = logging.getLogger(__name__)
 
@@ -129,23 +136,29 @@ class LearnedAttackMapper:
 
     def __init__(self, random_state: int = 42) -> None:
         self.random_state = random_state
-        self.vectorizer = TfidfVectorizer(
-            ngram_range=(1, 2),
-            stop_words="english",
-            max_features=600,
-            sublinear_tf=True,
-        )
-        self.classifier = LogisticRegression(
-            C=2.0,
-            max_iter=300,
-            random_state=self.random_state,
-        )
         self._is_trained = False
         self._classes: List[str] = []
-        self._train()
+        if _SKLEARN_AVAILABLE:
+            self.vectorizer = TfidfVectorizer(
+                ngram_range=(1, 2),
+                stop_words="english",
+                max_features=600,
+                sublinear_tf=True,
+            )
+            self.classifier = LogisticRegression(
+                C=2.0,
+                max_iter=300,
+                random_state=self.random_state,
+            )
+            self._train()
+        else:
+            self.vectorizer = None
+            self.classifier = None
 
     def _train(self) -> None:
         """Fit vectorizer and classifier on the training corpus."""
+        if not _SKLEARN_AVAILABLE:
+            return
         texts = [t[0] for t in _TRAINING_CORPUS]
         labels = [t[1] for t in _TRAINING_CORPUS]
 
@@ -173,6 +186,26 @@ class LearnedAttackMapper:
                 confidence=0.5,
                 features_used="empty",
                 all_probabilities={},
+            )
+
+        if not _SKLEARN_AVAILABLE or not self._is_trained:
+            # Deterministic heuristic fallback when scikit-learn is absent (e.g. lean production)
+            q_lower = query_text.lower()
+            if any(k in q_lower for k in ["rce", "remote code", "mod_proxy", "spring", "log4j", "command injection"]):
+                tech, conf = "T1190", 0.85
+            elif any(k in q_lower for k in ["port", "probe", "syn", "scanner"]):
+                tech, conf = "T1595", 0.80
+            elif any(k in q_lower for k in ["token", "secret", "credential", "key", "password"]):
+                tech, conf = "T1552", 0.82
+            elif any(k in q_lower for k in ["takeover", "cname", "dangling"]):
+                tech, conf = "T1584", 0.78
+            else:
+                tech, conf = "T1190", 0.65
+            return LearnedMappingPrediction(
+                technique_id=tech,
+                confidence=conf,
+                features_used=query_text[:120],
+                all_probabilities={tech: conf},
             )
 
         X_q = self.vectorizer.transform([query_text])
@@ -222,7 +255,10 @@ class LearnedAttackMapper:
                 "note": "No findings with matching rule techniques to compare against.",
             }
 
-        agreement = accuracy_score(y_true, y_pred)
+        if _SKLEARN_AVAILABLE and accuracy_score is not None:
+            agreement = accuracy_score(y_true, y_pred)
+        else:
+            agreement = sum(1 for a, b in zip(y_true, y_pred) if a == b) / len(y_true)
         return {
             "evaluated_findings": len(y_true),
             "agreement_rate": round(float(agreement), 4),

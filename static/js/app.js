@@ -19,13 +19,6 @@ window.AegisApp = (function () {
         try {
             if (window.AegisGlobe && typeof AegisGlobe.initGlobe === 'function') {
                 AegisGlobe.initGlobe('globe-container');
-                AegisGlobe.plotRealTargetPins('owasp.org', {
-                    lat: 37.7749,
-                    lon: -122.4194,
-                    city: 'San Francisco',
-                    country: 'United States',
-                    asn: 'AS13335 (Cloudflare Edge)'
-                });
             }
         } catch (globeErr) {
             console.warn('Globe initialization error handled gracefully:', globeErr);
@@ -41,14 +34,14 @@ window.AegisApp = (function () {
         // 3. Early Copilot Initialization (ensures welcome message & prompt pills render immediately)
         try {
             if (window.AegisCopilot && typeof AegisCopilot.initCopilot === 'function') {
-                const initTarget = document.getElementById('scanTargetInput') ? document.getElementById('scanTargetInput').value.trim() : 'owasp.org';
+                const initTarget = document.getElementById('scanTargetInput') ? document.getElementById('scanTargetInput').value.trim() : '';
                 AegisCopilot.initCopilot(initTarget);
             }
         } catch (copilotErr) {
             console.warn('Copilot early initialization error handled gracefully:', copilotErr);
         }
 
-        // 4. Load initial report or demo data
+        // 4. Load initial report if a target is already set
         try {
             await loadInitialData();
         } catch (dataErr) {
@@ -59,18 +52,15 @@ window.AegisApp = (function () {
     async function loadInitialData() {
         try {
             const inputTarget = document.getElementById('scanTargetInput') ? document.getElementById('scanTargetInput').value.trim() : '';
-            const targetParam = inputTarget ? `?target=${encodeURIComponent(inputTarget)}` : '';
+            if (!inputTarget) {
+                // Awaiting explicit target entry; do not inject unrequested mock data
+                return;
+            }
+            const targetParam = `?target=${encodeURIComponent(inputTarget)}`;
             const resp = await fetch(`/api/report${targetParam}`);
             if (resp.ok) {
                 const data = await resp.json();
                 applyReportData(data);
-            } else {
-                // Fallback to latest online
-                const onlineResp = await fetch('/api/latest-online');
-                if (onlineResp.ok) {
-                    const onlineData = await onlineResp.json();
-                    applyReportData(onlineData);
-                }
             }
         } catch (e) {
             console.warn('Initial data load note:', e.message);
@@ -162,14 +152,14 @@ window.AegisApp = (function () {
             const cves = (f.related_cves || []).map(c => `<span class="badge badge-cve">${AegisUtils.escapeHtml(c)}</span>`).join(' ') || '<span style="color:#64748b;font-size:0.75rem;">None</span>';
 
             return `
-                <tr class="finding-row ${idx === selectedFindingIndex ? 'row-selected' : ''}" onclick="AegisApp.selectFinding(${idx})" style="cursor:pointer;">
+                <tr class="finding-row ${idx === selectedFindingIndex ? 'row-selected' : ''}" data-index="${idx}" style="cursor:pointer;">
                     <td><span class="badge" style="background:${sevColor};color:#fff;font-size:0.75rem;">${AegisUtils.escapeHtml(f.priority_level || f.severity || 'P2')}</span></td>
                     <td style="font-weight:700;color:#00f0ff;">${AegisUtils.escapeHtml(score)}</td>
                     <td style="color:#f1f5f9;font-weight:600;">${AegisUtils.escapeHtml(f.title || f.summary || f.vuln_id || 'Finding')}</td>
                     <td>${cves}</td>
                     <td style="color:#94a3b8;font-size:0.8rem;">${AegisUtils.escapeHtml(f.source || 'perimeter')}</td>
                     <td style="color:#38bdf8;font-family:monospace;font-size:0.8rem;">${AegisUtils.escapeHtml(epssProb)}</td>
-                    <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();AegisApp.viewRemediation(${idx})">Remediate</button></td>
+                    <td><button class="btn btn-secondary btn-sm btn-remediate" data-index="${idx}">Remediate</button></td>
                 </tr>
             `;
         }).join('');
@@ -303,6 +293,12 @@ window.AegisApp = (function () {
     }
 
     function setupEventListeners() {
+        // Brand Reload
+        const brand = document.getElementById('brandBox');
+        if (brand) {
+            brand.addEventListener('click', () => location.reload());
+        }
+
         // Scan Button
         const btnScan = document.getElementById('btnStartScan');
         if (btnScan) {
@@ -330,7 +326,7 @@ window.AegisApp = (function () {
             });
         }
 
-        // Domain Verification Modal Trigger
+        // Domain Verification Modal Trigger & Close
         const btnVerify = document.getElementById('btnOpenVerification');
         if (btnVerify) {
             btnVerify.onclick = () => {
@@ -338,14 +334,122 @@ window.AegisApp = (function () {
                 AegisVerification.startVerification(target);
             };
         }
+        const btnCloseVerify = document.getElementById('btnCloseVerificationModal');
+        if (btnCloseVerify) {
+            btnCloseVerify.addEventListener('click', () => {
+                const m = document.getElementById('verificationModal');
+                if (m) m.style.display = 'none';
+            });
+        }
 
-        // Command Palette (Ctrl+K / Cmd+K)
+        // Header Navigation & Toggles
+        const btnPalette = document.getElementById('btnTogglePalette');
+        if (btnPalette) btnPalette.addEventListener('click', toggleCommandPalette);
+
+        const btnAttackGraph = document.getElementById('btnOpenAttackGraph');
+        if (btnAttackGraph) btnAttackGraph.addEventListener('click', () => window.open('/attack-graph', '_blank'));
+
+        const btnCopilot = document.getElementById('btnHeaderCopilot');
+        if (btnCopilot) btnCopilot.addEventListener('click', () => window.AegisCopilot && AegisCopilot.toggleCopilot());
+
+        const btnTerminal = document.getElementById('btnHeaderTerminal');
+        if (btnTerminal) btnTerminal.addEventListener('click', () => document.getElementById('auditTerminal')?.classList.toggle('active'));
+
+        const btnTerminalMin = document.getElementById('btnTerminalMinimize');
+        if (btnTerminalMin) btnTerminalMin.addEventListener('click', () => document.getElementById('auditTerminal')?.classList.toggle('active'));
+
+        const btnGlobeSpin = document.getElementById('btnToggleGlobeSpin');
+        if (btnGlobeSpin) btnGlobeSpin.addEventListener('click', () => window.AegisGlobe && AegisGlobe.toggleSpin());
+
+        const btnRadarReset = document.getElementById('btnResetThreatRadar');
+        if (btnRadarReset) {
+            btnRadarReset.addEventListener('click', () => {
+                if (window.AegisCharts && currentReport) {
+                    const findings = currentReport.findings || currentReport.prioritized_findings || [];
+                    AegisCharts.renderThreatRadar(findings[0] || null, false);
+                }
+            });
+        }
+
+        // Remediation Modal Controls
+        const btnCloseRemediation = document.getElementById('btnCloseRemediationModal');
+        if (btnCloseRemediation) {
+            btnCloseRemediation.addEventListener('click', () => {
+                const m = document.getElementById('remediationModal');
+                if (m) m.style.display = 'none';
+            });
+        }
+
+        const btnCopyRem = document.getElementById('btnCopyRemediation');
+        if (btnCopyRem) btnCopyRem.addEventListener('click', copyCurrentRemediation);
+
+        const remediationTabs = document.getElementById('remediationTabs');
+        if (remediationTabs) {
+            remediationTabs.addEventListener('click', (e) => {
+                const tabBtn = e.target.closest('.tab-btn');
+                if (tabBtn && tabBtn.dataset.tab) {
+                    switchRemediationTab(tabBtn.dataset.tab, tabBtn);
+                }
+            });
+        }
+
+        // Findings Table Delegated Clicks
+        const tbody = document.getElementById('findingsTableBody');
+        if (tbody) {
+            tbody.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-remediate');
+                if (btn) {
+                    e.stopPropagation();
+                    const idx = parseInt(btn.dataset.index, 10);
+                    if (!isNaN(idx)) viewRemediation(idx);
+                    return;
+                }
+                const row = e.target.closest('.finding-row');
+                if (row) {
+                    const idx = parseInt(row.dataset.index, 10);
+                    if (!isNaN(idx)) {
+                        selectFinding(idx);
+                        tbody.querySelectorAll('.finding-row').forEach(r => r.classList.remove('row-selected'));
+                        row.classList.add('row-selected');
+                    }
+                }
+            });
+        }
+
+        // Command Palette Keyboard & Actions
         window.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
                 e.preventDefault();
                 toggleCommandPalette();
             }
         });
+
+        const paletteResults = document.getElementById('paletteResults');
+        if (paletteResults) {
+            paletteResults.addEventListener('click', (e) => {
+                const item = e.target.closest('.palette-item');
+                if (!item) return;
+                const action = item.dataset.action;
+                toggleCommandPalette();
+                if (action === 'attack-graph') {
+                    window.open('/attack-graph', '_blank');
+                } else if (action === 'model-routing') {
+                    fetch('/api/ai/model-routing').then(r => r.json()).then(d => {
+                        alert('Model Routing Architecture:\n• Zero-Cost Template Tier: ' + d.savings_summary.template_zero_cost_pct + '%\n• Estimated Token Reduction: ' + d.savings_summary.estimated_token_reduction_pct + '%\n• Pattern: ' + d.savings_summary.model_routing_pattern);
+                    });
+                } else if (action === 'terminal') {
+                    document.getElementById('auditTerminal')?.classList.add('active');
+                } else if (action === 'ciso') {
+                    document.getElementById('btnExportHtml')?.click();
+                } else if (action === 'csv') {
+                    document.getElementById('btnExportCsv')?.click();
+                } else if (action === 'sbom') {
+                    document.getElementById('btnExportSbom')?.click();
+                } else if (action === 'verify') {
+                    document.getElementById('btnOpenVerification')?.click();
+                }
+            });
+        }
 
         // Export Dropdowns
         setupExportHandlers();
