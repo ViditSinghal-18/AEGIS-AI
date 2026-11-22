@@ -817,6 +817,49 @@ h1, h2, h3, h4 {
 }
 
 /* ========================================================================= */
+/* 5B. CONTEXTUAL RISK EXPOSURE MATRIX CARD                                  */
+/* ========================================================================= */
+.matrix-card-wrapper {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-rule);
+    border-radius: var(--radius-sm);
+    padding: 20px 24px 16px;
+    margin-top: 10px;
+}
+
+.matrix-canvas-container {
+    position: relative;
+    height: 340px;
+    width: 100%;
+}
+
+.matrix-footnote {
+    display: flex;
+    justify-content: flex-end;
+    font-size: 0.72rem;
+    color: var(--ink-tertiary);
+    margin-top: 12px;
+    letter-spacing: 0.02em;
+}
+
+.matrix-badge-container {
+    display: flex;
+    align-items: center;
+}
+
+.matrix-meta-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.75rem;
+    padding: 4px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-rule);
+    color: var(--ink-secondary);
+    white-space: nowrap;
+}
+
+/* ========================================================================= */
 /* 6. ATTACK PATH TIMELINE (Simple line with 4 labeled nodes)                */
 /* ========================================================================= */
 .attack-timeline-wrapper {

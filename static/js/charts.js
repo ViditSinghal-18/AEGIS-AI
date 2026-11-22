@@ -41,7 +41,7 @@ window.AegisCharts = (function () {
                 validPoints.push({
                     x: cvss,
                     y: epss * 100, // percentage for display
-                    r: Math.max(6, Math.min(22, score * 2.2)),
+                    r: Math.max(7, Math.min(22, score * 2.2)),
                     finding: f,
                     index: idx
                 });
@@ -53,11 +53,48 @@ window.AegisCharts = (function () {
         // Update exclusion counter UI
         const matrixMeta = document.getElementById('matrixMetaBadge');
         if (matrixMeta) {
-            matrixMeta.textContent = `Plotted: ${validPoints.length} | Excluded: ${excludedCount} (Non-CVE/Perimeter)`;
+            matrixMeta.textContent = `Plotted: ${validPoints.length} · Excluded: ${excludedCount} (Non-CVE/Perimeter)`;
         }
 
         if (matrixChartInstance) {
             matrixChartInstance.destroy();
+        }
+
+        const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+        const maxEpssPercent = validPoints.length > 0 ? Math.max(...validPoints.map(p => p.y)) : 0;
+
+        // Dynamic, honest scale for real-world EPSS values:
+        let suggestedMaxY = 5;
+        let yStep = 1;
+        let minY = -0.5;
+        let maxY = 5.5;
+
+        if (maxEpssPercent > 50) {
+            suggestedMaxY = 100;
+            yStep = 20;
+            minY = -20;
+            maxY = 120;
+        } else if (maxEpssPercent > 20) {
+            suggestedMaxY = 50;
+            yStep = 10;
+            minY = -10;
+            maxY = 60;
+        } else if (maxEpssPercent > 5) {
+            suggestedMaxY = 25;
+            yStep = 5;
+            minY = -5;
+            maxY = 30;
+        } else if (maxEpssPercent > 1) {
+            suggestedMaxY = 10;
+            yStep = 2;
+            minY = -2;
+            maxY = 12;
+        } else {
+            // For low/zero EPSS (<1%), scale between 0.0% and 2.0%
+            suggestedMaxY = 2.0;
+            yStep = 0.5;
+            minY = -0.5;
+            maxY = 2.5;
         }
 
         const ctx = canvas.getContext('2d');
@@ -67,22 +104,31 @@ window.AegisCharts = (function () {
                 datasets: [{
                     label: 'Perimeter Vulnerabilities',
                     data: validPoints,
+                    clip: false, // CRITICAL: Never slice bubble geometry at chart boundaries
                     backgroundColor: validPoints.map(p => {
-                        const s = p.finding.priority_level || '';
-                        if (s.includes('P1') || p.finding.severity === 'Critical') return 'rgba(239, 68, 68, 0.75)';
-                        if (s.includes('P2') || p.finding.severity === 'High') return 'rgba(249, 115, 22, 0.75)';
-                        if (s.includes('P3') || p.finding.severity === 'Medium') return 'rgba(245, 158, 11, 0.75)';
-                        return 'rgba(59, 130, 246, 0.75)';
+                        const s = (p.finding.priority_level || p.finding.severity || '').toUpperCase();
+                        if (s.includes('P1') || s.includes('CRIT')) return isDark ? 'rgba(217, 72, 43, 0.85)' : 'rgba(217, 72, 43, 0.80)'; // Vermilion
+                        if (s.includes('P2') || s.includes('HIGH')) return isDark ? 'rgba(217, 119, 6, 0.85)' : 'rgba(217, 119, 6, 0.80)';  // Ochre
+                        if (s.includes('P3') || s.includes('MED')) return isDark ? 'rgba(180, 83, 9, 0.80)' : 'rgba(180, 83, 9, 0.75)';   // Amber
+                        return isDark ? 'rgba(120, 113, 108, 0.80)' : 'rgba(120, 113, 108, 0.70)'; // Neutral slate
                     }),
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(27, 26, 23, 0.35)',
                     borderWidth: 1.5,
-                    hoverBorderColor: '#00f0ff',
+                    hoverBorderColor: isDark ? '#ffffff' : '#1B1A17',
                     hoverBorderWidth: 2.5
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        left: 20,
+                        right: 24,
+                        top: 16,
+                        bottom: 12
+                    }
+                },
                 onClick: (e, elements) => {
                     if (elements.length > 0 && onSelectFinding) {
                         const pt = validPoints[elements[0].index];
@@ -92,11 +138,14 @@ window.AegisCharts = (function () {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(11, 18, 33, 0.95)',
-                        titleColor: '#00f0ff',
-                        bodyColor: '#f1f5f9',
-                        borderColor: 'rgba(0, 240, 255, 0.3)',
+                        backgroundColor: isDark ? 'rgba(27, 26, 23, 0.96)' : 'rgba(244, 241, 234, 0.98)',
+                        titleColor: isDark ? '#ffffff' : '#1B1A17',
+                        bodyColor: isDark ? '#d6d3d1' : '#44403c',
+                        borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)',
                         borderWidth: 1,
+                        padding: 10,
+                        titleFont: { family: "'IBM Plex Sans', sans-serif", weight: '600', size: 12 },
+                        bodyFont: { family: "'IBM Plex Mono', monospace", size: 11 },
                         callbacks: {
                             title: (items) => {
                                 const pt = items[0].raw;
@@ -105,9 +154,9 @@ window.AegisCharts = (function () {
                             label: (item) => {
                                 const pt = item.raw;
                                 return [
-                                    `CVSS Base: ${pt.x.toFixed(1)} / 10`,
+                                    `CVSS Base Flaw: ${pt.x.toFixed(1)} / 10`,
                                     `EPSS Weaponization: ${pt.y.toFixed(2)}%`,
-                                    `AEGIS Contextual Score: ${pt.finding.contextual_risk_score || 'N/A'}/10`,
+                                    `AEGIS Composite Score: ${pt.finding.contextual_risk_score || 'N/A'}/10`,
                                     `Priority: ${pt.finding.priority_level || 'P2'}`
                                 ];
                             }
@@ -116,17 +165,52 @@ window.AegisCharts = (function () {
                 },
                 scales: {
                     x: {
-                        min: 0,
-                        max: 10,
-                        title: { display: true, text: 'Theoretical Severity (CVSS v3.1 Base Score)', color: '#94a3b8' },
-                        grid: { color: 'rgba(255, 255, 255, 0.06)' },
-                        ticks: { color: '#94a3b8' }
+                        min: -1,
+                        max: 11,
+                        title: {
+                            display: true,
+                            text: 'Theoretical Severity (CVSS v3.1 Base Score)',
+                            color: isDark ? '#a8a29e' : '#57534e',
+                            font: { family: "'IBM Plex Sans', sans-serif", size: 11, weight: '500' },
+                            padding: { top: 8 }
+                        },
+                        grid: {
+                            color: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)'
+                        },
+                        ticks: {
+                            color: isDark ? '#a8a29e' : '#78716c',
+                            font: { family: "'IBM Plex Mono', monospace", size: 10 },
+                            stepSize: 1,
+                            callback: (val) => (val >= 0 && val <= 10 ? val : '')
+                        }
                     },
                     y: {
-                        min: 0,
-                        title: { display: true, text: 'Real Exploitation Likelihood (FIRST.org EPSS %)', color: '#94a3b8' },
-                        grid: { color: 'rgba(255, 255, 255, 0.06)' },
-                        ticks: { color: '#94a3b8' }
+                        min: minY,
+                        max: maxY,
+                        title: {
+                            display: true,
+                            text: 'Real Exploitation Likelihood (FIRST.org EPSS %)',
+                            color: isDark ? '#a8a29e' : '#57534e',
+                            font: { family: "'IBM Plex Sans', sans-serif", size: 11, weight: '500' },
+                            padding: { bottom: 8 }
+                        },
+                        grid: {
+                            color: (ctx) => {
+                                if (ctx.tick && ctx.tick.value === 0) {
+                                    return isDark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(0, 0, 0, 0.22)';
+                                }
+                                return isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
+                            }
+                        },
+                        ticks: {
+                            color: isDark ? '#a8a29e' : '#78716c',
+                            font: { family: "'IBM Plex Mono', monospace", size: 10 },
+                            stepSize: yStep,
+                            callback: (val) => {
+                                if (val < 0 || val > suggestedMaxY) return '';
+                                return Number(val).toFixed(suggestedMaxY <= 2 ? 1 : 0) + '%';
+                            }
+                        }
                     }
                 }
             }

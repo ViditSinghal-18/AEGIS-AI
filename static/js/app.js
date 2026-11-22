@@ -54,6 +54,9 @@ window.AegisApp = (function () {
             const inputTarget = document.getElementById('scanTargetInput') ? document.getElementById('scanTargetInput').value.trim() : '';
             if (!inputTarget) {
                 // Awaiting explicit target entry; do not inject unrequested mock data
+                if (window.AegisCharts && typeof AegisCharts.renderExposureMatrix === 'function') {
+                    AegisCharts.renderExposureMatrix([], 'riskMatrixChart');
+                }
                 return;
             }
             const targetParam = `?target=${encodeURIComponent(inputTarget)}`;
@@ -529,6 +532,12 @@ window.AegisApp = (function () {
                 const current = html.getAttribute('data-theme') || 'light';
                 const next = current === 'light' ? 'dark' : 'light';
                 html.setAttribute('data-theme', next);
+                if (window.AegisCharts) {
+                    const findings = (currentReport && (currentReport.findings || currentReport.prioritized_findings)) || [];
+                    AegisCharts.renderExposureMatrix(findings, 'riskMatrixChart', (selectedF, idx) => {
+                        selectFinding(idx);
+                    });
+                }
             });
         }
 

@@ -10,15 +10,6 @@
       "product": "OWASP Foundation - The Open Source Foundation for Application SecurityOWASP Foundation",
       "version": "",
       "extra": "passive-web-observation"
-    },
-    {
-      "port": 80,
-      "protocol": "tcp",
-      "state": "open",
-      "service": "http",
-      "product": "",
-      "version": "",
-      "extra": "passive-shodan-internetdb"
     }
   ],
   "http": {
@@ -51,7 +42,7 @@
       "protocol": "TLSv1.3",
       "issuer": "Let's Encrypt",
       "subject": "owasp.org",
-      "days_until_expiry": 80,
+      "days_until_expiry": 78,
       "issues": []
     }
   },
@@ -68,53 +59,22 @@
         "owasp.org\ttext =",
         "owasp.org\ttext =",
         "owasp.org\ttext =",
+        "\"v=spf1 include:_spf.google.com include:servers.mcsv.net include:amazonses.com -all\"",
         "owasp.org\ttext =",
         "owasp.org\ttext =",
         "owasp.org\ttext =",
-        "owasp.org\ttext =",
-        "\"v=spf1 include:_spf.google.com include:servers.mcsv.net include:amazonses.com -all\""
+        "owasp.org\ttext ="
       ],
       "spf_present": true,
       "dmarc_present": true,
       "issues": []
     },
-    "ct_subdomains": [
-      "admin.owasp.org",
-      "aghast.owasp.org",
-      "austin.owasp.org",
-      "blt.owasp.org",
-      "cloud.owasp.org",
-      "contact.owasp.org",
-      "copi.owasp.org",
-      "cornucopia.owasp.org",
-      "ctf.owasp.org",
-      "docs.owasp.org",
-      "dsomm.owasp.org",
-      "genai.owasp.org",
-      "giving.owasp.org",
-      "kerala.owasp.org",
-      "llm.owasp.org",
-      "name-virt-host.owasp.org",
-      "nest.owasp.org",
-      "ocms.owasp.org",
-      "pce.dev.owasp.org",
-      "prodsec.owasp.org",
-      "projectsummit.owasp.org",
-      "secureflag.owasp.org",
-      "support.docs.owasp.org",
-      "support.owasp.org",
-      "www.projectsummit.owasp.org"
-    ],
+    "ct_subdomains": [],
     "ct_notice": "Subdomains discovered via public Certificate Transparency logs for mapping only (none were probed or scanned).",
     "shodan": {
-      "ports": [
-        80,
-        443
-      ],
+      "ports": [],
       "cpes": [],
-      "tags": [
-        "pqc"
-      ],
+      "tags": [],
       "source": "shodan-internetdb"
     },
     "csp": {
@@ -221,48 +181,7 @@
         "Add DNS TXT record for _smtp._tls.owasp.org: 'v=TLSRPTv1; rua=mailto:tls-rpt@owasp.org;'"
       ]
     },
-    "dangling_dns": [
-      {
-        "subdomain": "admin.owasp.org",
-        "cname_target": "41e3b5a8b9f664cc.vercel-dns-016.com",
-        "provider_name": null,
-        "is_vulnerable": false,
-        "status_code": null,
-        "fingerprint_matched": null,
-        "evidence": "CNAME points to '41e3b5a8b9f664cc.vercel-dns-016.com' (not a cataloged vulnerable cloud provider pattern).",
-        "remediation": "None required."
-      },
-      {
-        "subdomain": "aghast.owasp.org",
-        "cname_target": "owasp-aghast.github.io",
-        "provider_name": "GitHub Pages",
-        "is_vulnerable": false,
-        "status_code": 200,
-        "fingerprint_matched": null,
-        "evidence": "CNAME points to GitHub Pages ('owasp-aghast.github.io'), but service responds with active content (no unallocated error fingerprint found).",
-        "remediation": "Ensure the cloud service binding is monitored and retained."
-      },
-      {
-        "subdomain": "austin.owasp.org",
-        "cname_target": null,
-        "provider_name": null,
-        "is_vulnerable": false,
-        "status_code": null,
-        "fingerprint_matched": null,
-        "evidence": "No CNAME record discovered for subdomain.",
-        "remediation": "None required."
-      },
-      {
-        "subdomain": "blt.owasp.org",
-        "cname_target": null,
-        "provider_name": null,
-        "is_vulnerable": false,
-        "status_code": null,
-        "fingerprint_matched": null,
-        "evidence": "No CNAME record discovered for subdomain.",
-        "remediation": "None required."
-      }
-    ],
+    "dangling_dns": [],
     "exposed_secrets": [],
     "breach_propensity": {
       "target": "owasp.org",
@@ -292,7 +211,6 @@
     "Mode: PASSIVE (Public reconnaissance only \u2014 no active port scanning was performed).",
     "External Posture Grade: C (74.8/100) \u2014 Breach Propensity: Elevated",
     "Email Security Grade: F (0/100) \u2014 DMARC: missing",
-    "CSP Defense Grade: C (70/100)",
-    "Discovered 25 subdomains from Certificate Transparency logs."
+    "CSP Defense Grade: C (70/100)"
   ]
 }

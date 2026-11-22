@@ -202,11 +202,33 @@
             </div>
         </section>
 
+        <!-- SECTION 2: CONTEXTUAL RISK EXPOSURE MATRIX -->
+        <section class="dossier-section" aria-label="Contextual Risk Exposure Matrix">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">02 / Contextual Risk Exposure Matrix</h2>
+                    <div class="section-subtitle">Theoretical Flaw Severity (CVSS v3.1) vs. Real-World Exploitation Likelihood (FIRST.org EPSS %)</div>
+                </div>
+                <div class="matrix-badge-container">
+                    <span id="matrixMetaBadge" class="mono matrix-meta-badge">Plotted: 0 &middot; Excluded: 0 (Non-CVE/Perimeter)</span>
+                </div>
+            </div>
+
+            <div class="matrix-card-wrapper">
+                <div class="matrix-canvas-container">
+                    <canvas id="riskMatrixChart"></canvas>
+                </div>
+                <div class="matrix-footnote mono">
+                    <span>Bubble diameter corresponds to AEGIS contextual risk score (1&ndash;10). Click any bubble to inspect finding.</span>
+                </div>
+            </div>
+        </section>
+
         <!-- SECTION 3: ATTACK PATH TIMELINE (Simple line with 4 labeled nodes) -->
         <section class="dossier-section" aria-label="Attack Path Timeline">
             <div class="section-header">
                 <div>
-                    <h2 class="section-title">02 / Attack Path Trajectory</h2>
+                    <h2 class="section-title">03 / Attack Path Trajectory</h2>
                     <div class="section-subtitle">Adversary propagation timeline derived from active perimeter signals.</div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 14px;">
@@ -253,7 +275,7 @@
         <section class="dossier-section" aria-label="Regulatory Compliance">
             <div class="section-header">
                 <div>
-                    <h2 class="section-title">03 / Multi-Framework Governance &amp; Regulatory Readiness</h2>
+                    <h2 class="section-title">04 / Multi-Framework Governance &amp; Regulatory Readiness</h2>
                     <div class="section-subtitle">Evaluated directly against security controls. Honest empty states when unassessed.</div>
                 </div>
             </div>
@@ -314,7 +336,7 @@
         <section class="dossier-section" aria-label="Perimeter Infrastructure">
             <div class="section-header">
                 <div>
-                    <h2 class="section-title">04 / Perimeter Infrastructure &amp; Routing</h2>
+                    <h2 class="section-title">05 / Perimeter Infrastructure &amp; Routing</h2>
                     <div class="section-subtitle">Verified autonomous transit, edge ingress, and hosting topology.</div>
                 </div>
             </div>
@@ -349,9 +371,7 @@
             <!-- Elements preserved for JS backward compatibility without 3D canvas noise -->
             <div id="globe-container" style="display: none;" aria-hidden="true"></div>
             <button id="btnToggleGlobeSpin" style="display: none;" aria-hidden="true"></button>
-            <canvas id="riskMatrixChart" style="display: none;" aria-hidden="true"></canvas>
             <canvas id="threatRadarChart" style="display: none;" aria-hidden="true"></canvas>
-            <span id="matrixMetaBadge" style="display: none;" aria-hidden="true"></span>
             <button id="btnResetThreatRadar" style="display: none;" aria-hidden="true"></button>
         </section>
 

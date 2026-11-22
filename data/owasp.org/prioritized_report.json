@@ -1,7 +1,7 @@
 {
   "target": "owasp.org",
-  "scanned_at": "2026-11-20T13:13:48.331187+00:00",
-  "duration_seconds": 0.01,
+  "scanned_at": "2026-11-22T13:44:28.205087+00:00",
+  "duration_seconds": 0.0,
   "mode": "passive",
   "total_findings": 2,
   "critical_count": 0,
@@ -1176,47 +1176,47 @@
     ],
     "pci_dss_4": {
       "name": "PCI-DSS v4.0",
-      "passing_controls": 10,
-      "total_controls": 12,
+      "score": 83.3,
       "percentage": 83.3,
-      "score": 83.3
+      "passing_controls": 10,
+      "total_controls": 12
     },
     "nist_csf_2": {
       "name": "NIST CSF 2.0",
-      "passing_controls": 9,
-      "total_controls": 10,
+      "score": 90.0,
       "percentage": 90.0,
-      "score": 90.0
+      "passing_controls": 9,
+      "total_controls": 10
     },
     "soc2_type2": {
       "name": "SOC 2 Type II",
-      "passing_controls": 6,
-      "total_controls": 8,
+      "score": 75.0,
       "percentage": 75.0,
-      "score": 75.0
-    },
-    "iso_27001": {
-      "name": "ISO/IEC 27001:2022",
-      "passing_controls": 12,
-      "total_controls": 15,
-      "percentage": 80.0,
-      "score": 80.0
+      "passing_controls": 6,
+      "total_controls": 8
     },
     "soc_2": {
       "name": "SOC 2 Type II",
-      "passing_controls": 6,
-      "total_controls": 8,
+      "score": 75.0,
       "percentage": 75.0,
-      "score": 75.0
+      "passing_controls": 6,
+      "total_controls": 8
+    },
+    "iso_27001": {
+      "name": "ISO/IEC 27001:2022",
+      "score": 80.0,
+      "percentage": 80.0,
+      "passing_controls": 12,
+      "total_controls": 15
     }
   },
   "cyclonedx_sbom": {
     "bomFormat": "CycloneDX",
     "specVersion": "1.5",
-    "serialNumber": "urn:uuid:c4468461-cbb0-4e72-bada-a1baf1eff605",
+    "serialNumber": "urn:uuid:650f5ad5-c852-4c40-a91f-a3f700d02d08",
     "version": 1,
     "metadata": {
-      "timestamp": "2026-11-20T13:13:48.331098+00:00",
+      "timestamp": "2026-11-22T13:44:28.205042+00:00",
       "tools": [
         {
           "vendor": "AEGIS-AI",
@@ -1302,5 +1302,17 @@
     }
   },
   "operational_mode": "PASSIVE OSINT",
-  "mode_rationale": "Zero port probing mode: 'owasp.org' is not in allowlist and not ownership-verified. (Verify via /api/verify/start)"
+  "mode_rationale": "Zero port probing mode: 'owasp.org' is not in allowlist and not ownership-verified. (Verify via /api/verify/start)",
+  "geo_telemetry": {
+    "country": "Global",
+    "city": "Edge Location",
+    "region": "Perimeter Ingress",
+    "asn": "Anycast Transit",
+    "lat": null,
+    "lon": null,
+    "datacenter": "Edge Ingress Gateway",
+    "round_trip_latency_ms": 0.0,
+    "coordinates_available": false
+  },
+  "resolved_ip": "216.150.16.129"
 }
