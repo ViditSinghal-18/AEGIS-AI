@@ -80,8 +80,6 @@ window.AegisUtils = (function () {
     }
 
     function getApiToken() {
-        const meta = document.querySelector('meta[name="aegis-token"]');
-        if (meta && meta.content) return meta.content.trim();
         if (window.AEGIS_API_TOKEN) return String(window.AEGIS_API_TOKEN).trim();
         return '';
     }

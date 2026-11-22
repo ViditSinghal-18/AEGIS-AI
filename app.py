@@ -107,12 +107,13 @@ def apply_security_headers(response):
         "connect-src 'self' https: http:; "
         "frame-ancestors 'none';"
     )
-    if CORS_ORIGIN == "*":
-        response.headers["Access-Control-Allow-Origin"] = "*"
-    else:
-        response.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Aegis-Token"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    if CORS_ORIGIN:
+        if CORS_ORIGIN == "*":
+            response.headers["Access-Control-Allow-Origin"] = "*"
+        else:
+            response.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Aegis-Token"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
 
     # Prevent browsers from caching stale API responses and HTML templates
     if request.path.startswith("/api/") or request.path in ("/", "/dashboard"):
@@ -187,7 +188,7 @@ def load_dynamic_inventory() -> list[dict[str, Any]]:
 
 @app.route("/")
 def index():
-    return render_template("index.html", api_token=AEGIS_API_TOKEN)
+    return render_template("index.html")
 
 @app.route("/favicon.ico")
 def favicon():
@@ -220,7 +221,7 @@ def view_dashboard():
     if os.path.exists(dash_path):
         with open(dash_path, "r", encoding="utf-8") as f:
             return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
-    return render_template("index.html", api_token=AEGIS_API_TOKEN)
+    return render_template("index.html")
 
 @app.route("/api/inventory", methods=["GET"])
 def get_inventory():

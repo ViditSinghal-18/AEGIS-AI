@@ -28,5 +28,3 @@ services:
         value: https://api.groq.com/openai/v1
       - key: AEGIS_LLM_API_KEY
         sync: false
-      - key: AEGIS_API_TOKEN
-        generateValue: true

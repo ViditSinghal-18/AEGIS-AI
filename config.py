@@ -184,6 +184,8 @@ _normalize_host = normalize_host
 
 def is_public_deployment() -> bool:
     """Return True if running in a public cloud hosting environment (Render, Railway, Fly, Heroku, Cloud Run, etc.)."""
+    if os.environ.get("AEGIS_ALLOW_ACTIVE", "").lower() in ("true", "1", "yes"):
+        return False
     return bool(
         os.environ.get("RENDER")
         or os.environ.get("AEGIS_PUBLIC_ENV")
@@ -200,7 +202,6 @@ def is_public_deployment() -> bool:
         or (os.environ.get("ENVIRONMENT", "").lower() == "production")
         or (os.environ.get("NODE_ENV", "").lower() == "production")
         or (os.environ.get("FLASK_ENV", "").lower() == "production")
-        or (bool(os.environ.get("PORT")) and not DEBUG and HOST == "0.0.0.0")
     )
 
 
