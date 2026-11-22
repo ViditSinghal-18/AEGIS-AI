@@ -33,7 +33,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
-from sklearn.linear_model import LogisticRegression
+
+try:
+    from sklearn.linear_model import LogisticRegression
+    _SKLEARN_AVAILABLE = True
+except ImportError:
+    _SKLEARN_AVAILABLE = False
+    LogisticRegression = None
 
 import config
 
@@ -178,10 +184,20 @@ def calibrate_scoring_weights(
     y_test = np.array([d["in_kev"] for d in test_data], dtype=np.int32)
 
     # Fit Logistic Regression to learn empirical log-odds weights
-    clf = LogisticRegression(C=1.0, random_state=seed, solver="lbfgs")
-    clf.fit(X_train, y_train)
+    if _SKLEARN_AVAILABLE and LogisticRegression is not None:
+        clf = LogisticRegression(C=1.0, random_state=seed, solver="lbfgs")
+        clf.fit(X_train, y_train)
+        raw_coefs = clf.coef_[0]
+    else:
+        # High-performance pure-numpy logistic regression gradient descent fallback (zero extra dependencies)
+        weights = np.zeros(X_train.shape[1], dtype=np.float64)
+        lr = 0.1
+        for _ in range(250):
+            preds = 1.0 / (1.0 + np.exp(-np.clip(X_train @ weights, -25, 25)))
+            grad = X_train.T @ (preds - y_train) / max(len(y_train), 1)
+            weights -= lr * grad
+        raw_coefs = weights
 
-    raw_coefs = clf.coef_[0]
     # Ensure positive weights and normalize to sum to 1.0
     pos_coefs = np.maximum(0.0, raw_coefs)
     total_coef = float(np.sum(pos_coefs))
