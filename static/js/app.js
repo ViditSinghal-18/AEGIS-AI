@@ -111,14 +111,25 @@ window.AegisApp = (function () {
         AegisUtils.safeSetText('statComplianceGrade', `Grade ${grade}`);
         AegisUtils.safeSetText('targetDisplay', target || 'None Selected');
 
-        // Plot 3D Globe Pins & Ingress Connectivity from real geo data (no fabricated coordinates)
+        // Plot 3D Globe Pins & Ingress Connectivity from real geo data with interactive vulnerability nodes
         const geo = data.geo_telemetry || (data.report && data.report.geo_telemetry);
+        const onSelectFromGlobe = (fIdx) => {
+            selectFinding(fIdx);
+            const finding = findings[fIdx];
+            const title = finding ? (finding.title || finding.vuln_id) : 'Finding';
+            AegisUtils.showToast(`Inspecting perimeter finding: ${title}`, 'info');
+            const dossierEl = document.getElementById('selectedFindingTitle');
+            if (dossierEl) {
+                dossierEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        };
+
         if (geo && geo.coordinates_available !== false && geo.lat !== null && geo.lon !== null) {
-            AegisGlobe.plotRealTargetPins(target, geo, data.subdomains || []);
-            AegisUtils.safeSetText('globeTargetLocation', `${geo.city || 'Edge Ingress'}, ${geo.country || 'Global'} (${geo.asn || 'Perimeter Gateway'}) · 6 Ingress Streams Active`);
+            AegisGlobe.plotRealTargetPins(target, geo, data.subdomains || [], findings, onSelectFromGlobe);
+            AegisUtils.safeSetText('globeTargetLocation', `${geo.city || 'Edge Ingress'}, ${geo.country || 'Global'} (${geo.asn || 'Perimeter Gateway'}) · ${findings.length} Vulnerabilities Active on Surface`);
         } else {
-            AegisGlobe.plotRealTargetPins(target, null, data.subdomains || []);
-            AegisUtils.safeSetText('globeTargetLocation', `${target} · Edge Anycast Transit (6 Global Sensor Relays Monitored)`);
+            AegisGlobe.plotRealTargetPins(target, null, data.subdomains || [], findings, onSelectFromGlobe);
+            AegisUtils.safeSetText('globeTargetLocation', `${target} · Edge Anycast Transit (${findings.length} Vulnerabilities Active on Surface)`);
         }
 
         // Render Charts

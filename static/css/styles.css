@@ -190,7 +190,8 @@ body {
 .modal-box .corner-reticle,
 .copilot-drawer .corner-reticle,
 .hud-badge .corner-reticle,
-.hud-telemetry-feed .corner-reticle {
+.hud-telemetry-feed .corner-reticle,
+.globe-tooltip .corner-reticle {
     border-color: var(--cyan);
 }
 
@@ -200,7 +201,8 @@ body {
 .target-bar:focus-within .corner-reticle,
 .hud-badge:hover .corner-reticle,
 .hud-telemetry-feed:hover .corner-reticle,
-.modal-box:hover .corner-reticle {
+.modal-box:hover .corner-reticle,
+.globe-tooltip:hover .corner-reticle {
     filter: drop-shadow(0 0 6px var(--cyan-glow));
     opacity: 1;
 }
@@ -688,6 +690,70 @@ main {
 
 #globe-canvas:active {
     cursor: grabbing;
+}
+
+/* ==========================================================================
+   Globe Interactive Ingress & Vulnerability Tooltip HUD
+   ========================================================================== */
+.globe-tooltip {
+    position: absolute;
+    z-index: 50;
+    pointer-events: none;
+    width: 290px;
+    background: rgba(6, 10, 24, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 12px 14px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 240, 255, 0.2);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    transform: translate(-50%, -125%);
+    overflow: visible;
+}
+
+.globe-tooltip .corner-reticle {
+    width: 8px;
+    height: 8px;
+    border-color: var(--cyan);
+}
+
+.globe-tooltip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.globe-tooltip-title {
+    font-weight: 700;
+    font-size: 0.84rem;
+    color: #fff;
+    line-height: 1.35;
+    margin-bottom: 6px;
+}
+
+.globe-tooltip-meta {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.globe-tooltip-cves {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.globe-tooltip-hint {
+    font-size: 0.68rem;
+    color: var(--cyan);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .hud-overlay {

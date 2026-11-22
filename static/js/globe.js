@@ -91,17 +91,163 @@ window.AegisGlobe = (function () {
     let isSpinning = true;
     let prefersReducedMotion = false;
     let currentTargetPin = null; // { name, lat, lon, city, country, asn }
+    let currentFindings = [];
+    let onSelectFindingCallback = null;
     let globalActiveMode = 'webgl'; // 'webgl' or 'canvas2d'
     let animationId = null;
 
     // Three.js instances
     let scene, camera, renderer, globeGroup;
     let threeNodes = [];
+    let threeVulnNodes = [];
     let threePulseRings = [];
     let threeArcs = [];
     let threeBeads = [];
     let threeRadarSweep = null;
+    let hoveredMesh = null;
     let tooltipEl = null;
+
+    function getVulnColor(severity) {
+        const s = (severity || '').toLowerCase();
+        if (s.includes('crit') || s === 'p1') return { hex: 0xff3366, str: '#ff3366', name: 'Critical' };
+        if (s.includes('high') || s === 'p2') return { hex: 0xf97316, str: '#f97316', name: 'High' };
+        if (s.includes('med') || s === 'p3') return { hex: 0xf59e0b, str: '#f59e0b', name: 'Medium' };
+        if (s.includes('low') || s === 'p4') return { hex: 0x38bdf8, str: '#38bdf8', name: 'Low' };
+        return { hex: 0x00f0ff, str: '#00f0ff', name: 'Info' };
+    }
+
+    function getFindingLatLon(finding, index, total, targetLat, targetLon) {
+        if (targetLat !== null && targetLat !== undefined && targetLon !== null && targetLon !== undefined && !isNaN(targetLat) && !isNaN(targetLon)) {
+            const angle = (index * 137.508) * (Math.PI / 180);
+            const dist = 5.0 + (index * 2.5);
+            const latOffset = Math.sin(angle) * dist;
+            const cosLat = Math.max(0.2, Math.cos(targetLat * Math.PI / 180));
+            const lonOffset = (Math.cos(angle) * dist) / cosLat;
+
+            let lat = targetLat + latOffset;
+            let lon = targetLon + lonOffset;
+            lat = Math.max(-75, Math.min(75, lat));
+            lon = ((lon + 180) % 360) - 180;
+            return { lat, lon };
+        } else {
+            const baseG = REGIONAL_GATEWAYS[index % REGIONAL_GATEWAYS.length];
+            const angle = (index * 55) * (Math.PI / 180);
+            const dist = 6.0;
+            return {
+                lat: Math.max(-75, Math.min(75, baseG.lat + Math.sin(angle) * dist)),
+                lon: ((baseG.lon + Math.cos(angle) * dist + 180) % 360) - 180
+            };
+        }
+    }
+
+    function showTooltip(data, screenX, screenY, containerRect) {
+        if (!tooltipEl) tooltipEl = document.getElementById('globeTooltip');
+        if (!tooltipEl || !data) return;
+
+        const sevEl = document.getElementById('globeTooltipSeverity');
+        const scoreEl = document.getElementById('globeTooltipScore');
+        const titleEl = document.getElementById('globeTooltipTitle');
+        const metaEl = document.getElementById('globeTooltipMeta');
+        const cvesEl = document.getElementById('globeTooltipCves');
+
+        if (data.type === 'vulnerability') {
+            const sev = data.severity || 'Medium';
+            const colorObj = getVulnColor(sev);
+            
+            if (sevEl) {
+                sevEl.textContent = (data.priority_level || sev).toUpperCase();
+                sevEl.style.background = colorObj.str;
+                sevEl.style.color = '#fff';
+            }
+            if (scoreEl) {
+                scoreEl.textContent = `Score: ${data.score || 'N/A'}`;
+                scoreEl.style.color = colorObj.str;
+            }
+            if (titleEl) {
+                titleEl.textContent = data.title || 'Security Weakness';
+            }
+            if (metaEl) {
+                metaEl.textContent = `EPSS: ${data.epss || '0.00%'} · Vector: ${data.source || 'Perimeter Ingress'}`;
+            }
+            if (cvesEl) {
+                if (data.cves && data.cves.length > 0 && data.cves !== 'None') {
+                    const cveList = Array.isArray(data.cves) ? data.cves : [data.cves];
+                    cvesEl.innerHTML = cveList.slice(0, 3).map(c => `<span class="badge badge-cve">${(window.AegisUtils && AegisUtils.escapeHtml) ? AegisUtils.escapeHtml(c) : c}</span>`).join(' ');
+                } else {
+                    cvesEl.innerHTML = `<span style="font-size:0.68rem;color:#64748b;">No CVE assigned · Perimeter Misconfig</span>`;
+                }
+            }
+            const hintEl = tooltipEl.querySelector('.globe-tooltip-hint');
+            if (hintEl) hintEl.innerHTML = '➔ Click node to inspect triage dossier &amp; patch';
+        } else if (data.isTarget) {
+            if (sevEl) {
+                sevEl.textContent = 'PRIMARY TARGET';
+                sevEl.style.background = '#00f0ff';
+                sevEl.style.color = '#020617';
+            }
+            if (scoreEl) {
+                scoreEl.textContent = currentFindings.length ? `${currentFindings.length} Flaws` : 'Monitored';
+                scoreEl.style.color = '#00f0ff';
+            }
+            if (titleEl) {
+                titleEl.textContent = data.name || 'Target Asset';
+            }
+            if (metaEl) {
+                metaEl.textContent = `Location: ${data.location || 'Edge Gateway'}`;
+            }
+            if (cvesEl) {
+                cvesEl.innerHTML = `<span style="font-size:0.68rem;color:#38bdf8;">Autonomous Surface Monitoring Active</span>`;
+            }
+            const hintEl = tooltipEl.querySelector('.globe-tooltip-hint');
+            if (hintEl) hintEl.textContent = 'Ingress Gateway Hub';
+        } else {
+            // Regional Gateway
+            if (sevEl) {
+                sevEl.textContent = 'SENSOR RELAY';
+                sevEl.style.background = data.color || '#38bdf8';
+                sevEl.style.color = '#020617';
+            }
+            if (scoreEl) {
+                scoreEl.textContent = 'ACTIVE';
+                scoreEl.style.color = data.color || '#38bdf8';
+            }
+            if (titleEl) {
+                titleEl.textContent = data.name || 'Regional Gateway';
+            }
+            if (metaEl) {
+                metaEl.textContent = `${data.location} · ${data.role || 'Telemetry Sensor'}`;
+            }
+            if (cvesEl) {
+                cvesEl.innerHTML = `<span style="font-size:0.68rem;color:#10b981;">Latency: 14ms · Streams: Synchronized</span>`;
+            }
+            const hintEl = tooltipEl.querySelector('.globe-tooltip-hint');
+            if (hintEl) hintEl.textContent = 'Global Observation Sensor';
+        }
+
+        const tipWidth = 290;
+        const tipHeight = 135;
+        let left = screenX;
+        let top = screenY - 20;
+
+        if (containerRect) {
+            if (left - tipWidth / 2 < 12) left = tipWidth / 2 + 12;
+            if (left + tipWidth / 2 > containerRect.width - 12) left = containerRect.width - tipWidth / 2 - 12;
+            if (top - tipHeight < 10) top = screenY + tipHeight + 25;
+        }
+
+        tooltipEl.style.left = `${left}px`;
+        tooltipEl.style.top = `${top}px`;
+        tooltipEl.style.display = 'block';
+        tooltipEl.style.opacity = '1';
+    }
+
+    function hideTooltip() {
+        if (!tooltipEl) tooltipEl = document.getElementById('globeTooltip');
+        if (tooltipEl) {
+            tooltipEl.style.display = 'none';
+            tooltipEl.style.opacity = '0';
+        }
+    }
 
     // =========================================================================
     // 2. High-Fidelity Canvas 2D Cyber Globe Engine (Robust Fallback)
@@ -126,13 +272,16 @@ window.AegisGlobe = (function () {
         let rotY = 0.0;
         let rotX = 0.22; // slight Earth axial tilt (~12.6 degrees)
         let isDragging = false;
+        let dragDist = 0;
         let prevMouse = { x: 0, y: 0 };
         let radarAngle = 0;
         let pulsePhase = 0;
+        let hoveredCanvasNode = null;
 
-        // Mouse & Touch Drag Controls
+        // Mouse & Touch Drag & Hover Controls
         canvas.addEventListener('mousedown', (e) => {
             isDragging = true;
+            dragDist = 0;
             canvas.style.cursor = 'grabbing';
             prevMouse = { x: e.clientX, y: e.clientY };
         });
@@ -141,12 +290,114 @@ window.AegisGlobe = (function () {
             canvas.style.cursor = 'grab';
         });
         canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
             if (isDragging) {
                 const dx = e.clientX - prevMouse.x;
                 const dy = e.clientY - prevMouse.y;
+                dragDist += Math.abs(dx) + Math.abs(dy);
                 rotY += dx * 0.007;
                 rotX = Math.max(-0.6, Math.min(0.6, rotX + dy * 0.007));
                 prevMouse = { x: e.clientX, y: e.clientY };
+                hideTooltip();
+                return;
+            }
+
+            const curW = container.clientWidth || width;
+            const curH = container.clientHeight || height;
+            const cx = curW / 2;
+            const cy = curH / 2;
+            const radius = Math.min(curW, curH) * 0.38;
+
+            let hit = null;
+
+            // 1. Check vulnerability nodes
+            if (currentFindings && currentFindings.length > 0) {
+                for (let idx = 0; idx < currentFindings.length; idx++) {
+                    const f = currentFindings[idx];
+                    const coords = getFindingLatLon(
+                        f,
+                        idx,
+                        currentFindings.length,
+                        currentTargetPin ? currentTargetPin.lat : null,
+                        currentTargetPin ? currentTargetPin.lon : null
+                    );
+                    const p = project(coords.lat, coords.lon, radius);
+                    if (p.z > 0) {
+                        const vx = cx + p.x;
+                        const vy = cy + p.y;
+                        if (Math.hypot(mouseX - vx, mouseY - vy) < 15) {
+                            hit = {
+                                type: 'vulnerability',
+                                findingIndex: idx,
+                                title: f.title || f.summary || f.vuln_id || `Finding #${idx + 1}`,
+                                severity: f.severity || f.priority_level || 'Medium',
+                                priority_level: f.priority_level || f.severity || 'P3',
+                                score: f.contextual_risk_score || f.risk_score || 'N/A',
+                                epss: f.epss_probability !== undefined ? (f.epss_probability * 100).toFixed(2) + '%' : (f.threat_intel ? f.threat_intel.epss_percent + '%' : '0.00%'),
+                                source: f.source || 'Perimeter Ingress',
+                                cves: f.related_cves || []
+                            };
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 2. Check target node
+            if (!hit && currentTargetPin && currentTargetPin.lat !== null && currentTargetPin.lon !== null) {
+                const p = project(currentTargetPin.lat, currentTargetPin.lon, radius);
+                if (p.z > 0) {
+                    const tx = cx + p.x;
+                    const ty = cy + p.y;
+                    if (Math.hypot(mouseX - tx, mouseY - ty) < 16) {
+                        hit = {
+                            isTarget: true,
+                            name: currentTargetPin.name,
+                            location: `${currentTargetPin.city || 'Edge'}, ${currentTargetPin.country || 'Global'}`,
+                            role: 'Primary Ingress Gateway · Target'
+                        };
+                    }
+                }
+            }
+
+            // 3. Check regional gateways
+            if (!hit) {
+                for (let i = 0; i < REGIONAL_GATEWAYS.length; i++) {
+                    const g = REGIONAL_GATEWAYS[i];
+                    const p = project(g.lat, g.lon, radius);
+                    if (p.z > 0) {
+                        const gx = cx + p.x;
+                        const gy = cy + p.y;
+                        if (Math.hypot(mouseX - gx, mouseY - gy) < 14) {
+                            hit = { ...g };
+                            break;
+                        }
+                    }
+                }
+            }
+
+            hoveredCanvasNode = hit;
+            if (hit) {
+                canvas.style.cursor = 'pointer';
+                showTooltip(hit, mouseX, mouseY, rect);
+            } else {
+                canvas.style.cursor = 'grab';
+                hideTooltip();
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            hoveredCanvasNode = null;
+            hideTooltip();
+        });
+
+        canvas.addEventListener('click', () => {
+            if (dragDist > 6) return;
+            if (hoveredCanvasNode && hoveredCanvasNode.type === 'vulnerability' && onSelectFindingCallback) {
+                onSelectFindingCallback(hoveredCanvasNode.findingIndex);
             }
         });
 
@@ -435,6 +686,62 @@ window.AegisGlobe = (function () {
                 }
             }
 
+            // 8.5 Draw Vulnerability Beacon Nodes & Ingress Arcs
+            if (currentFindings && currentFindings.length > 0) {
+                currentFindings.forEach((finding, idx) => {
+                    const coords = getFindingLatLon(
+                        finding,
+                        idx,
+                        currentFindings.length,
+                        currentTargetPin ? currentTargetPin.lat : null,
+                        currentTargetPin ? currentTargetPin.lon : null
+                    );
+                    const p = project(coords.lat, coords.lon, radius);
+                    if (p.z > 0) {
+                        const depth = p.z / radius;
+                        const vx = cx + p.x;
+                        const vy = cy + p.y;
+                        const colorObj = getVulnColor(finding.severity || finding.priority_level);
+
+                        // Draw connecting arc from target
+                        if (targetNode) {
+                            const pt = project(targetNode.lat, targetNode.lon, radius);
+                            if (pt.z > -10) {
+                                ctx.strokeStyle = `rgba(${colorObj.hex >> 16}, ${(colorObj.hex >> 8) & 255}, ${colorObj.hex & 255}, ${(0.6 * depth).toFixed(2)})`;
+                                ctx.lineWidth = 1.4;
+                                ctx.beginPath();
+                                ctx.moveTo(cx + pt.x, cy + pt.y);
+                                ctx.lineTo(vx, vy);
+                                ctx.stroke();
+                            }
+                        }
+
+                        // Core Node
+                        ctx.fillStyle = colorObj.str;
+                        ctx.shadowColor = colorObj.str;
+                        ctx.shadowBlur = 12;
+                        ctx.beginPath();
+                        ctx.arc(vx, vy, 4.2 * depth + 1.0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+
+                        // Pulsing Beacon Ring
+                        const ringR = (4.5 + Math.sin(pulsePhase * 2 + idx) * 3.5) * depth;
+                        ctx.strokeStyle = colorObj.str;
+                        ctx.lineWidth = 1.4;
+                        ctx.beginPath();
+                        ctx.arc(vx, vy, Math.max(2, ringR), 0, Math.PI * 2);
+                        ctx.stroke();
+
+                        // Inner White Glow Center
+                        ctx.fillStyle = '#ffffff';
+                        ctx.beginPath();
+                        ctx.arc(vx, vy, 1.8 * depth, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                });
+            }
+
             // 9. Dual Outer Holographic Orbital Ring with HUD Compass Ticks
             ctx.save();
             ctx.strokeStyle = 'rgba(0, 240, 255, 0.40)';
@@ -570,22 +877,85 @@ window.AegisGlobe = (function () {
         ringMesh2.rotation.x = Math.PI / 1.7;
         globeGroup.add(ringMesh2);
 
-        // 5. Interactive Drag-to-Orbit Controls
+        // 5. Interactive Drag-to-Orbit & Raycast Hover Inspection
         let isDragging = false;
+        let dragDist = 0;
         let prevMouse = { x: 0, y: 0 };
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
 
         container.addEventListener('mousedown', (e) => {
             isDragging = true;
+            dragDist = 0;
             prevMouse = { x: e.clientX, y: e.clientY };
         });
-        window.addEventListener('mouseup', () => { isDragging = false; });
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
         container.addEventListener('mousemove', (e) => {
+            const rect = container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
             if (isDragging) {
                 const deltaX = e.clientX - prevMouse.x;
                 const deltaY = e.clientY - prevMouse.y;
+                dragDist += Math.abs(deltaX) + Math.abs(deltaY);
                 globeGroup.rotation.y += deltaX * 0.006;
                 globeGroup.rotation.x += deltaY * 0.006;
                 prevMouse = { x: e.clientX, y: e.clientY };
+                hideTooltip();
+                return;
+            }
+
+            // Raycast for hover inspection
+            mouse.x = (mouseX / rect.width) * 2 - 1;
+            mouse.y = -(mouseY / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            const interactiveTargets = [...threeVulnNodes, ...threeNodes];
+            const intersects = raycaster.intersectObjects(interactiveTargets, false);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0].object;
+                if (hoveredMesh && hoveredMesh !== hit) {
+                    hoveredMesh.scale.set(1, 1, 1);
+                }
+                hoveredMesh = hit;
+                hoveredMesh.scale.set(1.4, 1.4, 1.4);
+                container.style.cursor = 'pointer';
+                showTooltip(hit.userData, mouseX, mouseY, rect);
+            } else {
+                if (hoveredMesh) {
+                    hoveredMesh.scale.set(1, 1, 1);
+                    hoveredMesh = null;
+                }
+                container.style.cursor = 'grab';
+                hideTooltip();
+            }
+        });
+
+        container.addEventListener('mouseleave', () => {
+            if (hoveredMesh) {
+                hoveredMesh.scale.set(1, 1, 1);
+                hoveredMesh = null;
+            }
+            hideTooltip();
+        });
+
+        container.addEventListener('click', (e) => {
+            if (dragDist > 6) return;
+            const rect = container.getBoundingClientRect();
+            mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(threeVulnNodes, false);
+            if (intersects.length > 0) {
+                const hit = intersects[0].object;
+                if (hit.userData && hit.userData.findingIndex !== undefined && onSelectFindingCallback) {
+                    onSelectFindingCallback(hit.userData.findingIndex);
+                }
             }
         });
 
@@ -615,9 +985,14 @@ window.AegisGlobe = (function () {
                 }
             });
 
-            // Target radar ring rotation
+            // Target & vulnerability radar ring rotation
+            const now = Date.now() * 0.006;
             threePulseRings.forEach(ring => {
                 ring.rotation.z += 0.012;
+                if (ring.userData && ring.userData.isVulnRing) {
+                    const s = 1.0 + Math.sin(now + ring.userData.phase) * 0.32;
+                    ring.scale.set(s, s, 1);
+                }
             });
 
             renderer.render(scene, camera);
@@ -659,6 +1034,8 @@ window.AegisGlobe = (function () {
         // Clear dynamic elements
         threeNodes.forEach(n => globeGroup.remove(n));
         threeNodes = [];
+        threeVulnNodes.forEach(vn => globeGroup.remove(vn));
+        threeVulnNodes = [];
         threePulseRings.forEach(r => globeGroup.remove(r));
         threePulseRings = [];
         threeArcs.forEach(a => globeGroup.remove(a));
@@ -785,6 +1162,102 @@ window.AegisGlobe = (function () {
             }
         });
 
+        // Add Vulnerability Beacon Nodes from currentFindings
+        if (currentFindings && currentFindings.length > 0) {
+            currentFindings.forEach((finding, idx) => {
+                const coords = getFindingLatLon(
+                    finding,
+                    idx,
+                    currentFindings.length,
+                    currentTargetPin ? currentTargetPin.lat : null,
+                    currentTargetPin ? currentTargetPin.lon : null
+                );
+                const pos = latLonToVec3(coords.lat, coords.lon, radius + 0.8);
+                const colorObj = getVulnColor(finding.severity || finding.priority_level);
+
+                // Vulnerability Core Sphere
+                const vulnGeo = new THREE.SphereGeometry(2.6, 16, 16);
+                const vulnMat = new THREE.MeshBasicMaterial({
+                    color: colorObj.hex,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const vulnMesh = new THREE.Mesh(vulnGeo, vulnMat);
+                vulnMesh.position.copy(pos);
+                vulnMesh.userData = {
+                    type: 'vulnerability',
+                    findingIndex: idx,
+                    title: finding.title || finding.summary || finding.vuln_id || `Perimeter Finding #${idx + 1}`,
+                    severity: finding.severity || finding.priority_level || 'Medium',
+                    priority_level: finding.priority_level || finding.severity || 'P3',
+                    score: finding.contextual_risk_score || finding.risk_score || 'N/A',
+                    epss: finding.epss_probability !== undefined ? (finding.epss_probability * 100).toFixed(2) + '%' : (finding.threat_intel ? finding.threat_intel.epss_percent + '%' : '0.00%'),
+                    source: finding.source || 'Perimeter Ingress',
+                    cves: finding.related_cves || [],
+                    remediation: finding.remediation || ''
+                };
+                globeGroup.add(vulnMesh);
+                threeNodes.push(vulnMesh);
+                threeVulnNodes.push(vulnMesh);
+
+                // Radiating Pulsating Ring
+                const ringGeo = new THREE.RingGeometry(3.0, 5.2, 24);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: colorObj.hex,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.8,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                ringMesh.position.copy(pos);
+                ringMesh.lookAt(new THREE.Vector3(0, 0, 0));
+                ringMesh.userData = { isVulnRing: true, phase: idx * 0.8 };
+                globeGroup.add(ringMesh);
+                threePulseRings.push(ringMesh);
+
+                // Curved Ingress Arc from Target Core or Nearest Gateway
+                const originVec = targetVec || regionalVecs['us-east'] || pos;
+                const dist = originVec.distanceTo(pos);
+                if (dist > 3) {
+                    const mid = originVec.clone().add(pos).multiplyScalar(0.5);
+                    mid.normalize().multiplyScalar(radius + Math.min(dist * 0.45, 18));
+
+                    const curve = new THREE.QuadraticBezierCurve3(originVec, mid, pos);
+                    const pts = curve.getPoints(32);
+                    const arcGeo = new THREE.BufferGeometry().setFromPoints(pts);
+                    const arcMat = new THREE.LineBasicMaterial({
+                        color: colorObj.hex,
+                        transparent: true,
+                        opacity: 0.75,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    });
+                    const arcLine = new THREE.Line(arcGeo, arcMat);
+                    arcLine.userData = { offset: idx * 0.35 };
+                    globeGroup.add(arcLine);
+                    threeArcs.push(arcLine);
+
+                    // Traveling photon pulse bead
+                    const beadGeo = new THREE.SphereGeometry(1.8, 10, 10);
+                    const beadMat = new THREE.MeshBasicMaterial({
+                        color: 0xffffff,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    });
+                    const beadMesh = new THREE.Mesh(beadGeo, beadMat);
+                    beadMesh.userData = {
+                        curve: curve,
+                        speed: 0.007 + (idx % 3) * 0.003,
+                        progress: (idx * 0.22) % 1
+                    };
+                    globeGroup.add(beadMesh);
+                    threeBeads.push(beadMesh);
+                }
+            });
+        }
+
         // Smoothly orient globe towards target if set
         if (currentTargetPin && currentTargetPin.lat !== null && currentTargetPin.lon !== null) {
             const targetPhi = (90 - currentTargetPin.lat) * (Math.PI / 180);
@@ -798,13 +1271,17 @@ window.AegisGlobe = (function () {
         const locBadge = document.getElementById('globeTargetLocation');
         if (!locBadge) return;
 
+        const vulnInfo = currentFindings.length > 0
+            ? ` · ${currentFindings.length} Vulnerabilities Mapped on Surface`
+            : '';
+
         if (currentTargetPin && currentTargetPin.lat !== null && currentTargetPin.lon !== null) {
             const city = currentTargetPin.city || 'Edge';
             const country = currentTargetPin.country || 'Global';
             const asn = currentTargetPin.asn || 'Perimeter Ingress';
-            locBadge.textContent = `${city}, ${country} (${asn}) · 6 Ingress Streams Active`;
+            locBadge.textContent = `${city}, ${country} (${asn})${vulnInfo || ' · 6 Ingress Streams Active'}`;
         } else {
-            locBadge.textContent = 'Global Ingress Mesh Active · 7 Regional Gateways Monitored';
+            locBadge.textContent = `Global Ingress Mesh Active · 7 Regional Gateways Monitored${vulnInfo}`;
         }
     }
 
@@ -850,7 +1327,7 @@ window.AegisGlobe = (function () {
         runCanvas2DGlobe(container, width, height);
     }
 
-    function plotRealTargetPins(targetName, geoData, subdomains = []) {
+    function plotRealTargetPins(targetName, geoData, subdomains = [], findings = [], onSelectCallback = null) {
         const safeTarget = targetName || '';
         let lat = null;
         let lon = null;
@@ -879,8 +1356,24 @@ window.AegisGlobe = (function () {
             currentTargetPin = null;
         }
 
+        currentFindings = Array.isArray(findings) ? findings : [];
+        if (typeof onSelectCallback === 'function') {
+            onSelectFindingCallback = onSelectCallback;
+        }
+
         updateLocationBadge();
 
+        if (globalActiveMode === 'webgl') {
+            rebuildThreeSceneElements();
+        }
+    }
+
+    function plotVulnerabilities(findings = [], onSelectCallback = null) {
+        currentFindings = Array.isArray(findings) ? findings : [];
+        if (typeof onSelectCallback === 'function') {
+            onSelectFindingCallback = onSelectCallback;
+        }
+        updateLocationBadge();
         if (globalActiveMode === 'webgl') {
             rebuildThreeSceneElements();
         }
@@ -898,6 +1391,7 @@ window.AegisGlobe = (function () {
     return {
         initGlobe,
         plotRealTargetPins,
+        plotVulnerabilities,
         toggleSpin
     };
 })();

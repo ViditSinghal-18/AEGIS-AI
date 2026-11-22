@@ -16,7 +16,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
     
     <!-- Modular Stylesheet -->
-    <link rel="stylesheet" href="/static/css/styles.css?v=3.0">
+    <link rel="stylesheet" href="/static/css/styles.css?v=3.1">
 
     <!-- Bundled Vendor Libraries -->
     <script src="/static/js/three.min.js?v=2.3"></script>
@@ -138,6 +138,22 @@
             <span class="corner-reticle br"></span>
 
             <div id="globe-container" class="globe-viewport"></div>
+
+            <!-- Interactive 3D Globe Ingress & Vulnerability Tooltip HUD -->
+            <div id="globeTooltip" class="globe-tooltip" style="display: none;">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
+                <div class="globe-tooltip-header">
+                    <span id="globeTooltipSeverity" class="badge">CRITICAL</span>
+                    <span id="globeTooltipScore" class="mono">--</span>
+                </div>
+                <div id="globeTooltipTitle" class="globe-tooltip-title">Perimeter Vulnerability</div>
+                <div id="globeTooltipMeta" class="globe-tooltip-meta mono">EPSS: -- &middot; CVSS: --</div>
+                <div id="globeTooltipCves" class="globe-tooltip-cves"></div>
+                <div class="globe-tooltip-hint mono">➔ Click node to inspect triage dossier &amp; patch</div>
+            </div>
 
             <!-- 3D Globe HUD Overlays -->
             <div class="hud-overlay">
@@ -589,12 +605,12 @@
 
     <!-- Modular Application JavaScript Files -->
     <script src="/static/js/utils.js?v=2.3"></script>
-    <script src="/static/js/globe.js?v=2.3"></script>
+    <script src="/static/js/globe.js?v=3.1"></script>
     <script src="/static/js/charts.js?v=2.3"></script>
     <script src="/static/js/telemetry.js?v=2.3"></script>
     <script src="/static/js/verification.js?v=2.3"></script>
     <script src="/static/js/copilot.js?v=2.3"></script>
-    <script src="/static/js/app.js?v=2.3"></script>
+    <script src="/static/js/app.js?v=3.1"></script>
 
 </body>
 </html>
