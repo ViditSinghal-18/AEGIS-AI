@@ -1178,25 +1178,36 @@
       "name": "PCI-DSS v4.0",
       "passing_controls": 10,
       "total_controls": 12,
-      "percentage": 83.3
+      "percentage": 83.3,
+      "score": 83.3
     },
     "nist_csf_2": {
       "name": "NIST CSF 2.0",
       "passing_controls": 9,
       "total_controls": 10,
-      "percentage": 90.0
+      "percentage": 90.0,
+      "score": 90.0
     },
     "soc2_type2": {
       "name": "SOC 2 Type II",
       "passing_controls": 6,
       "total_controls": 8,
-      "percentage": 75.0
+      "percentage": 75.0,
+      "score": 75.0
     },
     "iso_27001": {
       "name": "ISO/IEC 27001:2022",
       "passing_controls": 12,
       "total_controls": 15,
-      "percentage": 80.0
+      "percentage": 80.0,
+      "score": 80.0
+    },
+    "soc_2": {
+      "name": "SOC 2 Type II",
+      "passing_controls": 6,
+      "total_controls": 8,
+      "percentage": 75.0,
+      "score": 75.0
     }
   },
   "cyclonedx_sbom": {

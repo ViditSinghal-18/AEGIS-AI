@@ -1,390 +1,475 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AEGIS-AI | Autonomous Attack Surface Risk-Based Vulnerability Management (RBVM)</title>
+    <title>AEGIS-AI &mdash; Defensive Attack-Surface &amp; Vulnerability Triage Dossier</title>
     
-    <!-- Favicon & Brand Symbols -->
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="alternate icon" href="/favicon.ico">
-    <meta name="theme-color" content="#050811">
+    <meta name="theme-color" content="#F4F1EA">
     
-    <!-- Google Fonts & FontAwesome -->
+    <!-- Google Fonts: Newsreader (Editorial Serif Display), IBM Plex Sans (UI Sans), IBM Plex Mono (Data Mono) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,600&display=swap" rel="stylesheet">
     
-    <!-- Modular Stylesheet -->
-    <link rel="stylesheet" href="/static/css/styles.css?v=2.3">
+    <!-- Editorial Case File Stylesheet -->
+    <link rel="stylesheet" href="/static/css/styles.css?v=3.0">
 
-    <!-- Bundled Vendor Libraries -->
-    <script src="/static/js/three.min.js?v=2.3"></script>
+    <!-- Vendor Libraries (retained for backward-compatible chart instances) -->
     <script src="/static/js/chart.min.js?v=2.3"></script>
 </head>
 <body>
 
     <!-- Accessible Skip Link -->
-    <a href="#mainContent" class="skip-link">Skip to main content</a>
+    <a href="#mainContent" class="skip-link">Skip to investigation report</a>
 
     <!-- ========================================== -->
-    <!-- TOP STICKY COMMAND BAR                     -->
+    <!-- 1. TOP BAR (Clean, editorial, no emojis)   -->
     <!-- ========================================== -->
-    <header role="banner">
-        <div class="brand-box" id="brandBox" style="cursor: pointer;">
-            <div class="brand-icon">
-                <img src="/static/favicon.svg" alt="AEGIS-AI Cyber Shield" width="26" height="26" style="display: block; filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.65));">
+    <header class="dossier-topbar" role="banner">
+        <div class="topbar-inner">
+            <!-- Product Wordmark -->
+            <div class="wordmark" id="brandBox" tabindex="0" role="button" aria-label="AEGIS-AI Home">
+                <span class="wordmark-title">AEGIS-AI</span>
+                <span class="wordmark-divider">/</span>
+                <span class="wordmark-sub">Perimeter Dossier</span>
             </div>
-            <div>
-                <div class="brand-title">
-                    AEGIS-AI
-                    <span class="brand-tag">3D RBVM</span>
-                </div>
-                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 1px;" class="mono">
-                    Autonomous CTEM &amp; Threat Exposure Platform
-                </div>
+
+            <!-- Single Target Input & Primary "Run audit" Button -->
+            <div class="target-control-group">
+                <input type="text" id="scanTargetInput" class="target-input mono" placeholder="Target domain or host (e.g. huggingface.co)" aria-label="Target domain or host">
+                <label id="activeScanToggleContainer" class="mode-toggle" title="Active TCP port &amp; service probing (requires verified ownership)">
+                    <input type="checkbox" id="chkActiveScan">
+                    <span id="activeScanLabel">Active probe</span>
+                </label>
+                <button class="btn btn-primary" id="btnStartScan" aria-label="Run security audit">
+                    <span id="scanBtnText">Run audit</span>
+                    <span id="scanSpinner" style="display: none;" aria-hidden="true">&hellip;</span>
+                </button>
             </div>
-        </div>
 
-        <!-- Target Selector & Scan Launcher -->
-        <div class="target-bar">
-            <span style="font-size: 0.9rem; margin-left: 6px;" aria-hidden="true">🎯</span>
-            <input type="text" id="scanTargetInput" class="target-input mono" value="" placeholder="Host or domain (e.g. example.com)" aria-label="Target domain or IP address">
-            <label id="activeScanToggleContainer" title="Active TCP port & service probing (requires verified domain ownership or allowlist)" style="display: flex; align-items: center; gap: 5px; font-size: 0.74rem; color: #94a3b8; margin: 0 4px; cursor: pointer; user-select: none;">
-                <input type="checkbox" id="chkActiveScan" style="accent-color: #00f0ff; cursor: pointer;">
-                <span id="activeScanLabel">Active</span>
-            </label>
-            <button class="btn-scan" id="btnStartScan" aria-label="Run security audit">
-                <span id="scanSpinner">⚡</span>
-                <span id="scanBtnText">Run Audit</span>
-            </button>
-        </div>
+            <!-- Plain Text Mode Indicator, Export Menu & Quick Toggles -->
+            <div class="topbar-actions">
+                <div class="mode-indicator" id="modePill" title="Operational safety gate mode">
+                    <span id="operationalModeBadge">PASSIVE OSINT</span>
+                </div>
 
-        <!-- Quick Action Tools Bar -->
-        <div class="header-actions">
-            <button class="btn-hud" id="btnOpenVerification" title="Verify Domain Ownership to Unlock Active Mode">
-                🔑 Verify Ownership
-            </button>
-            <button class="btn-hud mono" id="btnTogglePalette" title="Press Ctrl+K">
-                ⌨️ <span style="font-size: 0.7rem; background: rgba(255,255,255,0.1); padding: 1px 4px; border-radius: 4px;">Ctrl+K</span>
-            </button>
-            <button class="btn-hud" id="btnExportCsv" title="Download CSV">
-                📥 CSV
-            </button>
-            <button class="btn-hud" id="btnExportHtml" title="Download CISO HTML Report">
-                📑 CISO Report
-            </button>
-            <button class="btn-hud" id="btnExportSbom" title="CycloneDX v1.5 SBOM">
-                📦 SBOM
-            </button>
-            <button class="btn-hud" id="btnOpenAttackGraph" title="View Interactive Cyber Attack Surface Topology Network Graph">
-                🕸️ Attack Graph
-            </button>
-            <button class="btn-hud" id="btnHeaderCopilot" title="Toggle Aegis Copilot">
-                🤖 Copilot
-            </button>
-            <button class="btn-hud" id="btnHeaderTerminal" title="Toggle Live Console">
-                💻 Terminal
-            </button>
+                <button class="btn btn-subtle" id="btnOpenVerification" title="Verify domain ownership to authorize active probing">Verify domain</button>
+                <button class="btn btn-subtle" id="btnOpenAttackGraph" title="View attack surface topology in this tab">Attack Graph</button>
 
-            <!-- Server-Side Mode Gate Indicator -->
-            <div class="status-pill" id="modePill" title="Operational Mode determined by server safety gate">
-                <span class="status-dot"></span>
-                <span id="operationalModeBadge">PASSIVE OSINT</span>
+                <!-- Export Dropdown Menu (No row of emoji buttons) -->
+                <div class="export-dropdown" id="exportDropdownContainer">
+                    <button class="btn btn-subtle" id="btnExportMenuToggle" aria-haspopup="true" aria-expanded="false">Export &darr;</button>
+                    <div class="dropdown-menu" id="exportDropdownMenu">
+                        <button class="dropdown-item" id="btnExportCsv">Vulnerabilities (CSV)</button>
+                        <button class="dropdown-item" id="btnExportHtml">Executive Briefing (HTML)</button>
+                        <button class="dropdown-item" id="btnExportSbom">CycloneDX SBOM (JSON)</button>
+                        <button class="dropdown-item" id="btnExportJson">Raw Dossier (JSON)</button>
+                    </div>
+                </div>
+
+                <button class="btn btn-subtle" id="btnHeaderCopilot" title="Toggle analyst margin notes">Margin Notes</button>
+                <button class="btn btn-subtle" id="btnHeaderTerminal" title="Toggle audit progress logs">Logs</button>
+                <button class="btn btn-subtle" id="btnToggleTheme" title="Switch between warm off-white and warm charcoal theme">Theme</button>
+                <button class="btn btn-subtle mono" id="btnTogglePalette" title="Open command palette (Ctrl+K)">Ctrl+K</button>
             </div>
         </div>
     </header>
 
     <!-- ========================================== -->
-    <!-- MAIN DASHBOARD CONTENT                     -->
+    <!-- 2. QUIET PROGRESS LINE (Named audit stages) -->
     <!-- ========================================== -->
-    <main id="mainContent" role="main">
-
-        <!-- LIVE AUDIT TELEMETRY STREAM TERMINAL -->
-        <div id="auditTerminal" class="audit-terminal-container">
-            <div class="terminal-bar">
-                <div class="terminal-left">
-                    <span class="terminal-dot red"></span>
-                    <span class="terminal-dot yellow"></span>
-                    <span class="terminal-dot green"></span>
-                    <span class="terminal-title">AEGIS-AI // REAL PERIMETER RECONNAISSANCE &amp; SYNTHESIS CONSOLE</span>
+    <div id="auditTerminal" class="quiet-audit-container">
+        <div class="quiet-audit-card">
+            <div class="quiet-audit-header">
+                <div class="quiet-stage-stepper">
+                    <span class="stage-step" id="stepDns"><span class="step-num">1</span> DNS</span>
+                    <span class="stage-sep">&rarr;</span>
+                    <span class="stage-step" id="stepTls"><span class="step-num">2</span> TLS</span>
+                    <span class="stage-sep">&rarr;</span>
+                    <span class="stage-step" id="stepHeaders"><span class="step-num">3</span> Headers</span>
+                    <span class="stage-sep">&rarr;</span>
+                    <span class="stage-step" id="stepCt"><span class="step-num">4</span> Certificates</span>
+                    <span class="stage-sep">&rarr;</span>
+                    <span class="stage-step" id="stepTriage"><span class="step-num">5</span> Intelligence</span>
                 </div>
-                <div class="terminal-right">
-                    <span class="terminal-status-badge" id="terminalStatusBadge">
-                        <span class="pulse-indicator"></span> STANDBY
-                    </span>
-                    <button class="terminal-toggle-btn" id="btnTerminalMinimize" title="Toggle Console">_</button>
+                <div class="quiet-audit-actions">
+                    <span class="quiet-status mono" id="terminalStatusBadge">Standby</span>
+                    <button class="btn-text-action" id="btnTerminalMinimize">Toggle log lines</button>
                 </div>
             </div>
-            <div class="terminal-body" id="terminalLogs">
-                <div class="term-line prompt">&gt; System initialized. Awaiting target audit command...</div>
+            <div class="quiet-terminal-logs" id="terminalLogs">
+                <div class="quiet-log-line">Dossier ready. Enter target above and click "Run audit" to begin perimeter reconnaissance.</div>
             </div>
         </div>
+    </div>
 
-        <!-- SECTION 1: ROTATING 3D CYBER GLOBE HERO -->
-        <section class="hero-stage" aria-label="3D Attack Surface Globe">
-            <div id="globe-container" style="width: 100%; height: 420px; position: relative;"></div>
+    <!-- ========================================== -->
+    <!-- 3. MAIN DOSSIER CONTENT                    -->
+    <!-- ========================================== -->
+    <main id="mainContent" class="dossier-main" role="main">
 
-            <!-- 3D Globe HUD Overlays -->
-            <div class="hud-overlay">
-                <div class="hud-top">
-                    <div class="hud-badge">
-                        <span class="hud-badge-title">Enterprise Threat Posture</span>
-                        <div class="hud-badge-val">
-                            <span id="statComplianceScore" style="color: var(--cyan);">--%</span>
-                            <span class="unit" id="statComplianceGrade">Awaiting Scan</span>
-                        </div>
+        <!-- SECTION 1: VERDICT HEADER & LARGE NUMERALS -->
+        <section class="dossier-verdict-section" aria-label="Investigation Verdict">
+            <div class="dossier-verdict-eyebrow">
+                <span>DEFENSIVE PERIMETER INVESTIGATION DOSSIER</span>
+                <span class="dossier-meta-sep">&middot;</span>
+                <span>TARGET: <strong id="targetDisplay" class="mono">None Selected</strong></span>
+                <span class="dossier-meta-sep">&middot;</span>
+                <span id="verdictTimestamp">Awaiting target execution</span>
+            </div>
+
+            <!-- Plain-Language Verdict Sentence -->
+            <h1 class="verdict-sentence" id="verdictSentence">
+                Target unassessed &mdash; enter host to generate risk triage case file.
+            </h1>
+
+            <!-- 4 Large Executive Numerals -->
+            <div class="dossier-numerals-grid">
+                <!-- Numeral 1: Composite Risk Score -->
+                <div class="numeral-card">
+                    <div class="numeral-header">COMPOSITE RISK POSTURE</div>
+                    <div class="numeral-value-group">
+                        <span class="numeral-large mono" id="statComplianceScore">--</span>
+                        <span class="numeral-unit" id="statComplianceGrade">Awaiting scan</span>
                     </div>
+                    <div class="numeral-subtext">Calibrated threat posture score</div>
+                </div>
 
-                    <div class="hud-controls">
-                        <button class="btn-hud" id="btnToggleGlobeSpin">
-                            🔄 <span>Toggle Spin</span>
-                        </button>
+                <!-- Numeral 2: Triaged Findings Breakdown -->
+                <div class="numeral-card">
+                    <div class="numeral-header">TRIAGED FINDINGS</div>
+                    <div class="numeral-large mono" id="statTotalFindings">0</div>
+                    <div class="numeral-breakdown">
+                        <span class="sev-tag crit"><strong id="statCritCount">0</strong> Crit</span>
+                        <span class="sev-sep">&middot;</span>
+                        <span class="sev-tag high"><strong id="statHighCount">0</strong> High</span>
+                        <span class="sev-sep">&middot;</span>
+                        <span class="sev-tag med"><strong id="statMedCount">0</strong> Med</span>
+                        <span class="sev-sep">&middot;</span>
+                        <span class="sev-tag low"><strong id="statLowCount">0</strong> Low</span>
                     </div>
                 </div>
 
-                <div class="hud-bottom">
-                    <div class="hud-telemetry-feed mono">
-                        <div class="hud-telemetry-item">
-                            <span style="color: var(--cyan);">●</span>
-                            <span>Target: <strong id="targetDisplay" style="color: #fff;">None Selected</strong></span>
-                        </div>
-                        <div class="hud-telemetry-item">
-                            <span style="color: var(--emerald);">●</span>
-                            <span>Location: <strong id="globeTargetLocation" style="color: #fff;">Awaiting Target</strong></span>
-                        </div>
-                        <div class="hud-telemetry-item">
-                            <span style="color: var(--amber);">●</span>
-                            <span>Threat Feeds: <strong style="color: #fff;">CISA KEV + FIRST.org EPSS</strong></span>
-                        </div>
+                <!-- Numeral 3: Exploitable in the Wild -->
+                <div class="numeral-card">
+                    <div class="numeral-header">EXPLOITABLE IN WILD</div>
+                    <div class="numeral-large mono" id="statExploitableCount">0</div>
+                    <div class="numeral-subtext">CISA KEV catalog or EPSS &ge; 5%</div>
+                </div>
+
+                <!-- Numeral 4: Compliance Readiness -->
+                <div class="numeral-card">
+                    <div class="numeral-header">COMPLIANCE READINESS</div>
+                    <div class="numeral-large mono" id="statReadinessScore">--%</div>
+                    <div class="numeral-subtext">Across 4 governance frameworks</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: FINDINGS LEDGER -->
+        <section class="dossier-section" aria-label="Findings Ledger">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">01 / Findings Ledger</h2>
+                    <div class="section-subtitle">Ranked inventory ordered by exploit likelihood and contextual asset exposure.</div>
+                </div>
+            </div>
+
+            <div class="ledger-table-wrapper">
+                <table class="ledger-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">#</th>
+                            <th>Finding Title</th>
+                            <th style="width: 140px;">Priority</th>
+                            <th style="width: 150px;">Exploit Likelihood</th>
+                            <th style="width: 140px;">Source</th>
+                            <th style="width: 100px; text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="findingsTableBody">
+                        <tr>
+                            <td colspan="6" class="ledger-empty-cell">
+                                No perimeter findings detected yet. Enter a target above and click "Run audit".
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- SECTION 3: ATTACK PATH TIMELINE (Simple line with 4 labeled nodes) -->
+        <section class="dossier-section" aria-label="Attack Path Timeline">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">02 / Attack Path Trajectory</h2>
+                    <div class="section-subtitle">Adversary propagation timeline derived from active perimeter signals.</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div class="mono" style="font-size: 0.8rem; color: var(--ink-secondary);">
+                        Focus: <strong id="selectedFindingTitle" style="color: var(--ink-primary);">Primary Exposure</strong>
+                        <span id="selectedFindingScore" style="color: var(--ink-tertiary); margin-left: 6px;"></span>
+                    </div>
+                    <button class="btn btn-subtle btn-sm" id="btnOpenAttackGraphSection" title="View interactive topology graph in this tab">View Full Graph</button>
+                </div>
+            </div>
+
+            <!-- Legacy fields retained for JS backwards compatibility -->
+            <div id="selectedFindingDesc" style="display: none;" aria-hidden="true"></div>
+            <div id="selectedFindingEvidence" style="display: none;" aria-hidden="true"></div>
+            <div id="selectedFindingAction" style="display: none;" aria-hidden="true"></div>
+
+            <div class="attack-timeline-wrapper" id="attackSimulatorContainer">
+                <div class="attack-path-line-container">
+                    <div class="attack-stop-node active">
+                        <div class="stop-marker"></div>
+                        <div class="stop-title">Discover</div>
+                        <div class="stop-desc">Asset identification and surface discovery.</div>
+                    </div>
+                    <div class="attack-stop-node active">
+                        <div class="stop-marker"></div>
+                        <div class="stop-title">Weaponize</div>
+                        <div class="stop-desc">Verification of viable exploit trigger.</div>
+                    </div>
+                    <div class="attack-stop-node active">
+                        <div class="stop-marker"></div>
+                        <div class="stop-title">Impact</div>
+                        <div class="stop-desc">Potential unauthorized ingress or data disclosure.</div>
+                    </div>
+                    <div class="attack-stop-node defend">
+                        <div class="stop-marker"></div>
+                        <div class="stop-title">Defend</div>
+                        <div class="stop-desc">Application of virtual patch or header enforcement.</div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- SECTION 2: EXECUTIVE METRIC CARDS -->
-        <div class="stats-ribbon" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin: 18px 24px;">
-            <div class="glass-panel" style="padding: 16px;">
-                <div class="stat-label">Total Findings</div>
-                <div class="stat-val" id="statTotalFindings" style="font-size: 24px; font-weight: 800; color: #fff; margin-top: 4px;">0</div>
-            </div>
-            <div class="glass-panel" style="padding: 16px; border-left: 3px solid #ef4444;">
-                <div class="stat-label">P1 Critical Risk</div>
-                <div class="stat-val" id="statCritCount" style="font-size: 24px; font-weight: 800; color: #ef4444; margin-top: 4px;">0</div>
-            </div>
-            <div class="glass-panel" style="padding: 16px; border-left: 3px solid #f97316;">
-                <div class="stat-label">P2 High Risk</div>
-                <div class="stat-val" id="statHighCount" style="font-size: 24px; font-weight: 800; color: #f97316; margin-top: 4px;">0</div>
-            </div>
-            <div class="glass-panel" style="padding: 16px; border-left: 3px solid #f59e0b;">
-                <div class="stat-label">P3 Medium Risk</div>
-                <div class="stat-val" id="statMedCount" style="font-size: 24px; font-weight: 800; color: #f59e0b; margin-top: 4px;">0</div>
-            </div>
-            <div class="glass-panel" style="padding: 16px; border-left: 3px solid #3b82f6;">
-                <div class="stat-label">P4 Low / Info</div>
-                <div class="stat-val" id="statLowCount" style="font-size: 24px; font-weight: 800; color: #3b82f6; margin-top: 4px;">0</div>
-            </div>
-        </div>
-
-        <!-- SECTION 3: VISUAL EXPOSURE MATRIX & THREAT RADAR -->
-        <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 18px; margin: 0 24px 20px 24px;">
-            <!-- Exposure Matrix -->
-            <div class="glass-panel" style="padding: 18px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <div>
-                        <h3 style="font-size: 1rem; font-weight: 700; color: #fff;">Contextual Risk Exposure Matrix</h3>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
-                            X: CVSS Theoretical Base Flaw &middot; Y: FIRST.org EPSS Real Weaponization (%)
-                        </div>
-                    </div>
-                    <span class="badge" id="matrixMetaBadge" style="background: rgba(0,240,255,0.12); color: #00f0ff; border: 1px solid rgba(0,240,255,0.25);">
-                        Plotted: 0 | Excluded: 0
-                    </span>
-                </div>
-                <div style="height: 280px; position: relative;">
-                    <canvas id="riskMatrixChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Threat Radar -->
-            <div class="glass-panel" style="padding: 18px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <h3 style="font-size: 1rem; font-weight: 700; color: #fff;">Blind CVSS vs. AEGIS Contextual</h3>
-                    <button class="btn btn-secondary btn-sm" id="btnResetThreatRadar">Reset</button>
-                </div>
-                <div style="height: 280px; position: relative;">
-                    <canvas id="threatRadarChart"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECTION 4: FINDINGS TRIAGE TABLE & ATTACK SIMULATOR -->
-        <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 18px; margin: 0 24px 20px 24px;">
-            <!-- Findings Table -->
-            <div class="glass-panel" style="padding: 18px;">
-                <h3 style="font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 12px;">Correlated Perimeter Findings</h3>
-                <div style="overflow-x: auto; max-height: 400px;">
-                    <table class="table-triage" style="width: 100%; border-collapse: collapse;">
-                        <thead>
-                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left; font-size: 0.75rem; color: #94a3b8;">
-                                <th style="padding: 8px;">Priority</th>
-                                <th style="padding: 8px;">Score</th>
-                                <th style="padding: 8px;">Finding Title</th>
-                                <th style="padding: 8px;">CVEs</th>
-                                <th style="padding: 8px;">Source</th>
-                                <th style="padding: 8px;">EPSS Prob</th>
-                                <th style="padding: 8px;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="findingsTableBody">
-                            <tr><td colspan="7" style="padding: 20px; text-align: center; color: #64748b;">Awaiting scan telemetry. Enter a target above and click "Run Audit".</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Selected Finding & Attack Simulator -->
-            <div class="glass-panel" style="padding: 18px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3 style="font-size: 1rem; font-weight: 700; color: #fff;" id="selectedFindingTitle">Finding Triage Dossier</h3>
-                    <span class="badge" id="selectedFindingScore" style="background: rgba(0,240,255,0.15); color: #00f0ff; font-weight: 700;">-- / 10</span>
-                </div>
-                <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 8px;" id="selectedFindingDesc">Select a row to inspect evidence and virtual patch.</div>
-                
-                <h4 style="font-size: 0.85rem; color: #00f0ff; margin-top: 14px; margin-bottom: 8px;">Illustrative Adversary Walkthrough</h4>
-                <div id="attackSimulatorContainer" style="display: flex; flex-direction: column; gap: 8px;"></div>
-            </div>
-        </div>
-
-        <!-- SECTION 5: MULTI-FRAMEWORK COMPLIANCE GOVERNANCE -->
-        <div class="glass-panel" style="margin: 0 24px 24px 24px; padding: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <!-- SECTION 4: COMPACT COMPLIANCE GOVERNANCE TABLE -->
+        <section class="dossier-section" aria-label="Regulatory Compliance">
+            <div class="section-header">
                 <div>
-                    <h3 style="font-size: 1.05rem; font-weight: 700; color: #fff;">Multi-Framework Governance &amp; Regulatory Compliance</h3>
-                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
-                        Dynamically evaluated from discovered security controls. No hardcoded fixed percentages.
-                    </div>
+                    <h2 class="section-title">03 / Multi-Framework Governance &amp; Regulatory Readiness</h2>
+                    <div class="section-subtitle">Evaluated directly against security controls. Honest empty states when unassessed.</div>
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;">
-                <div class="compliance-card" style="background: rgba(5,8,17,0.7); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 6px;">
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">PCI-DSS 4.0</div>
-                    <div style="font-size: 22px; font-weight: 800; color: #00f0ff; margin: 4px 0;" id="compPciScore">--%</div>
-                    <div style="font-size: 0.75rem; color: #64748b;" id="compPciPass">Awaiting Target</div>
-                </div>
+            <div class="compliance-table-wrapper">
+                <table class="compliance-table">
+                    <thead>
+                        <tr>
+                            <th>Regulatory Framework</th>
+                            <th>Controls Met / Audited</th>
+                            <th>Readiness Score</th>
+                            <th>Assessment Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <span class="framework-name">PCI-DSS 4.0</span>
+                                <span class="framework-sub">Requirement 6.2 (Patching) &middot; 4.1.1 (TLS Transport)</span>
+                            </td>
+                            <td id="compPciPass" class="mono">Not assessed yet</td>
+                            <td id="compPciScore" class="mono">--%</td>
+                            <td id="compPciStatus" class="status-pill-clean empty">Awaiting Target</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="framework-name">NIST CSF 2.0</span>
+                                <span class="framework-sub">Govern &middot; Protect (PR.PS/PR.AC) &middot; Detect (DE.CM)</span>
+                            </td>
+                            <td id="compNistPass" class="mono">Not assessed yet</td>
+                            <td id="compNistScore" class="mono">--%</td>
+                            <td id="compNistStatus" class="status-pill-clean empty">Awaiting Target</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="framework-name">ISO/IEC 27001:2022</span>
+                                <span class="framework-sub">Annex A.8.8 (Vulnerabilities) &middot; A.8.20 (Network Security)</span>
+                            </td>
+                            <td id="compIsoPass" class="mono">Not assessed yet</td>
+                            <td id="compIsoScore" class="mono">--%</td>
+                            <td id="compIsoStatus" class="status-pill-clean empty">Awaiting Target</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="framework-name">SOC 2 Type II</span>
+                                <span class="framework-sub">Trust Services Criteria CC6.6 (Boundaries) &middot; CC7.1 (Monitoring)</span>
+                            </td>
+                            <td id="compSoc2Pass" class="mono">Not assessed yet</td>
+                            <td id="compSoc2Score" class="mono">--%</td>
+                            <td id="compSoc2Status" class="status-pill-clean empty">Awaiting Target</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
-                <div class="compliance-card" style="background: rgba(5,8,17,0.7); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 6px;">
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">NIST CSF 2.0</div>
-                    <div style="font-size: 22px; font-weight: 800; color: #10b981; margin: 4px 0;" id="compNistScore">--%</div>
-                    <div style="font-size: 0.75rem; color: #64748b;" id="compNistPass">Awaiting Target</div>
-                </div>
-
-                <div class="compliance-card" style="background: rgba(5,8,17,0.7); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 6px;">
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">ISO/IEC 27001:2022</div>
-                    <div style="font-size: 22px; font-weight: 800; color: #38bdf8; margin: 4px 0;" id="compIsoScore">--%</div>
-                    <div style="font-size: 0.75rem; color: #64748b;" id="compIsoPass">Awaiting Target</div>
-                </div>
-
-                <div class="compliance-card" style="background: rgba(5,8,17,0.7); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 6px;">
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">SOC 2 Type II</div>
-                    <div style="font-size: 22px; font-weight: 800; color: #f59e0b; margin: 4px 0;" id="compSoc2Score">--%</div>
-                    <div style="font-size: 0.75rem; color: #64748b;" id="compSoc2Pass">Awaiting Target</div>
+        <!-- SECTION 5: INFRASTRUCTURE & ROUTING TEXT CARD -->
+        <section class="dossier-section" aria-label="Perimeter Infrastructure">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">04 / Perimeter Infrastructure &amp; Routing</h2>
+                    <div class="section-subtitle">Verified autonomous transit, edge ingress, and hosting topology.</div>
                 </div>
             </div>
-        </div>
+
+            <div class="infra-grid">
+                <div class="infra-item">
+                    <span class="infra-label">Primary Resolved IP</span>
+                    <span class="infra-val mono" id="infraResolvedIp">Unavailable</span>
+                </div>
+                <div class="infra-item">
+                    <span class="infra-label">Location / Origin</span>
+                    <span class="infra-val" id="globeTargetLocation">Unavailable</span>
+                </div>
+                <div class="infra-item">
+                    <span class="infra-label">Autonomous System (ASN)</span>
+                    <span class="infra-val mono" id="infraAsn">Unavailable</span>
+                </div>
+                <div class="infra-item">
+                    <span class="infra-label">Hosting / Cloud Gateway</span>
+                    <span class="infra-val" id="infraDatacenter">Unavailable</span>
+                </div>
+                <div class="infra-item">
+                    <span class="infra-label">Verified Ingress Socket</span>
+                    <span class="infra-val mono" id="infraIngress">TCP 443 (HTTPS)</span>
+                </div>
+                <div class="infra-item">
+                    <span class="infra-label">Transit Latency</span>
+                    <span class="infra-val mono" id="infraLatency">Unavailable</span>
+                </div>
+            </div>
+
+            <!-- Elements preserved for JS backward compatibility without 3D canvas noise -->
+            <div id="globe-container" style="display: none;" aria-hidden="true"></div>
+            <button id="btnToggleGlobeSpin" style="display: none;" aria-hidden="true"></button>
+            <canvas id="riskMatrixChart" style="display: none;" aria-hidden="true"></canvas>
+            <canvas id="threatRadarChart" style="display: none;" aria-hidden="true"></canvas>
+            <span id="matrixMetaBadge" style="display: none;" aria-hidden="true"></span>
+            <button id="btnResetThreatRadar" style="display: none;" aria-hidden="true"></button>
+        </section>
 
     </main>
 
-    <!-- FLOATING LAUNCHER FAB (shown when copilot dock is closed) -->
-    <button class="copilot-fab" id="copilotFab" aria-label="Open Aegis Copilot" style="display: flex;">
-        <span style="font-size: 1.2rem;">🤖</span>
-        <span>Aegis Copilot</span>
-    </button>
+    <!-- ========================================== -->
+    <!-- 4. COPILOT MARGIN NOTES (Slide-over panel) -->
+    <!-- ========================================== -->
+    <aside id="copilotDrawer" class="margin-notes-panel" aria-label="Analyst Margin Notes" style="display: none;">
+        <div class="margin-notes-header">
+            <div>
+                <h3 class="margin-notes-title">Analyst Margin Notes</h3>
+                <div class="margin-notes-subtitle">Grounded defensive triage &middot; Contextual queries</div>
+            </div>
+            <div class="margin-notes-actions">
+                <button class="btn-text-action" id="btnCopilotMinimize" title="Minimize">&minus;</button>
+                <button class="btn-text-action" id="btnCopilotClose" title="Close" aria-label="Close notes">&times;</button>
+            </div>
+        </div>
 
-    <!-- AEGIS COPILOT INTERACTIVE CHAT DOCK -->
-    <div id="copilotDrawer" class="copilot-drawer" style="display: none;">
-        <div class="copilot-header">
-            <div class="copilot-header-info">
-                <span class="copilot-header-icon">🤖</span>
-                <div>
-                    <div class="copilot-header-title">
-                        Aegis Copilot
-                        <span class="copilot-status-dot" title="SOC Guardrail Active"></span>
-                    </div>
-                    <div class="copilot-header-sub">Grounded Defensive SOC Assistant</div>
+        <div class="margin-notes-body">
+            <div class="margin-notes-suggested">
+                <span class="suggested-title">SUGGESTED INVESTIGATION QUERIES</span>
+                <div class="copilot-chips" id="copilotChips">
+                    <button class="text-query-link chip" data-prompt="Summarize top findings and immediate action items">Summarize top findings</button>
+                    <button class="text-query-link chip" data-prompt="What are our primary regulatory compliance gaps?">Audit regulatory compliance</button>
+                    <button class="text-query-link chip" data-prompt="Provide Nginx and Apache virtual patches for active findings">Generate virtual patch rules</button>
+                    <button class="text-query-link chip" data-prompt="Explain the contextual risk scoring formula and EPSS percentile">Explain risk methodology</button>
                 </div>
             </div>
-            <div class="copilot-header-actions">
-                <button class="copilot-control-btn" id="btnCopilotMinimize" title="Minimize" aria-label="Minimize Copilot">_</button>
-                <button class="copilot-control-btn" id="btnCopilotClose" title="Close" aria-label="Close Copilot">&times;</button>
+
+            <div class="copilot-messages" id="copilotMessages" role="log" aria-live="polite"></div>
+        </div>
+
+        <div class="margin-notes-footer">
+            <div class="margin-notes-input-box">
+                <input type="text" id="copilotInput" placeholder="Ask question about this dossier..." aria-label="Copilot prompt">
+                <button class="btn btn-primary btn-sm" id="btnCopilotSend">Ask</button>
             </div>
         </div>
-        <div class="copilot-messages" id="copilotMessages"></div>
-        <div class="copilot-chips" id="copilotChips">
-            <button class="chip" data-prompt="Summarize top findings">🛡️ Summary</button>
-            <button class="chip" data-prompt="What is our NIST compliance readiness?">📋 Compliance</button>
-            <button class="chip" data-prompt="Provide Nginx virtual patch">🛠️ Patch Config</button>
-            <button class="chip" data-prompt="Explain risk scoring formula">📐 Scoring Formula</button>
-        </div>
-        <div class="copilot-input-bar">
-            <input type="text" id="copilotInput" placeholder="Ask Aegis Copilot..." aria-label="Copilot input prompt">
-            <button id="btnCopilotSend">Send</button>
+    </aside>
+
+    <!-- Hidden launcher FAB retained for JS compatibility without floating bubble -->
+    <button id="copilotFab" style="display: none;" aria-hidden="true"></button>
+
+    <!-- ========================================== -->
+    <!-- 5. IN-TAB ATTACK GRAPH MODAL               -->
+    <!-- ========================================== -->
+    <div id="attackGraphModal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="attackGraphModalTitle">
+        <div class="modal-box modal-xl">
+            <div class="modal-header">
+                <div>
+                    <h3 id="attackGraphModalTitle" class="modal-title">Attack Surface Topology Graph</h3>
+                    <div class="modal-subtitle">Interactive perimeter asset and ingress exposure graph for current target</div>
+                </div>
+                <button class="modal-close" id="btnCloseAttackGraphModal" aria-label="Close attack graph">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 0; height: 680px; position: relative;">
+                <iframe id="attackGraphFrame" title="Attack Surface Network Graph" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
         </div>
     </div>
 
-    <!-- DOMAIN OWNERSHIP VERIFICATION MODAL -->
-    <div id="verificationModal" class="modal-backdrop" style="display: none;">
+    <!-- ========================================== -->
+    <!-- 6. DOMAIN VERIFICATION MODAL               -->
+    <!-- ========================================== -->
+    <div id="verificationModal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true">
         <div class="modal-box">
             <div class="modal-header">
-                <h3>Domain Ownership Verification</h3>
-                <button class="modal-close" id="btnCloseVerificationModal">&times;</button>
+                <h3 class="modal-title">Domain Ownership Verification</h3>
+                <button class="modal-close" id="btnCloseVerificationModal" aria-label="Close modal">&times;</button>
             </div>
             <div id="verificationModalBody" style="padding: 16px;"></div>
         </div>
     </div>
 
-    <!-- REMEDIATION & VIRTUAL PATCHING MODAL -->
-    <div id="remediationModal" class="modal-backdrop" style="display: none;">
-        <div class="modal-box" style="max-width: 720px; width: 90%;">
+    <!-- ========================================== -->
+    <!-- 7. REMEDIATION & VIRTUAL PATCHING MODAL    -->
+    <!-- ========================================== -->
+    <div id="remediationModal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true">
+        <div class="modal-box modal-lg">
             <div class="modal-header">
                 <div>
-                    <h3 id="remediationModalTitle">🛠️ Security Remediation &amp; Virtual Patching</h3>
-                    <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;" id="remediationModalSubtitle">Production hardening rules &amp; configurations</div>
+                    <h3 id="remediationModalTitle" class="modal-title">Security Remediation &amp; Virtual Patching</h3>
+                    <div class="modal-subtitle" id="remediationModalSubtitle">Production hardening rules &amp; configurations</div>
                 </div>
-                <button class="modal-close" id="btnCloseRemediationModal">&times;</button>
+                <button class="modal-close" id="btnCloseRemediationModal" aria-label="Close modal">&times;</button>
             </div>
-            <div id="remediationModalBody" style="padding: 16px;">
-                <div style="display: flex; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 12px; flex-wrap: wrap;" id="remediationTabs">
-                    <button class="btn btn-sm btn-primary tab-btn" data-tab="nginx">Nginx</button>
-                    <button class="btn btn-sm btn-secondary tab-btn" data-tab="apache">Apache</button>
-                    <button class="btn btn-sm btn-secondary tab-btn" data-tab="caddy">Caddy</button>
-                    <button class="btn btn-sm btn-secondary tab-btn" data-tab="helmet">Helmet (Node.js)</button>
-                    <button class="btn btn-sm btn-secondary tab-btn" data-tab="waf">WAF Rules</button>
+            <div class="modal-body" id="remediationModalBody">
+                <div style="display: flex; gap: 8px; border-bottom: 1px solid var(--border-rule); padding-bottom: 10px; margin-bottom: 14px; flex-wrap: wrap;" id="remediationTabs">
+                    <button class="tab-btn active" data-tab="nginx">Nginx</button>
+                    <button class="tab-btn" data-tab="apache">Apache</button>
+                    <button class="tab-btn" data-tab="caddy">Caddy</button>
+                    <button class="tab-btn" data-tab="helmet">Helmet (Node.js)</button>
+                    <button class="tab-btn" data-tab="waf">WAF Rules</button>
                 </div>
-                <div style="position: relative;">
-                    <div style="display: flex; justify-content: flex-end; margin-bottom: 6px;">
-                        <button class="btn btn-secondary btn-sm" id="btnCopyRemediation">📋 Copy Configuration</button>
-                    </div>
-                    <pre id="remediationCodeDisplay" style="background: #030712; border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 6px; padding: 14px; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 0.8rem; color: #38bdf8; max-height: 320px; overflow: auto; white-space: pre-wrap; line-height: 1.5;"></pre>
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 6px;">
+                    <button class="btn btn-secondary btn-sm" id="btnCopyRemediation">Copy Configuration</button>
                 </div>
-                <div id="remediationFindingNote" style="margin-top: 12px; font-size: 0.8rem; color: #cbd5e1; background: rgba(0, 240, 255, 0.05); padding: 10px; border-radius: 4px; border-left: 3px solid #00f0ff;"></div>
+                <pre id="remediationCodeDisplay" style="background: var(--bg-inset); border: 1px solid var(--border-rule); border-radius: var(--radius-sm); padding: 14px; font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-primary); max-height: 320px; overflow: auto; white-space: pre-wrap; line-height: 1.5;"></pre>
+                <div id="remediationFindingNote" style="margin-top: 12px; font-size: 0.8rem; color: var(--ink-secondary); background: var(--bg-subtle); padding: 10px; border-radius: var(--radius-sm); border-left: 3px solid var(--accent-vermilion);"></div>
             </div>
         </div>
     </div>
 
-    <!-- COMMAND PALETTE MODAL (Ctrl+K) -->
-    <div id="commandPaletteModal" class="modal-backdrop" style="display: none;">
+    <!-- ========================================== -->
+    <!-- 8. COMMAND PALETTE MODAL (Ctrl+K)          -->
+    <!-- ========================================== -->
+    <div id="commandPaletteModal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true">
         <div class="modal-box" style="max-width: 500px;">
-            <input type="text" id="paletteSearchInput" placeholder="Type a command or jump to section..." style="width: 100%; background: #030712; border: 1px solid #00f0ff; color: #fff; padding: 12px; border-radius: 4px; font-size: 0.9rem;">
-            <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 6px;" id="paletteResults">
-                <div class="palette-item" data-action="attack-graph">🕸️ Open Attack Surface Topology Graph</div>
-                <div class="palette-item" data-action="model-routing">⚡ Inspect Model Routing Architecture</div>
-                <div class="palette-item" data-action="terminal">💻 Open Telemetry Terminal</div>
-                <div class="palette-item" data-action="ciso">📑 Generate CISO Executive Report</div>
-                <div class="palette-item" data-action="csv">📥 Download Vulnerability CSV</div>
-                <div class="palette-item" data-action="sbom">📦 Download CycloneDX v1.5 SBOM</div>
-                <div class="palette-item" data-action="verify">🔑 Verify Domain Ownership</div>
+            <input type="text" id="paletteSearchInput" placeholder="Type a command or jump to section..." style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-rule); color: var(--ink-primary); padding: 12px; border-radius: var(--radius-sm); font-size: 0.85rem; outline: none;">
+            <div style="margin-top: 10px; display: flex; flex-direction: column;" id="paletteResults">
+                <div class="palette-item" data-action="attack-graph">Open Attack Surface Topology Graph</div>
+                <div class="palette-item" data-action="terminal">Open Telemetry Logs</div>
+                <div class="palette-item" data-action="ciso">Generate CISO Executive Report</div>
+                <div class="palette-item" data-action="csv">Download Vulnerability CSV</div>
+                <div class="palette-item" data-action="sbom">Download CycloneDX v1.5 SBOM</div>
+                <div class="palette-item" data-action="verify">Verify Domain Ownership</div>
             </div>
         </div>
     </div>
@@ -392,13 +477,13 @@
     <div id="toastContainer" style="position: fixed; bottom: 20px; right: 20px; z-index: 999999;"></div>
 
     <!-- Modular Application JavaScript Files -->
-    <script src="/static/js/utils.js?v=2.3"></script>
-    <script src="/static/js/globe.js?v=2.3"></script>
-    <script src="/static/js/charts.js?v=2.3"></script>
-    <script src="/static/js/telemetry.js?v=2.3"></script>
-    <script src="/static/js/verification.js?v=2.3"></script>
-    <script src="/static/js/copilot.js?v=2.3"></script>
-    <script src="/static/js/app.js?v=2.3"></script>
+    <script src="/static/js/utils.js?v=3.0"></script>
+    <script src="/static/js/globe.js?v=3.0"></script>
+    <script src="/static/js/charts.js?v=3.0"></script>
+    <script src="/static/js/telemetry.js?v=3.0"></script>
+    <script src="/static/js/verification.js?v=3.0"></script>
+    <script src="/static/js/copilot.js?v=3.0"></script>
+    <script src="/static/js/app.js?v=3.0"></script>
 
 </body>
 </html>

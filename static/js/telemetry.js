@@ -20,20 +20,16 @@ window.AegisTelemetry = (function () {
         const consoleEl = document.getElementById(consoleId);
         if (!consoleEl) return;
 
-        const timeStr = new Date().toLocaleTimeString();
+        const timeStr = new Date().toLocaleTimeString([], { hour12: false });
         const line = document.createElement('div');
-        line.className = `terminal-line line-${type}`;
-        line.style.cssText = `
-            font-family: 'JetBrains Mono', Consolas, monospace;
-            font-size: 0.78rem;
-            line-height: 1.5;
-            color: ${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#38bdf8'};
-            padding: 2px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-        `;
+        line.className = `quiet-log-line line-${type}`;
 
-        const durationBadge = durationMs !== null ? `<span style="color:#64748b;margin-left:6px;">[${durationMs}ms]</span>` : '';
-        line.innerHTML = `<span style="color:#64748b;">[${timeStr}]</span> <strong style="color:#f1f5f9;">${AegisUtils.escapeHtml(stageName)}:</strong> ${AegisUtils.escapeHtml(message)} ${durationBadge}`;
+        let prefixColor = 'var(--ink-tertiary)';
+        if (type === 'error') prefixColor = 'var(--rule-crit)';
+        else if (type === 'warning') prefixColor = 'var(--rule-high)';
+
+        const durationBadge = durationMs !== null ? `<span style="color:var(--ink-tertiary);margin-left:6px;">[${durationMs}ms]</span>` : '';
+        line.innerHTML = `<span style="color:${prefixColor};">${timeStr}</span> &middot; <strong style="color:var(--ink-primary);">${AegisUtils.escapeHtml(stageName)}:</strong> <span style="color:var(--ink-secondary);">${AegisUtils.escapeHtml(message)}</span> ${durationBadge}`;
 
         consoleEl.appendChild(line);
         consoleEl.scrollTop = consoleEl.scrollHeight;
@@ -48,7 +44,14 @@ window.AegisTelemetry = (function () {
         let aggregatedDiscovery = { target: target, http: {}, dns: {}, tls: {}, discovered_assets: [] };
         let allOk = true;
 
+        const stageStepMap = { 'dns': 'stepDns', 'tls': 'stepTls', 'headers': 'stepHeaders', 'ct': 'stepCt' };
+
         for (const stage of STAGES) {
+            const stepEl = document.getElementById(stageStepMap[stage.id]);
+            if (stepEl) {
+                stepEl.classList.add('active');
+            }
+
             const t0 = performance.now();
             try {
                 appendLog(consoleId, stage.name, 'Sending outbound probe...', 'info');
@@ -75,20 +78,27 @@ window.AegisTelemetry = (function () {
                         aggregatedDiscovery.ct_subdomains = data.subdomains || [];
                     }
 
+                    if (stepEl) {
+                        stepEl.classList.remove('active');
+                        stepEl.classList.add('complete');
+                    }
                     appendLog(consoleId, stage.name, summaryText, 'success', elapsed);
                 } else {
                     const errText = await resp.text();
+                    if (stepEl) stepEl.classList.remove('active');
                     appendLog(consoleId, stage.name, `Probe returned HTTP ${resp.status}: ${errText.substring(0, 100)}`, 'warning', elapsed);
                 }
             } catch (err) {
                 const elapsed = Math.round(performance.now() - t0);
+                if (stepEl) stepEl.classList.remove('active');
                 appendLog(consoleId, stage.name, `Probe failed: ${err.message}`, 'error', elapsed);
                 allOk = false;
             }
         }
 
         // Final Full Scan Trigger (Prioritization & Correlation)
-        appendLog(consoleId, 'Prioritization', 'Executing mathematical risk triage formula...', 'info');
+        const triageStep = document.getElementById('stepTriage');
+        if (triageStep) triageStep.classList.add('active');
         const finalT0 = performance.now();
         try {
             const res = await fetch('/api/scan-online', {
@@ -99,14 +109,17 @@ window.AegisTelemetry = (function () {
             const finalElapsed = Math.round(performance.now() - finalT0);
 
             if (res.ok) {
+                if (triageStep) { triageStep.classList.remove('active'); triageStep.classList.add('complete'); }
                 const finalData = await res.json();
                 const totalF = (finalData.report && finalData.report.findings) ? finalData.report.findings.length : 0;
                 appendLog(consoleId, 'Prioritization', `Triage complete. ${totalF} findings prioritized with CISA KEV and EPSS signals.`, 'success', finalElapsed);
                 if (onComplete) onComplete(finalData);
             } else {
+                if (triageStep) triageStep.classList.remove('active');
                 appendLog(consoleId, 'Prioritization', `Assessment dispatch failed with status ${res.status}.`, 'error', finalElapsed);
             }
         } catch (err) {
+            if (triageStep) triageStep.classList.remove('active');
             appendLog(consoleId, 'Prioritization', `Error during final report correlation: ${err.message}`, 'error');
         }
     }

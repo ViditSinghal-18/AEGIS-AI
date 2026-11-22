@@ -105,19 +105,50 @@ window.AegisApp = (function () {
 
         // Compliance Scores
         const comp = data.compliance_governance || {};
-        const readiness = comp.overall_readiness_score || data.score || 75.0;
+        const readiness = comp.overall_readiness_score !== undefined ? comp.overall_readiness_score : (comp.score !== undefined ? comp.score : (data.score !== undefined ? data.score : 75.0));
         const grade = comp.overall_grade || data.grade || 'B';
         AegisUtils.safeSetText('statComplianceScore', `${readiness}%`);
         AegisUtils.safeSetText('statComplianceGrade', `Grade ${grade}`);
 
+        // Plain-Language Verdict Sentence
+        const verdictEl = document.getElementById('verdictSentence');
+        if (verdictEl) {
+            if (findings.length === 0) {
+                verdictEl.textContent = `${target}: 0 perimeter exposures detected, perimeter hardened.`;
+            } else {
+                const urgentCount = critCount + highCount;
+                if (urgentCount > 0) {
+                    verdictEl.textContent = `${target}: ${findings.length} ${findings.length === 1 ? 'finding' : 'findings'} identified (${critCount} critical, ${highCount} high priority requiring action).`;
+                } else {
+                    verdictEl.textContent = `${target}: ${findings.length} ${findings.length === 1 ? 'finding' : 'findings'} identified, none currently urgent.`;
+                }
+            }
+        }
+        const verdictTime = document.getElementById('verdictTimestamp');
+        if (verdictTime) {
+            verdictTime.textContent = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+        }
+
+        // Exploitable in Wild Count (CISA KEV or high EPSS >= 5%)
+        const exploitableCount = findings.filter(f => f.in_cisa_kev || (f.epss_probability && f.epss_probability >= 0.05) || (f.threat_intel && f.threat_intel.in_cisa_kev)).length;
+        AegisUtils.safeSetText('statExploitableCount', exploitableCount);
+        AegisUtils.safeSetText('statReadinessScore', `${readiness}%`);
+
+        // Infrastructure Card Details
+        AegisUtils.safeSetText('infraResolvedIp', data.resolved_ip || (data.report && data.report.resolved_ip) || 'Unavailable');
+        const geo = data.geo_telemetry || (data.report && data.report.geo_telemetry) || {};
+        AegisUtils.safeSetText('infraAsn', geo.asn || 'Unavailable');
+        AegisUtils.safeSetText('infraDatacenter', geo.datacenter || (geo.region || 'Standard Gateway'));
+        AegisUtils.safeSetText('infraIngress', data.ingress_info || 'TCP 443 (HTTPS)');
+        AegisUtils.safeSetText('infraLatency', geo.round_trip_latency_ms ? `${geo.round_trip_latency_ms} ms` : 'Unavailable');
+
         // Plot 3D Globe Pins & Ingress Connectivity from real geo data (no fabricated coordinates)
-        const geo = data.geo_telemetry || (data.report && data.report.geo_telemetry);
         if (geo && geo.coordinates_available !== false && geo.lat !== null && geo.lon !== null) {
             AegisGlobe.plotRealTargetPins(target, geo, data.subdomains || []);
-            AegisUtils.safeSetText('globeTargetLocation', `${geo.city || 'Edge Ingress'}, ${geo.country || 'Global'} (${geo.asn || 'Perimeter Gateway'}) · 6 Ingress Streams Active`);
+            AegisUtils.safeSetText('globeTargetLocation', `${geo.city || 'Edge Ingress'}, ${geo.country || 'Global'} (${geo.asn || 'Perimeter Gateway'})`);
         } else {
             AegisGlobe.plotRealTargetPins(target, null, data.subdomains || []);
-            AegisUtils.safeSetText('globeTargetLocation', `${target} · Edge Anycast Transit (6 Global Sensor Relays Monitored)`);
+            AegisUtils.safeSetText('globeTargetLocation', `${target} · Edge Anycast Transit`);
         }
 
         // Render Charts
@@ -141,25 +172,82 @@ window.AegisApp = (function () {
         if (!tbody) return;
 
         if (!findings || findings.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#64748b;">No perimeter findings detected.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="ledger-empty-cell">No perimeter findings detected. Asset perimeter appears secure.</td></tr>`;
             return;
         }
 
         tbody.innerHTML = findings.map((f, idx) => {
-            const sevColor = AegisUtils.getSeverityColor(f.severity || f.priority_level);
+            const rawSev = (f.priority_level || f.severity || 'P3').toUpperCase();
+            let sevClass = 'sev-low';
+            let sevLabel = 'Low';
+            let labelClass = 'low';
+
+            if (rawSev.includes('P1') || rawSev.includes('CRITICAL')) {
+                sevClass = 'sev-critical';
+                sevLabel = 'Critical';
+                labelClass = 'crit';
+            } else if (rawSev.includes('P2') || rawSev.includes('HIGH')) {
+                sevClass = 'sev-high';
+                sevLabel = 'High';
+                labelClass = 'high';
+            } else if (rawSev.includes('P3') || rawSev.includes('MEDIUM')) {
+                sevClass = 'sev-medium';
+                sevLabel = 'Medium';
+                labelClass = 'med';
+            }
+
+            const tocNum = String(idx + 1).padStart(2, '0');
             const score = f.contextual_risk_score || f.risk_score || 'N/A';
-            const epssProb = f.epss_probability !== undefined ? (f.epss_probability * 100).toFixed(2) + '%' : (f.threat_intel ? f.threat_intel.epss_percent + '%' : '0.5%');
-            const cves = (f.related_cves || []).map(c => `<span class="badge badge-cve">${AegisUtils.escapeHtml(c)}</span>`).join(' ') || '<span style="color:#64748b;font-size:0.75rem;">None</span>';
+            const epssProb = f.epss_probability !== undefined && f.epss_probability !== null 
+                ? (f.epss_probability * 100).toFixed(2) + '%' 
+                : (f.threat_intel ? f.threat_intel.epss_percent + '%' : '0.50%');
+
+            const cves = (f.related_cves || []).map(c => `<span class="cve-tag">${AegisUtils.escapeHtml(c)}</span>`).join(' ');
+            const inKev = f.in_cisa_kev || (f.threat_intel && f.threat_intel.in_cisa_kev);
+            const likelihoodHtml = inKev 
+                ? `<span class="priority-label crit">CISA KEV</span> <span class="mono" style="font-size:0.75rem;color:var(--ink-secondary);">(${epssProb})</span>`
+                : `<span class="mono">${epssProb}</span>`;
+
+            const evidence = f.evidence || f.exposure_context || 'Verified in perimeter response headers or DNS records.';
+            const whyItMatters = f.why_it_matters || f.description || 'Misconfiguration or component exposure increases exploitable perimeter surface.';
+            const fixSnippet = f.remediation || f.suggested_action || f.recommended_remediation || 'Apply defensive configuration hardening or update component.';
 
             return `
-                <tr class="finding-row ${idx === selectedFindingIndex ? 'row-selected' : ''}" data-index="${idx}" style="cursor:pointer;">
-                    <td><span class="badge" style="background:${sevColor};color:#fff;font-size:0.75rem;">${AegisUtils.escapeHtml(f.priority_level || f.severity || 'P2')}</span></td>
-                    <td style="font-weight:700;color:#00f0ff;">${AegisUtils.escapeHtml(score)}</td>
-                    <td style="color:#f1f5f9;font-weight:600;">${AegisUtils.escapeHtml(f.title || f.summary || f.vuln_id || 'Finding')}</td>
-                    <td>${cves}</td>
-                    <td style="color:#94a3b8;font-size:0.8rem;">${AegisUtils.escapeHtml(f.source || 'perimeter')}</td>
-                    <td style="color:#38bdf8;font-family:monospace;font-size:0.8rem;">${AegisUtils.escapeHtml(epssProb)}</td>
-                    <td><button class="btn btn-secondary btn-sm btn-remediate" data-index="${idx}">Remediate</button></td>
+                <tr class="finding-row ${sevClass} ${idx === selectedFindingIndex ? 'row-selected' : ''}" data-index="${idx}">
+                    <td class="row-toc-num">${tocNum}</td>
+                    <td class="finding-title-cell">
+                        ${AegisUtils.escapeHtml(f.title || f.summary || f.vuln_id || 'Security Finding')}
+                        ${cves ? `<span class="finding-cves">${cves}</span>` : ''}
+                    </td>
+                    <td>
+                        <span class="priority-label ${labelClass}">${sevLabel}</span>
+                    </td>
+                    <td>${likelihoodHtml}</td>
+                    <td><span class="mono" style="font-size:0.76rem;color:var(--ink-secondary);">${AegisUtils.escapeHtml(f.source || 'perimeter')}</span></td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-subtle btn-sm btn-remediate" data-index="${idx}" aria-label="Fix finding ${tocNum}">Fix</button>
+                    </td>
+                </tr>
+                <tr class="finding-detail-row" id="findingDetail${idx}" style="display: ${idx === selectedFindingIndex ? 'table-row' : 'none'};">
+                    <td colspan="6">
+                        <div class="finding-detail-grid">
+                            <div>
+                                <div class="detail-block-title">Observable Evidence</div>
+                                <div class="detail-block-content mono" style="background:var(--bg-subtle);padding:8px 10px;border-radius:3px;">${AegisUtils.escapeHtml(evidence)}</div>
+                            </div>
+                            <div>
+                                <div class="detail-block-title">Why It Matters</div>
+                                <div class="detail-block-content">${AegisUtils.escapeHtml(whyItMatters)}</div>
+                            </div>
+                            <div class="fix-block">
+                                <div class="fix-header">
+                                    <span class="detail-block-title" style="margin-bottom:0;">Recommended Remediation / Virtual Patch</span>
+                                    <button class="btn btn-subtle btn-sm btn-copy-inline-fix" data-snippet="${AegisUtils.escapeHtml(fixSnippet)}">Copy Snippet</button>
+                                </div>
+                                <div class="fix-code">${AegisUtils.escapeHtml(fixSnippet)}</div>
+                            </div>
+                        </div>
+                    </td>
                 </tr>
             `;
         }).join('');
@@ -173,7 +261,7 @@ window.AegisApp = (function () {
         selectedFindingIndex = idx;
         const f = findings[idx];
 
-        // Update Threat Radar
+        // Update Threat Radar (if canvas present)
         AegisCharts.renderThreatRadar(f, false, 'threatRadarChart');
 
         // Update Finding Details Drawer / Panel
@@ -181,7 +269,7 @@ window.AegisApp = (function () {
         AegisUtils.safeSetText('selectedFindingDesc', f.description || f.why_it_matters || f.summary || 'No description');
         AegisUtils.safeSetText('selectedFindingEvidence', f.evidence || f.exposure_context || 'Verified in perimeter scan');
         AegisUtils.safeSetText('selectedFindingAction', f.remediation || f.suggested_action || f.recommended_remediation || 'Review security configuration');
-        AegisUtils.safeSetText('selectedFindingScore', f.contextual_risk_score || 'N/A');
+        AegisUtils.safeSetText('selectedFindingScore', f.contextual_risk_score ? `(${f.contextual_risk_score} / 10)` : '');
 
         // Update Attack Simulator walkthrough
         renderAttackSimulator(f);
@@ -194,7 +282,7 @@ window.AegisApp = (function () {
         const target = (currentReport && currentReport.target) || 'target.site';
         const mitre = finding.mitre_attack || { technique_id: 'T1190', technique_name: 'Exploit Public-Facing App', tactic: 'Initial Access' };
         const findingTitle = finding.title || finding.summary || finding.vuln_id || 'Security Weakness';
-        const findingAction = finding.remediation || finding.suggested_action || finding.recommended_remediation || 'Enforce WAF virtual patch.';
+        const findingAction = finding.remediation || finding.suggested_action || finding.recommended_remediation || 'Enforce defensive header or WAF virtual patch.';
         let epssPercent = 0.5;
         if (finding.epss_probability !== undefined && finding.epss_probability !== null) {
             epssPercent = parseFloat(finding.epss_probability) * 100;
@@ -203,28 +291,30 @@ window.AegisApp = (function () {
         }
 
         container.innerHTML = `
-            <div style="font-size:0.75rem;color:#f59e0b;background:rgba(245,158,11,0.1);border-left:3px solid #f59e0b;padding:6px 10px;margin-bottom:12px;border-radius:3px;">
-                ⚠️ <strong>ILLUSTRATIVE CONCEPTUAL MODEL ONLY:</strong> No offensive exploitation payloads were transmitted against the target.
+            <div class="attack-path-line-container">
+                <div class="attack-stop-node active">
+                    <div class="stop-marker"></div>
+                    <div class="stop-title">Discover</div>
+                    <div class="stop-desc">Asset identification on <code>${AegisUtils.escapeHtml(target)}</code></div>
+                </div>
+                <div class="attack-stop-node active">
+                    <div class="stop-marker"></div>
+                    <div class="stop-title">Weaponize</div>
+                    <div class="stop-desc">${AegisUtils.escapeHtml(mitre.technique_id || 'T1190')}: ${AegisUtils.escapeHtml(mitre.technique_name || 'Exploit')}</div>
+                </div>
+                <div class="attack-stop-node active">
+                    <div class="stop-marker"></div>
+                    <div class="stop-title">Impact</div>
+                    <div class="stop-desc">${AegisUtils.escapeHtml(mitre.tactic || 'Access')} (${epssPercent.toFixed(1)}% EPSS)</div>
+                </div>
+                <div class="attack-stop-node defend">
+                    <div class="stop-marker"></div>
+                    <div class="stop-title">Defend</div>
+                    <div class="stop-desc">${AegisUtils.escapeHtml(findingAction.substring(0, 50))}${findingAction.length > 50 ? '…' : ''}</div>
+                </div>
             </div>
-
-            <div class="sim-phase-card">
-                <div class="sim-phase-header"><span class="sim-phase-badge">Phase 1</span> <strong>Reconnaissance & Asset Ingress</strong></div>
-                <div class="sim-phase-body">Adversary discovers public endpoint on ${AegisUtils.escapeHtml(target)} disclosing '${AegisUtils.escapeHtml(findingTitle)}'.</div>
-            </div>
-
-            <div class="sim-phase-card">
-                <div class="sim-phase-header"><span class="sim-phase-badge">Phase 2</span> <strong>Weaponization & Ingress Trigger (${AegisUtils.escapeHtml(mitre.technique_id || 'T1190')})</strong></div>
-                <div class="sim-phase-body">Adversary crafts probe matching ${AegisUtils.escapeHtml(mitre.technique_name || 'Exploit Public-Facing App')} to trigger target response.</div>
-            </div>
-
-            <div class="sim-phase-card">
-                <div class="sim-phase-header"><span class="sim-phase-badge">Phase 3</span> <strong>Adversary Impact (${AegisUtils.escapeHtml(mitre.tactic || 'Impact')})</strong></div>
-                <div class="sim-phase-body">Exposure allows potential unauthorized session reading or service manipulation (EPSS: ${epssPercent.toFixed(2)}%).</div>
-            </div>
-
-            <div class="sim-phase-card" style="border-left-color:#10b981;">
-                <div class="sim-phase-header"><span class="sim-phase-badge" style="background:#10b981;">Phase 4</span> <strong style="color:#10b981;">Defensive Remediation</strong></div>
-                <div class="sim-phase-body"><code>${AegisUtils.escapeHtml(findingAction)}</code></div>
+            <div class="attack-disclaimer-note">
+                CONCEPTUAL ADVERSARY TRAJECTORY MODEL &middot; NO OFFENSIVE PAYLOADS TRANSMITTED
             </div>
         `;
     }
@@ -233,14 +323,36 @@ window.AegisApp = (function () {
         if (!comp) return;
         const setCard = (prefix, data) => {
             if (!data) return;
-            AegisUtils.safeSetText(`${prefix}Score`, `${data.score || 0}%`);
-            AegisUtils.safeSetText(`${prefix}Pass`, `${data.passing_controls || 0}/${data.total_controls || 4} Controls`);
+            const rawScore = data.score !== undefined && data.score !== null ? data.score : (data.percentage !== undefined && data.percentage !== null ? data.percentage : null);
+            const passCount = data.passing_controls !== undefined && data.passing_controls !== null ? data.passing_controls : (Array.isArray(data.controls) ? data.controls.filter(c => c.status === 'PASS').length : null);
+            const totalCount = data.total_controls !== undefined && data.total_controls !== null ? data.total_controls : (Array.isArray(data.controls) ? data.controls.length : null);
+
+            let displayScore = rawScore;
+            if (displayScore === null && passCount !== null && totalCount && totalCount > 0) {
+                displayScore = Math.round((passCount / totalCount) * 1000) / 10;
+            }
+            if (displayScore !== null) {
+                AegisUtils.safeSetText(`${prefix}Score`, `${displayScore}%`);
+            }
+            if (passCount !== null && totalCount !== null) {
+                AegisUtils.safeSetText(`${prefix}Pass`, `${passCount}/${totalCount} Controls`);
+                const statusEl = document.getElementById(`${prefix}Status`);
+                if (statusEl) {
+                    if (displayScore >= 80) {
+                        statusEl.className = 'status-pill-clean pass';
+                        statusEl.textContent = 'Acceptable Posture';
+                    } else {
+                        statusEl.className = 'status-pill-clean review';
+                        statusEl.textContent = 'Review Needed';
+                    }
+                }
+            }
         };
 
         setCard('compPci', comp.pci_dss_4);
         setCard('compNist', comp.nist_csf_2);
         setCard('compIso', comp.iso_27001);
-        setCard('compSoc2', comp.soc_2);
+        setCard('compSoc2', comp.soc_2 || comp.soc2_type2 || comp.soc2);
     }
 
     let currentRemediationBundle = null;
@@ -354,14 +466,71 @@ window.AegisApp = (function () {
         const btnPalette = document.getElementById('btnTogglePalette');
         if (btnPalette) btnPalette.addEventListener('click', toggleCommandPalette);
 
+        function openAttackGraph() {
+            const inputScan = document.getElementById('scanTargetInput');
+            const target = (currentReport && currentReport.target) || (inputScan ? inputScan.value.trim() : '');
+            const url = target ? `/attack-graph?target=${encodeURIComponent(target)}` : '/attack-graph';
+            const modal = document.getElementById('attackGraphModal');
+            const frame = document.getElementById('attackGraphFrame');
+            if (modal && frame) {
+                frame.src = url;
+                modal.style.display = 'flex';
+            } else {
+                window.location.href = url;
+            }
+        }
+
         const btnAttackGraph = document.getElementById('btnOpenAttackGraph');
-        if (btnAttackGraph) btnAttackGraph.addEventListener('click', () => window.open('/attack-graph', '_blank'));
+        if (btnAttackGraph) btnAttackGraph.addEventListener('click', openAttackGraph);
+        const btnAttackGraphSection = document.getElementById('btnOpenAttackGraphSection');
+        if (btnAttackGraphSection) btnAttackGraphSection.addEventListener('click', openAttackGraph);
+
+        const btnCloseAttackGraph = document.getElementById('btnCloseAttackGraphModal');
+        if (btnCloseAttackGraph) {
+            btnCloseAttackGraph.addEventListener('click', () => {
+                const modal = document.getElementById('attackGraphModal');
+                const frame = document.getElementById('attackGraphFrame');
+                if (modal) modal.style.display = 'none';
+                if (frame) frame.src = '';
+            });
+        }
+
+        // Export Dropdown Menu
+        const btnExportToggle = document.getElementById('btnExportMenuToggle');
+        const exportContainer = document.getElementById('exportDropdownContainer');
+        if (btnExportToggle && exportContainer) {
+            btnExportToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                exportContainer.classList.toggle('active');
+            });
+            document.addEventListener('click', () => {
+                exportContainer.classList.remove('active');
+            });
+        }
+
+        const btnExportJson = document.getElementById('btnExportJson');
+        if (btnExportJson) {
+            btnExportJson.addEventListener('click', () => {
+                const target = (currentReport && currentReport.target) || (inputScan ? inputScan.value.trim() : '');
+                window.open(`/api/report?target=${encodeURIComponent(target)}`, '_blank');
+            });
+        }
 
         const btnCopilot = document.getElementById('btnHeaderCopilot');
         if (btnCopilot) btnCopilot.addEventListener('click', () => window.AegisCopilot && AegisCopilot.toggleCopilot());
 
         const btnTerminal = document.getElementById('btnHeaderTerminal');
         if (btnTerminal) btnTerminal.addEventListener('click', () => document.getElementById('auditTerminal')?.classList.toggle('active'));
+
+        const btnTheme = document.getElementById('btnToggleTheme');
+        if (btnTheme) {
+            btnTheme.addEventListener('click', () => {
+                const html = document.documentElement;
+                const current = html.getAttribute('data-theme') || 'light';
+                const next = current === 'light' ? 'dark' : 'light';
+                html.setAttribute('data-theme', next);
+            });
+        }
 
         const btnTerminalMin = document.getElementById('btnTerminalMinimize');
         if (btnTerminalMin) btnTerminalMin.addEventListener('click', () => document.getElementById('auditTerminal')?.classList.toggle('active'));
@@ -405,6 +574,18 @@ window.AegisApp = (function () {
         const tbody = document.getElementById('findingsTableBody');
         if (tbody) {
             tbody.addEventListener('click', (e) => {
+                const copyBtn = e.target.closest('.btn-copy-inline-fix');
+                if (copyBtn) {
+                    e.stopPropagation();
+                    const snippet = copyBtn.dataset.snippet;
+                    if (snippet) {
+                        navigator.clipboard.writeText(snippet).then(() => {
+                            AegisUtils.showToast('Remediation snippet copied!', 'success');
+                        });
+                    }
+                    return;
+                }
+
                 const btn = e.target.closest('.btn-remediate');
                 if (btn) {
                     e.stopPropagation();
@@ -412,6 +593,7 @@ window.AegisApp = (function () {
                     if (!isNaN(idx)) viewRemediation(idx);
                     return;
                 }
+
                 const row = e.target.closest('.finding-row');
                 if (row) {
                     const idx = parseInt(row.dataset.index, 10);
@@ -419,6 +601,13 @@ window.AegisApp = (function () {
                         selectFinding(idx);
                         tbody.querySelectorAll('.finding-row').forEach(r => r.classList.remove('row-selected'));
                         row.classList.add('row-selected');
+
+                        const detailRow = document.getElementById(`findingDetail${idx}`);
+                        if (detailRow) {
+                            const isShowing = detailRow.style.display !== 'none';
+                            tbody.querySelectorAll('.finding-detail-row').forEach(dr => dr.style.display = 'none');
+                            detailRow.style.display = isShowing ? 'none' : 'table-row';
+                        }
                     }
                 }
             });
@@ -440,7 +629,7 @@ window.AegisApp = (function () {
                 const action = item.dataset.action;
                 toggleCommandPalette();
                 if (action === 'attack-graph') {
-                    window.open('/attack-graph', '_blank');
+                    openAttackGraph();
                 } else if (action === 'model-routing') {
                     fetch('/api/ai/model-routing').then(r => r.json()).then(d => {
                         alert('Model Routing Architecture:\n• Zero-Cost Template Tier: ' + d.savings_summary.template_zero_cost_pct + '%\n• Estimated Token Reduction: ' + d.savings_summary.estimated_token_reduction_pct + '%\n• Pattern: ' + d.savings_summary.model_routing_pattern);

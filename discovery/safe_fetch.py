@@ -121,6 +121,15 @@ def is_ip_allowed_for_public_fetch(ip_str: str) -> bool:
     except ValueError:
         return False
 
+    # Check for RFC 6052 / RFC 8215 NAT64 / DNS64 IPv4-embedded IPv6 prefixes
+    # (e.g. 64:ff9b::/96 or 64:ff9b:1::/48 synthesized by IPv6-transition ISPs)
+    if isinstance(ip, ipaddress.IPv6Address):
+        nat64_wk = ipaddress.ip_network("64:ff9b::/96")
+        nat64_loc = ipaddress.ip_network("64:ff9b:1::/48")
+        if ip in nat64_wk or ip in nat64_loc:
+            embedded_ipv4 = ipaddress.ip_address(ip.packed[-4:])
+            return is_ip_allowed_for_public_fetch(str(embedded_ipv4))
+
     # Disallow all non-public / internal IP ranges
     if (
         ip.is_private

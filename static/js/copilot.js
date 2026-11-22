@@ -64,7 +64,7 @@ window.AegisCopilot = (function () {
         if (container && container.children.length === 0) {
             appendChatMessage(
                 'ai',
-                `👋 Greetings! I am **Aegis Copilot**, your autonomous defensive SOC assistant. Monitoring target \`${target || 'active asset'}\`.\n\nAsk me to summarize findings, verify compliance posture, provide Nginx virtual patches, or explain specific CVE risks.`,
+                `**Analyst Margin Notes** &mdash; Grounded in perimeter telemetry for \`${target || 'active asset'}\`.\n\nAsk questions about prioritized findings, compliance gaps, or virtual patch hardening.`,
                 'rule-based',
                 'SOC Telemetry Engine'
             );
@@ -73,17 +73,14 @@ window.AegisCopilot = (function () {
 
     function toggleCopilot() {
         const drawer = document.getElementById('copilotDrawer');
-        const fab = document.getElementById('copilotFab');
         if (drawer) {
             const isHidden = drawer.style.display === 'none' || window.getComputedStyle(drawer).display === 'none';
             if (isHidden) {
                 drawer.style.display = 'flex';
-                if (fab) fab.style.display = 'none';
                 const input = document.getElementById('copilotInput');
                 if (input) input.focus();
             } else {
                 drawer.style.display = 'none';
-                if (fab) fab.style.display = 'flex';
             }
         }
     }

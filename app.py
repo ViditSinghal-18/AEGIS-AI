@@ -98,17 +98,29 @@ def safe_save_json(filepath, data):
 def apply_security_headers(response):
     """Enforce defense-in-depth HTTP headers and restricted CORS."""
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-        "font-src 'self' https://fonts.gstatic.com; "
-        "img-src 'self' data: https:; "
-        "connect-src 'self' https: http:; "
-        "frame-ancestors 'none';"
-    )
+    if request.path.startswith("/attack-graph"):
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' https: http:; "
+            "frame-ancestors 'self';"
+        )
+    else:
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' https: http:; "
+            "frame-ancestors 'none';"
+        )
     if CORS_ORIGIN:
         if CORS_ORIGIN == "*":
             response.headers["Access-Control-Allow-Origin"] = "*"
@@ -950,7 +962,12 @@ def get_compliance():
         findings = (data or {}).get("findings", (data or {}).get("prioritized_findings", []))
         comp = calculate_compliance(findings)
     elif "overall_readiness_score" not in comp:
-        scores = [comp[k]["score"] for k in ["pci_dss_4", "nist_csf_2", "iso_27001", "soc_2"] if k in comp and "score" in comp[k]]
+        scores = []
+        for k in ["pci_dss_4", "nist_csf_2", "iso_27001", "soc_2", "soc2_type2"]:
+            if k in comp:
+                val = comp[k].get("score", comp[k].get("percentage"))
+                if val is not None:
+                    scores.append(float(val))
         comp["overall_readiness_score"] = round(sum(scores) / len(scores), 1) if scores else 80.0
 
     return jsonify(comp)

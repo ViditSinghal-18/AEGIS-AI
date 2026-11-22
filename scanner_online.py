@@ -735,11 +735,63 @@ def convert_to_prioritized_report(online_res):
     ]
     soc2_score = round(sum(100 for c in soc2_controls if c["status"] == "PASS") / len(soc2_controls), 1)
 
+    pci_pass = sum(1 for c in pci_controls if c["status"] == "PASS")
+    nist_pass = sum(1 for c in nist_controls if c["status"] == "PASS")
+    iso_pass = sum(1 for c in iso_controls if c["status"] == "PASS")
+    soc2_pass = sum(1 for c in soc2_controls if c["status"] == "PASS")
+
+    comp_scores = [pci_score, nist_score, iso_score, soc2_score]
+    overall_comp = round(sum(comp_scores) / len(comp_scores), 1)
+
     compliance_data = {
-        "pci_dss_4": {"score": pci_score, "grade": "C+" if pci_score < 70 else ("A" if pci_score >= 85 else "B"), "controls": pci_controls},
-        "nist_csf_2": {"score": nist_score, "grade": "B" if nist_score >= 75 else "C", "controls": nist_controls},
-        "iso_27001": {"score": iso_score, "grade": "C" if iso_score < 60 else "B+", "controls": iso_controls},
-        "soc_2": {"score": soc2_score, "grade": "B-" if soc2_score >= 70 else "D", "controls": soc2_controls}
+        "score": overall_comp,
+        "overall_readiness_score": overall_comp,
+        "overall_grade": "A" if overall_comp >= 85 else ("B" if overall_comp >= 70 else "C"),
+        "pci_dss_4": {
+            "name": "PCI-DSS v4.0",
+            "score": pci_score,
+            "percentage": pci_score,
+            "passing_controls": pci_pass,
+            "total_controls": len(pci_controls),
+            "grade": "C+" if pci_score < 70 else ("A" if pci_score >= 85 else "B"),
+            "controls": pci_controls,
+        },
+        "nist_csf_2": {
+            "name": "NIST CSF 2.0",
+            "score": nist_score,
+            "percentage": nist_score,
+            "passing_controls": nist_pass,
+            "total_controls": len(nist_controls),
+            "grade": "B" if nist_score >= 75 else "C",
+            "controls": nist_controls,
+        },
+        "iso_27001": {
+            "name": "ISO/IEC 27001:2022",
+            "score": iso_score,
+            "percentage": iso_score,
+            "passing_controls": iso_pass,
+            "total_controls": len(iso_controls),
+            "grade": "C" if iso_score < 60 else "B+",
+            "controls": iso_controls,
+        },
+        "soc_2": {
+            "name": "SOC 2 Type II",
+            "score": soc2_score,
+            "percentage": soc2_score,
+            "passing_controls": soc2_pass,
+            "total_controls": len(soc2_controls),
+            "grade": "B-" if soc2_score >= 70 else "D",
+            "controls": soc2_controls,
+        },
+        "soc2_type2": {
+            "name": "SOC 2 Type II",
+            "score": soc2_score,
+            "percentage": soc2_score,
+            "passing_controls": soc2_pass,
+            "total_controls": len(soc2_controls),
+            "grade": "B-" if soc2_score >= 70 else "D",
+            "controls": soc2_controls,
+        },
     }
 
     threat_actors = [

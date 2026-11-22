@@ -138,6 +138,11 @@ def map_compliance(
         {"id": "RC", "name": "Recover", "status": "Standard", "pct": 80, "color": "#64748b"},
     ]
 
+    pci_pct = round((pci_pass / pci_total) * 100, 1)
+    nist_pct = round((nist_pass / nist_total) * 100, 1)
+    soc2_pct = round((soc2_pass / soc2_total) * 100, 1)
+    iso_pct = round((iso_pass / iso_total) * 100, 1)
+
     return {
         "score": compliance_score,
         "overall_readiness_score": compliance_score,
@@ -150,27 +155,38 @@ def map_compliance(
         "nist_functions": nist_functions,
         "pci_dss_4": {
             "name": "PCI-DSS v4.0",
+            "score": pci_pct,
+            "percentage": pci_pct,
             "passing_controls": pci_pass,
             "total_controls": pci_total,
-            "percentage": round((pci_pass / pci_total) * 100, 1),
         },
         "nist_csf_2": {
             "name": "NIST CSF 2.0",
+            "score": nist_pct,
+            "percentage": nist_pct,
             "passing_controls": nist_pass,
             "total_controls": nist_total,
-            "percentage": round((nist_pass / nist_total) * 100, 1),
         },
         "soc2_type2": {
             "name": "SOC 2 Type II",
+            "score": soc2_pct,
+            "percentage": soc2_pct,
             "passing_controls": soc2_pass,
             "total_controls": soc2_total,
-            "percentage": round((soc2_pass / soc2_total) * 100, 1),
+        },
+        "soc_2": {
+            "name": "SOC 2 Type II",
+            "score": soc2_pct,
+            "percentage": soc2_pct,
+            "passing_controls": soc2_pass,
+            "total_controls": soc2_total,
         },
         "iso_27001": {
             "name": "ISO/IEC 27001:2022",
+            "score": iso_pct,
+            "percentage": iso_pct,
             "passing_controls": iso_pass,
             "total_controls": iso_total,
-            "percentage": round((iso_pass / iso_total) * 100, 1),
         },
     }
 

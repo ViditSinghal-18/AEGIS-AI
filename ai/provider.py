@@ -283,14 +283,18 @@ def call_rule_based_fallback(prompt: str, report: Dict[str, Any]) -> str:
         pci = compliance.get("pci_dss_4", {})
         nist = compliance.get("nist_csf_2", {})
         iso = compliance.get("iso_27001", {})
-        soc2 = compliance.get("soc_2", {})
+        soc2 = compliance.get("soc_2", compliance.get("soc2_type2", {}))
+        pci_score = pci.get("score", pci.get("percentage", "N/A"))
+        nist_score = nist.get("score", nist.get("percentage", "N/A"))
+        iso_score = iso.get("score", iso.get("percentage", "N/A"))
+        soc2_score = soc2.get("score", soc2.get("percentage", "N/A"))
         return (
             f"### 📋 Multi-Framework Compliance Analysis for `{target}`\n\n"
             f"- **Overall Readiness:** {comp_score}% (Grade **{comp_grade}**)\n"
-            f"- **PCI-DSS 4.0:** {pci.get('score', 'N/A')}% ({pci.get('passing_controls', 0)}/{pci.get('total_controls', 4)} controls passed)\n"
-            f"- **NIST CSF 2.0:** {nist.get('score', 'N/A')}% ({nist.get('passing_controls', 0)}/{nist.get('total_controls', 5)} controls passed)\n"
-            f"- **ISO/IEC 27001:** {iso.get('score', 'N/A')}% ({iso.get('passing_controls', 0)}/{iso.get('total_controls', 4)} controls passed)\n"
-            f"- **SOC 2 Type II:** {soc2.get('score', 'N/A')}% ({soc2.get('passing_controls', 0)}/{soc2.get('total_controls', 4)} controls passed)\n\n"
+            f"- **PCI-DSS 4.0:** {pci_score}% ({pci.get('passing_controls', 0)}/{pci.get('total_controls', 12)} controls passed)\n"
+            f"- **NIST CSF 2.0:** {nist_score}% ({nist.get('passing_controls', 0)}/{nist.get('total_controls', 10)} controls passed)\n"
+            f"- **ISO/IEC 27001:** {iso_score}% ({iso.get('passing_controls', 0)}/{iso.get('total_controls', 15)} controls passed)\n"
+            f"- **SOC 2 Type II:** {soc2_score}% ({soc2.get('passing_controls', 0)}/{soc2.get('total_controls', 8)} controls passed)\n\n"
             f"*Detailed control breakdown is available via the `/api/compliance` endpoint.*"
         )
 
