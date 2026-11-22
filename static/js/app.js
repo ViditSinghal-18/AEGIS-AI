@@ -209,21 +209,37 @@ window.AegisApp = (function () {
             </div>
 
             <div class="sim-phase-card">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
                 <div class="sim-phase-header"><span class="sim-phase-badge">Phase 1</span> <strong>Reconnaissance & Asset Ingress</strong></div>
                 <div class="sim-phase-body">Adversary discovers public endpoint on ${AegisUtils.escapeHtml(target)} disclosing '${AegisUtils.escapeHtml(findingTitle)}'.</div>
             </div>
 
             <div class="sim-phase-card">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
                 <div class="sim-phase-header"><span class="sim-phase-badge">Phase 2</span> <strong>Weaponization & Ingress Trigger (${AegisUtils.escapeHtml(mitre.technique_id || 'T1190')})</strong></div>
                 <div class="sim-phase-body">Adversary crafts probe matching ${AegisUtils.escapeHtml(mitre.technique_name || 'Exploit Public-Facing App')} to trigger target response.</div>
             </div>
 
             <div class="sim-phase-card">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
                 <div class="sim-phase-header"><span class="sim-phase-badge">Phase 3</span> <strong>Adversary Impact (${AegisUtils.escapeHtml(mitre.tactic || 'Impact')})</strong></div>
                 <div class="sim-phase-body">Exposure allows potential unauthorized session reading or service manipulation (EPSS: ${epssPercent.toFixed(2)}%).</div>
             </div>
 
             <div class="sim-phase-card" style="border-left-color:#10b981;">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
                 <div class="sim-phase-header"><span class="sim-phase-badge" style="background:#10b981;">Phase 4</span> <strong style="color:#10b981;">Defensive Remediation</strong></div>
                 <div class="sim-phase-body"><code>${AegisUtils.escapeHtml(findingAction)}</code></div>
             </div>

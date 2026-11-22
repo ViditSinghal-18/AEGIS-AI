@@ -108,43 +108,101 @@ body {
 
 /* ==========================================================================
    Tactical Viewport Reticles (Corner Brackets ⌜ ⌝ ⌞ ⌟)
+   Applied across all primary consoles, panels, cards & metric tiles
    ========================================================================== */
 
 .corner-reticle {
     position: absolute;
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
     pointer-events: none;
-    z-index: 5;
-    opacity: 0.8;
+    z-index: 10;
+    opacity: 0.95;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .corner-reticle.tl {
-    top: -1px;
-    left: -1px;
+    top: -2px;
+    left: -2px;
     border-top: 2px solid var(--cyan);
     border-left: 2px solid var(--cyan);
 }
 
 .corner-reticle.tr {
-    top: -1px;
-    right: -1px;
+    top: -2px;
+    right: -2px;
     border-top: 2px solid var(--cyan);
     border-right: 2px solid var(--cyan);
 }
 
 .corner-reticle.bl {
-    bottom: -1px;
-    left: -1px;
+    bottom: -2px;
+    left: -2px;
     border-bottom: 2px solid var(--cyan);
     border-left: 2px solid var(--cyan);
 }
 
 .corner-reticle.br {
-    bottom: -1px;
-    right: -1px;
+    bottom: -2px;
+    right: -2px;
     border-bottom: 2px solid var(--cyan);
     border-right: 2px solid var(--cyan);
+}
+
+/* Color & Glow Variants for Corner Reticles */
+.accent-crit .corner-reticle {
+    border-color: var(--rose) !important;
+}
+.metric-card.accent-crit:hover .corner-reticle {
+    filter: drop-shadow(0 0 6px var(--rose-glow));
+    opacity: 1;
+}
+
+.accent-high .corner-reticle {
+    border-color: var(--orange) !important;
+}
+.metric-card.accent-high:hover .corner-reticle {
+    filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.6));
+    opacity: 1;
+}
+
+.accent-med .corner-reticle {
+    border-color: var(--amber) !important;
+}
+.metric-card.accent-med:hover .corner-reticle {
+    filter: drop-shadow(0 0 6px var(--amber-glow));
+    opacity: 1;
+}
+
+.accent-low .corner-reticle {
+    border-color: var(--blue) !important;
+}
+.metric-card.accent-low:hover .corner-reticle {
+    filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));
+    opacity: 1;
+}
+
+.accent-cyan .corner-reticle,
+.tactical-panel .corner-reticle,
+.compliance-card .corner-reticle,
+.target-bar .corner-reticle,
+.audit-terminal-container .corner-reticle,
+.modal-box .corner-reticle,
+.copilot-drawer .corner-reticle,
+.hud-badge .corner-reticle,
+.hud-telemetry-feed .corner-reticle {
+    border-color: var(--cyan);
+}
+
+.metric-card:hover .corner-reticle,
+.compliance-card:hover .corner-reticle,
+.tactical-panel:hover .corner-reticle,
+.target-bar:focus-within .corner-reticle,
+.hud-badge:hover .corner-reticle,
+.hud-telemetry-feed:hover .corner-reticle,
+.modal-box:hover .corner-reticle {
+    filter: drop-shadow(0 0 6px var(--cyan-glow));
+    opacity: 1;
 }
 
 /* ==========================================================================
@@ -217,6 +275,8 @@ header.tactical-header {
 
 /* Target Selector & Launcher */
 .target-bar {
+    position: relative;
+    overflow: visible;
     display: flex;
     align-items: center;
     background: rgba(10, 15, 30, 0.95);
@@ -464,10 +524,11 @@ main {
    ========================================================================== */
 
 .audit-terminal-container {
+    position: relative;
+    overflow: visible;
     background: #030611;
     border: 1px solid var(--border-hairline);
     border-radius: 8px;
-    overflow: hidden;
     display: none;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
 }
@@ -483,6 +544,7 @@ main {
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+    border-radius: 8px 8px 0 0;
 }
 
 .terminal-left {
@@ -563,6 +625,7 @@ main {
     max-height: 220px;
     overflow-y: auto;
     background: radial-gradient(circle at 10% 10%, rgba(0, 240, 255, 0.03) 0%, transparent 40%);
+    border-radius: 0 0 8px 8px;
 }
 
 .term-line {
@@ -598,7 +661,7 @@ main {
     width: 100%;
     height: 480px;
     border-radius: 12px;
-    overflow: hidden;
+    overflow: visible;
     background: radial-gradient(circle at 50% 50%, #0c1428 0%, #060914 70%, #03050b 100%);
     border: 1px solid var(--border-hairline);
     box-shadow: inset 0 0 80px rgba(0, 240, 255, 0.08), 0 16px 40px -10px rgba(0, 0, 0, 0.85);
@@ -608,6 +671,8 @@ main {
     width: 100%;
     height: 100%;
     position: relative;
+    overflow: hidden;
+    border-radius: 12px;
 }
 
 #globe-canvas {
@@ -643,6 +708,8 @@ main {
 }
 
 .hud-badge {
+    position: relative;
+    overflow: visible;
     background: rgba(8, 12, 24, 0.88);
     backdrop-filter: blur(14px);
     border: 1px solid var(--border-hairline);
@@ -703,6 +770,8 @@ main {
 }
 
 .hud-telemetry-feed {
+    position: relative;
+    overflow: visible;
     background: rgba(8, 12, 24, 0.88);
     backdrop-filter: blur(14px);
     border: 1px solid var(--border-subtle);
@@ -753,16 +822,17 @@ main {
     padding: 16px 18px;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 24px -6px rgba(0, 0, 0, 0.5);
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    overflow: hidden;
+    overflow: visible;
 }
 
 .metric-card::before {
     content: '';
     position: absolute;
     top: 0;
-    left: 0;
-    right: 0;
+    left: 8px;
+    right: 8px;
     height: 3px;
+    border-radius: 2px;
 }
 
 .metric-card.accent-cyan::before { background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
@@ -990,6 +1060,71 @@ main {
     font-size: 0.73rem;
 }
 
+.sim-phase-card {
+    position: relative;
+    overflow: visible;
+    background: rgba(10, 15, 30, 0.85);
+    border: 1px solid var(--border-subtle);
+    border-left: 3px solid var(--cyan);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+    margin-bottom: 8px;
+}
+
+.sim-phase-card:hover {
+    border-color: rgba(0, 240, 255, 0.4);
+    background: rgba(14, 22, 44, 0.95);
+}
+
+.sim-phase-card .corner-reticle {
+    width: 8px;
+    height: 8px;
+    border-color: rgba(0, 240, 255, 0.6);
+}
+
+.sim-phase-card:hover .corner-reticle {
+    border-color: var(--cyan);
+    filter: drop-shadow(0 0 4px var(--cyan-glow));
+    opacity: 1;
+}
+
+.sim-phase-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    color: #fff;
+    font-size: 0.82rem;
+}
+
+.sim-phase-badge {
+    background: var(--cyan);
+    color: var(--bg-void);
+    font-size: 0.65rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+
+.sim-phase-body {
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+    line-height: 1.4;
+}
+
+.sim-phase-body code {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    color: #38bdf8;
+    word-break: break-all;
+}
+
 /* ==========================================================================
    Multi-Framework Compliance Governance Cards
    ========================================================================== */
@@ -1001,6 +1136,8 @@ main {
 }
 
 .compliance-card {
+    position: relative;
+    overflow: visible;
     background: rgba(8, 12, 24, 0.75);
     border: 1px solid var(--border-hairline);
     border-radius: 8px;
@@ -1134,7 +1271,7 @@ main {
     z-index: 1000;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: visible;
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1149,6 +1286,7 @@ main {
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid var(--border-hairline);
+    border-radius: 12px 12px 0 0;
 }
 
 .copilot-header-info {
@@ -1247,6 +1385,7 @@ main {
     background: #080c1c;
     display: flex;
     gap: 8px;
+    border-radius: 0 0 12px 12px;
 }
 
 .copilot-input-bar input {
@@ -1309,7 +1448,7 @@ main {
     border: 1px solid var(--border-hairline);
     border-radius: 12px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    overflow: hidden;
+    overflow: visible;
     position: relative;
     max-height: 90vh;
     display: flex;
@@ -1320,6 +1459,7 @@ main {
     padding: 16px 20px;
     background: #060918;
     border-bottom: 1px solid var(--border-hairline);
+    border-radius: 12px 12px 0 0;
     display: flex;
     justify-content: space-between;
     align-items: center;

@@ -48,6 +48,10 @@
 
         <!-- Target Selector & Scan Launcher -->
         <div class="target-bar">
+            <span class="corner-reticle tl"></span>
+            <span class="corner-reticle tr"></span>
+            <span class="corner-reticle bl"></span>
+            <span class="corner-reticle br"></span>
             <span class="target-icon" aria-hidden="true">🎯</span>
             <input type="text" id="scanTargetInput" class="target-input mono" value="" placeholder="Target domain or IP (e.g. example.com)" aria-label="Target domain or IP address">
             <label id="activeScanToggleContainer" class="active-toggle-label" title="Active TCP port & service probing (requires verified domain ownership or allowlist)">
@@ -102,6 +106,10 @@
 
         <!-- LIVE AUDIT TELEMETRY STREAM TERMINAL -->
         <div id="auditTerminal" class="audit-terminal-container">
+            <span class="corner-reticle tl"></span>
+            <span class="corner-reticle tr"></span>
+            <span class="corner-reticle bl"></span>
+            <span class="corner-reticle br"></span>
             <div class="terminal-bar">
                 <div class="terminal-left">
                     <span class="terminal-dot red"></span>
@@ -135,6 +143,10 @@
             <div class="hud-overlay">
                 <div class="hud-top">
                     <div class="hud-badge tactical-card">
+                        <span class="corner-reticle tl"></span>
+                        <span class="corner-reticle tr"></span>
+                        <span class="corner-reticle bl"></span>
+                        <span class="corner-reticle br"></span>
                         <span class="hud-badge-title mono">// ENTERPRISE THREAT POSTURE</span>
                         <div class="hud-badge-val">
                             <span id="statComplianceScore" class="glow-text-cyan">--%</span>
@@ -156,6 +168,10 @@
 
                 <div class="hud-bottom">
                     <div class="hud-telemetry-feed mono tactical-card">
+                        <span class="corner-reticle tl"></span>
+                        <span class="corner-reticle tr"></span>
+                        <span class="corner-reticle bl"></span>
+                        <span class="corner-reticle br"></span>
                         <div class="hud-telemetry-item">
                             <span class="telemetry-node cyan">●</span>
                             <span>Target: <strong id="targetDisplay">None Selected</strong></span>
@@ -176,6 +192,10 @@
         <!-- SECTION 2: EXECUTIVE METRIC CARDS -->
         <div class="stats-ribbon">
             <div class="metric-card accent-cyan">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
                 <div class="metric-header">
                     <span class="stat-label">Total Findings</span>
                     <span class="metric-index mono">// SEC.01</span>
@@ -185,6 +205,10 @@
             </div>
 
             <div class="metric-card accent-crit">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
                 <div class="metric-header">
                     <span class="stat-label">P1 Critical Risk</span>
                     <span class="metric-index mono">// P1.BREACH</span>
@@ -194,6 +218,10 @@
             </div>
 
             <div class="metric-card accent-high">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
                 <div class="metric-header">
                     <span class="stat-label">P2 High Risk</span>
                     <span class="metric-index mono">// P2.EXPLOIT</span>
@@ -203,6 +231,10 @@
             </div>
 
             <div class="metric-card accent-med">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
                 <div class="metric-header">
                     <span class="stat-label">P3 Medium Risk</span>
                     <span class="metric-index mono">// P3.ATTACK</span>
@@ -212,6 +244,10 @@
             </div>
 
             <div class="metric-card accent-low">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
                 <div class="metric-header">
                     <span class="stat-label">P4 Low / Info</span>
                     <span class="metric-index mono">// P4.HYGIENE</span>
@@ -350,6 +386,10 @@
             <div class="compliance-grid">
                 <!-- PCI-DSS 4.0 -->
                 <div class="compliance-card">
+                    <span class="corner-reticle tl"></span>
+                    <span class="corner-reticle tr"></span>
+                    <span class="corner-reticle bl"></span>
+                    <span class="corner-reticle br"></span>
                     <div class="compliance-card-header">
                         <span class="framework-name">PCI-DSS 4.0</span>
                         <span class="comp-status-chip compliant" id="compPciStatus">MONITORED</span>
@@ -363,6 +403,10 @@
 
                 <!-- NIST CSF 2.0 -->
                 <div class="compliance-card">
+                    <span class="corner-reticle tl"></span>
+                    <span class="corner-reticle tr"></span>
+                    <span class="corner-reticle bl"></span>
+                    <span class="corner-reticle br"></span>
                     <div class="compliance-card-header">
                         <span class="framework-name">NIST CSF 2.0</span>
                         <span class="comp-status-chip compliant" id="compNistStatus">MONITORED</span>
@@ -376,6 +420,10 @@
 
                 <!-- ISO/IEC 27001:2022 -->
                 <div class="compliance-card">
+                    <span class="corner-reticle tl"></span>
+                    <span class="corner-reticle tr"></span>
+                    <span class="corner-reticle bl"></span>
+                    <span class="corner-reticle br"></span>
                     <div class="compliance-card-header">
                         <span class="framework-name">ISO/IEC 27001:2022</span>
                         <span class="comp-status-chip compliant" id="compIsoStatus">MONITORED</span>
@@ -389,6 +437,10 @@
 
                 <!-- SOC 2 Type II -->
                 <div class="compliance-card">
+                    <span class="corner-reticle tl"></span>
+                    <span class="corner-reticle tr"></span>
+                    <span class="corner-reticle bl"></span>
+                    <span class="corner-reticle br"></span>
                     <div class="compliance-card-header">
                         <span class="framework-name">SOC 2 Type II</span>
                         <span class="comp-status-chip partial" id="compSoc2Status">MONITORED</span>
@@ -412,6 +464,10 @@
 
     <!-- AEGIS COPILOT INTERACTIVE CHAT DOCK -->
     <div id="copilotDrawer" class="copilot-drawer" style="display: none;">
+        <span class="corner-reticle tl"></span>
+        <span class="corner-reticle tr"></span>
+        <span class="corner-reticle bl"></span>
+        <span class="corner-reticle br"></span>
         <div class="copilot-header">
             <div class="copilot-header-info">
                 <span class="copilot-header-icon">🤖</span>
@@ -444,6 +500,10 @@
     <!-- DOMAIN OWNERSHIP VERIFICATION MODAL -->
     <div id="verificationModal" class="modal-backdrop" style="display: none;">
         <div class="modal-box">
+            <span class="corner-reticle tl"></span>
+            <span class="corner-reticle tr"></span>
+            <span class="corner-reticle bl"></span>
+            <span class="corner-reticle br"></span>
             <div class="modal-header">
                 <h3>Domain Ownership Verification</h3>
                 <button class="modal-close" id="btnCloseVerificationModal">&times;</button>
@@ -455,6 +515,10 @@
     <!-- REMEDIATION & VIRTUAL PATCHING MODAL -->
     <div id="remediationModal" class="modal-backdrop" style="display: none;">
         <div class="modal-box" style="max-width: 720px; width: 90%;">
+            <span class="corner-reticle tl"></span>
+            <span class="corner-reticle tr"></span>
+            <span class="corner-reticle bl"></span>
+            <span class="corner-reticle br"></span>
             <div class="modal-header">
                 <div>
                     <h3 id="remediationModalTitle">🛠️ Security Remediation &amp; Virtual Patching</h3>
@@ -484,6 +548,10 @@
     <!-- COMMAND PALETTE MODAL (Ctrl+K) -->
     <div id="commandPaletteModal" class="modal-backdrop" style="display: none;">
         <div class="modal-box" style="max-width: 500px;">
+            <span class="corner-reticle tl"></span>
+            <span class="corner-reticle tr"></span>
+            <span class="corner-reticle bl"></span>
+            <span class="corner-reticle br"></span>
             <input type="text" id="paletteSearchInput" placeholder="Type a command or jump to section..." style="width: 100%; background: #030712; border: 1px solid #00f0ff; color: #fff; padding: 12px; border-radius: 4px; font-size: 0.9rem;">
             <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 6px;" id="paletteResults">
                 <div class="palette-item" data-action="attack-graph">🕸️ Open Attack Surface Topology Graph</div>
@@ -500,6 +568,10 @@
     <!-- IN-TAB ATTACK GRAPH MODAL -->
     <div id="attackGraphModal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="attackGraphModalTitle">
         <div class="modal-box" style="max-width: 1100px; width: 95%;">
+            <span class="corner-reticle tl"></span>
+            <span class="corner-reticle tr"></span>
+            <span class="corner-reticle bl"></span>
+            <span class="corner-reticle br"></span>
             <div class="modal-header">
                 <div>
                     <h3 id="attackGraphModalTitle" style="color: #fff; font-size: 1.1rem; font-weight: 700;">🕸️ Cyber Attack Surface Network Graph</h3>
