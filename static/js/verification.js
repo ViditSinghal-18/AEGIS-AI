@@ -73,7 +73,6 @@ window.AegisVerification = (function () {
             </div>
         `;
 
-        const tokenVal = instructions.dns_txt_record ? instructions.dns_txt_record.value : '';
         const btnCopy = document.getElementById('btnCopyDnsToken');
         if (btnCopy) {
             btnCopy.addEventListener('click', () => {

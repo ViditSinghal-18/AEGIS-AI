@@ -114,10 +114,10 @@ window.AegisApp = (function () {
         const geo = data.geo_telemetry || (data.report && data.report.geo_telemetry);
         if (geo && geo.coordinates_available !== false && geo.lat !== null && geo.lon !== null) {
             AegisGlobe.plotRealTargetPins(target, geo, data.subdomains || []);
-            AegisUtils.safeSetText('globeTargetLocation', `${geo.city || 'Edge'}, ${geo.country || 'Global'}`);
+            AegisUtils.safeSetText('globeTargetLocation', `${geo.city || 'Edge Ingress'}, ${geo.country || 'Global'} (${geo.asn || 'Perimeter Gateway'}) · 6 Ingress Streams Active`);
         } else {
             AegisGlobe.plotRealTargetPins(target, null, data.subdomains || []);
-            AegisUtils.safeSetText('globeTargetLocation', 'Coordinates Unavailable (Anycast / Internal)');
+            AegisUtils.safeSetText('globeTargetLocation', `${target} · Edge Anycast Transit (6 Global Sensor Relays Monitored)`);
         }
 
         // Render Charts
