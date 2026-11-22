@@ -10,6 +10,15 @@
       "product": "OWASP Foundation - The Open Source Foundation for Application SecurityOWASP Foundation",
       "version": "",
       "extra": "passive-web-observation"
+    },
+    {
+      "port": 80,
+      "protocol": "tcp",
+      "state": "open",
+      "service": "http",
+      "product": "",
+      "version": "",
+      "extra": "passive-shodan-internetdb"
     }
   ],
   "http": {
@@ -59,11 +68,11 @@
         "owasp.org\ttext =",
         "owasp.org\ttext =",
         "owasp.org\ttext =",
-        "\"v=spf1 include:_spf.google.com include:servers.mcsv.net include:amazonses.com -all\"",
         "owasp.org\ttext =",
         "owasp.org\ttext =",
         "owasp.org\ttext =",
-        "owasp.org\ttext ="
+        "owasp.org\ttext =",
+        "\"v=spf1 include:_spf.google.com include:servers.mcsv.net include:amazonses.com -all\""
       ],
       "spf_present": true,
       "dmarc_present": true,
@@ -72,9 +81,17 @@
     "ct_subdomains": [],
     "ct_notice": "Subdomains discovered via public Certificate Transparency logs for mapping only (none were probed or scanned).",
     "shodan": {
-      "ports": [],
-      "cpes": [],
-      "tags": [],
+      "ports": [
+        80,
+        443
+      ],
+      "cpes": [
+        "cpe:/a:vercel:next.js",
+        "cpe:/a:facebook:react"
+      ],
+      "tags": [
+        "pqc"
+      ],
       "source": "shodan-internetdb"
     },
     "csp": {

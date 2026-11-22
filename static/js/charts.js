@@ -107,14 +107,14 @@ window.AegisCharts = (function () {
                     clip: false, // CRITICAL: Never slice bubble geometry at chart boundaries
                     backgroundColor: validPoints.map(p => {
                         const s = (p.finding.priority_level || p.finding.severity || '').toUpperCase();
-                        if (s.includes('P1') || s.includes('CRIT')) return isDark ? 'rgba(217, 72, 43, 0.85)' : 'rgba(217, 72, 43, 0.80)'; // Vermilion
-                        if (s.includes('P2') || s.includes('HIGH')) return isDark ? 'rgba(217, 119, 6, 0.85)' : 'rgba(217, 119, 6, 0.80)';  // Ochre
-                        if (s.includes('P3') || s.includes('MED')) return isDark ? 'rgba(180, 83, 9, 0.80)' : 'rgba(180, 83, 9, 0.75)';   // Amber
-                        return isDark ? 'rgba(120, 113, 108, 0.80)' : 'rgba(120, 113, 108, 0.70)'; // Neutral slate
+                        if (s.includes('P1') || s.includes('CRIT')) return 'rgba(239, 68, 68, 0.85)'; // Red
+                        if (s.includes('P2') || s.includes('HIGH')) return 'rgba(249, 115, 22, 0.85)'; // Orange
+                        if (s.includes('P3') || s.includes('MED')) return 'rgba(245, 158, 11, 0.85)';  // Amber
+                        return 'rgba(59, 130, 246, 0.85)'; // Blue
                     }),
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(27, 26, 23, 0.35)',
+                    borderColor: 'rgba(255, 255, 255, 0.35)',
                     borderWidth: 1.5,
-                    hoverBorderColor: isDark ? '#ffffff' : '#1B1A17',
+                    hoverBorderColor: '#00f0ff',
                     hoverBorderWidth: 2.5
                 }]
             },
@@ -138,14 +138,14 @@ window.AegisCharts = (function () {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: isDark ? 'rgba(27, 26, 23, 0.96)' : 'rgba(244, 241, 234, 0.98)',
-                        titleColor: isDark ? '#ffffff' : '#1B1A17',
-                        bodyColor: isDark ? '#d6d3d1' : '#44403c',
-                        borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)',
+                        backgroundColor: 'rgba(11, 18, 33, 0.95)',
+                        titleColor: '#00f0ff',
+                        bodyColor: '#f1f5f9',
+                        borderColor: 'rgba(0, 240, 255, 0.3)',
                         borderWidth: 1,
                         padding: 10,
-                        titleFont: { family: "'IBM Plex Sans', sans-serif", weight: '600', size: 12 },
-                        bodyFont: { family: "'IBM Plex Mono', monospace", size: 11 },
+                        titleFont: { family: "'Inter', sans-serif", weight: '600', size: 12 },
+                        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
                         callbacks: {
                             title: (items) => {
                                 const pt = items[0].raw;
@@ -170,16 +170,16 @@ window.AegisCharts = (function () {
                         title: {
                             display: true,
                             text: 'Theoretical Severity (CVSS v3.1 Base Score)',
-                            color: isDark ? '#a8a29e' : '#57534e',
-                            font: { family: "'IBM Plex Sans', sans-serif", size: 11, weight: '500' },
+                            color: '#94a3b8',
+                            font: { family: "'Inter', sans-serif", size: 11, weight: '500' },
                             padding: { top: 8 }
                         },
                         grid: {
-                            color: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)'
+                            color: 'rgba(255, 255, 255, 0.06)'
                         },
                         ticks: {
-                            color: isDark ? '#a8a29e' : '#78716c',
-                            font: { family: "'IBM Plex Mono', monospace", size: 10 },
+                            color: '#94a3b8',
+                            font: { family: "'JetBrains Mono', monospace", size: 10 },
                             stepSize: 1,
                             callback: (val) => (val >= 0 && val <= 10 ? val : '')
                         }
@@ -190,21 +190,21 @@ window.AegisCharts = (function () {
                         title: {
                             display: true,
                             text: 'Real Exploitation Likelihood (FIRST.org EPSS %)',
-                            color: isDark ? '#a8a29e' : '#57534e',
-                            font: { family: "'IBM Plex Sans', sans-serif", size: 11, weight: '500' },
+                            color: '#94a3b8',
+                            font: { family: "'Inter', sans-serif", size: 11, weight: '500' },
                             padding: { bottom: 8 }
                         },
                         grid: {
                             color: (ctx) => {
                                 if (ctx.tick && ctx.tick.value === 0) {
-                                    return isDark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(0, 0, 0, 0.22)';
+                                    return 'rgba(0, 240, 255, 0.4)';
                                 }
-                                return isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
+                                return 'rgba(255, 255, 255, 0.06)';
                             }
                         },
                         ticks: {
-                            color: isDark ? '#a8a29e' : '#78716c',
-                            font: { family: "'IBM Plex Mono', monospace", size: 10 },
+                            color: '#94a3b8',
+                            font: { family: "'JetBrains Mono', monospace", size: 10 },
                             stepSize: yStep,
                             callback: (val) => {
                                 if (val < 0 || val > suggestedMaxY) return '';
