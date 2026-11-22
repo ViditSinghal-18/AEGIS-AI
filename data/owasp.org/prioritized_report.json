@@ -1,7 +1,7 @@
 {
   "target": "owasp.org",
-  "scanned_at": "2026-11-22T14:08:26.938327+00:00",
-  "duration_seconds": 0.01,
+  "scanned_at": "2026-11-22T15:03:45.335140+00:00",
+  "duration_seconds": 0.0,
   "mode": "passive",
   "total_findings": 2,
   "critical_count": 0,
@@ -1213,10 +1213,10 @@
   "cyclonedx_sbom": {
     "bomFormat": "CycloneDX",
     "specVersion": "1.5",
-    "serialNumber": "urn:uuid:a409b5c7-55a6-4403-ac82-908ec92e8966",
+    "serialNumber": "urn:uuid:73bd4060-f24d-47ef-8c57-93080ec5ebe9",
     "version": 1,
     "metadata": {
-      "timestamp": "2026-11-22T14:08:26.938272+00:00",
+      "timestamp": "2026-11-22T15:03:45.335115+00:00",
       "tools": [
         {
           "vendor": "AEGIS-AI",

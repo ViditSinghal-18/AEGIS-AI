@@ -10,13 +10,13 @@
     <link rel="alternate icon" href="/favicon.ico">
     <meta name="theme-color" content="#050811">
     
-    <!-- Google Fonts & FontAwesome -->
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
     
     <!-- Modular Stylesheet -->
-    <link rel="stylesheet" href="/static/css/styles.css?v=2.3">
+    <link rel="stylesheet" href="/static/css/styles.css?v=3.0">
 
     <!-- Bundled Vendor Libraries -->
     <script src="/static/js/three.min.js?v=2.3"></script>
@@ -30,17 +30,17 @@
     <!-- ========================================== -->
     <!-- TOP STICKY COMMAND BAR                     -->
     <!-- ========================================== -->
-    <header role="banner">
+    <header role="banner" class="tactical-header">
         <div class="brand-box" id="brandBox" style="cursor: pointer;">
             <div class="brand-icon">
-                <img src="/static/favicon.svg" alt="AEGIS-AI Cyber Shield" width="26" height="26" style="display: block; filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.65));">
+                <img src="/static/favicon.svg" alt="AEGIS-AI Cyber Shield" width="26" height="26">
             </div>
             <div>
                 <div class="brand-title">
                     AEGIS-AI
                     <span class="brand-tag">3D RBVM</span>
                 </div>
-                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 1px;" class="mono">
+                <div class="brand-subtitle mono">
                     Autonomous CTEM &amp; Threat Exposure Platform
                 </div>
             </div>
@@ -48,11 +48,11 @@
 
         <!-- Target Selector & Scan Launcher -->
         <div class="target-bar">
-            <span style="font-size: 0.9rem; margin-left: 6px;" aria-hidden="true">🎯</span>
-            <input type="text" id="scanTargetInput" class="target-input mono" value="" placeholder="Host or domain (e.g. example.com)" aria-label="Target domain or IP address">
-            <label id="activeScanToggleContainer" title="Active TCP port & service probing (requires verified domain ownership or allowlist)" style="display: flex; align-items: center; gap: 5px; font-size: 0.74rem; color: #94a3b8; margin: 0 4px; cursor: pointer; user-select: none;">
-                <input type="checkbox" id="chkActiveScan" style="accent-color: #00f0ff; cursor: pointer;">
-                <span id="activeScanLabel">Active</span>
+            <span class="target-icon" aria-hidden="true">🎯</span>
+            <input type="text" id="scanTargetInput" class="target-input mono" value="" placeholder="Target domain or IP (e.g. example.com)" aria-label="Target domain or IP address">
+            <label id="activeScanToggleContainer" class="active-toggle-label" title="Active TCP port & service probing (requires verified domain ownership or allowlist)">
+                <input type="checkbox" id="chkActiveScan" class="active-checkbox">
+                <span id="activeScanLabel">Active Probe</span>
             </label>
             <button class="btn-scan" id="btnStartScan" aria-label="Run security audit">
                 <span id="scanSpinner">⚡</span>
@@ -66,7 +66,7 @@
                 🔑 Verify Ownership
             </button>
             <button class="btn-hud mono" id="btnTogglePalette" title="Press Ctrl+K">
-                ⌨️ <span style="font-size: 0.7rem; background: rgba(255,255,255,0.1); padding: 1px 4px; border-radius: 4px;">Ctrl+K</span>
+                ⌨️ <span class="kbd-pill">Ctrl+K</span>
             </button>
             <button class="btn-hud" id="btnExportCsv" title="Download CSV">
                 📥 CSV
@@ -77,7 +77,7 @@
             <button class="btn-hud" id="btnExportSbom" title="CycloneDX v1.5 SBOM">
                 📦 SBOM
             </button>
-            <button class="btn-hud" id="btnOpenAttackGraph" title="View Interactive Cyber Attack Surface Topology Network Graph">
+            <button class="btn-hud highlight" id="btnOpenAttackGraph" title="View Interactive Cyber Attack Surface Topology Network Graph">
                 🕸️ Attack Graph
             </button>
             <button class="btn-hud" id="btnHeaderCopilot" title="Toggle Aegis Copilot">
@@ -121,41 +121,52 @@
             </div>
         </div>
 
-        <!-- SECTION 1: ROTATING 3D CYBER GLOBE HERO -->
-        <section class="hero-stage" aria-label="3D Attack Surface Globe">
-            <div id="globe-container" style="width: 100%; height: 420px; position: relative;"></div>
+        <!-- SECTION 1: ROTATING 3D CYBER GLOBE HERO VIEWPORT -->
+        <section class="hero-stage tactical-viewport" aria-label="3D Attack Surface Globe">
+            <!-- Tactical Corner Bracket Reticles -->
+            <span class="corner-reticle tl"></span>
+            <span class="corner-reticle tr"></span>
+            <span class="corner-reticle bl"></span>
+            <span class="corner-reticle br"></span>
+
+            <div id="globe-container" class="globe-viewport"></div>
 
             <!-- 3D Globe HUD Overlays -->
             <div class="hud-overlay">
                 <div class="hud-top">
-                    <div class="hud-badge">
-                        <span class="hud-badge-title">Enterprise Threat Posture</span>
+                    <div class="hud-badge tactical-card">
+                        <span class="hud-badge-title mono">// ENTERPRISE THREAT POSTURE</span>
                         <div class="hud-badge-val">
-                            <span id="statComplianceScore" style="color: var(--cyan);">--%</span>
+                            <span id="statComplianceScore" class="glow-text-cyan">--%</span>
                             <span class="unit" id="statComplianceGrade">Awaiting Scan</span>
                         </div>
                     </div>
 
+                    <div class="hud-center-tag mono">
+                        <span class="pulse-beacon"></span>
+                        <span>AEGIS SENTINEL // 3D SURFACE INGRESS RADAR</span>
+                    </div>
+
                     <div class="hud-controls">
-                        <button class="btn-hud" id="btnToggleGlobeSpin">
+                        <button class="btn-hud" id="btnToggleGlobeSpin" title="Toggle 3D Orbit Spin">
                             🔄 <span>Toggle Spin</span>
                         </button>
                     </div>
                 </div>
 
                 <div class="hud-bottom">
-                    <div class="hud-telemetry-feed mono">
+                    <div class="hud-telemetry-feed mono tactical-card">
                         <div class="hud-telemetry-item">
-                            <span style="color: var(--cyan);">●</span>
-                            <span>Target: <strong id="targetDisplay" style="color: #fff;">None Selected</strong></span>
+                            <span class="telemetry-node cyan">●</span>
+                            <span>Target: <strong id="targetDisplay">None Selected</strong></span>
                         </div>
                         <div class="hud-telemetry-item">
-                            <span style="color: var(--emerald);">●</span>
-                            <span>Location: <strong id="globeTargetLocation" style="color: #fff;">Awaiting Target</strong></span>
+                            <span class="telemetry-node emerald">●</span>
+                            <span>Location: <strong id="globeTargetLocation">Awaiting Target</strong></span>
                         </div>
                         <div class="hud-telemetry-item">
-                            <span style="color: var(--amber);">●</span>
-                            <span>Threat Feeds: <strong style="color: #fff;">CISA KEV + FIRST.org EPSS</strong></span>
+                            <span class="telemetry-node amber">●</span>
+                            <span>Feeds: <strong>CISA KEV + FIRST.org EPSS</strong></span>
                         </div>
                     </div>
                 </div>
@@ -163,133 +174,230 @@
         </section>
 
         <!-- SECTION 2: EXECUTIVE METRIC CARDS -->
-        <div class="stats-ribbon" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin: 18px 24px;">
-            <div class="glass-panel" style="padding: 16px;">
-                <div class="stat-label">Total Findings</div>
-                <div class="stat-val" id="statTotalFindings" style="font-size: 24px; font-weight: 800; color: #fff; margin-top: 4px;">0</div>
+        <div class="stats-ribbon">
+            <div class="metric-card accent-cyan">
+                <div class="metric-header">
+                    <span class="stat-label">Total Findings</span>
+                    <span class="metric-index mono">// SEC.01</span>
+                </div>
+                <div class="stat-val glow-text-cyan" id="statTotalFindings">0</div>
+                <div class="metric-sub mono">Correlated Ingress Vectors</div>
             </div>
-            <div class="glass-panel" style="padding: 16px; border-left: 3px solid #ef4444;">
-                <div class="stat-label">P1 Critical Risk</div>
-                <div class="stat-val" id="statCritCount" style="font-size: 24px; font-weight: 800; color: #ef4444; margin-top: 4px;">0</div>
+
+            <div class="metric-card accent-crit">
+                <div class="metric-header">
+                    <span class="stat-label">P1 Critical Risk</span>
+                    <span class="metric-index mono">// P1.BREACH</span>
+                </div>
+                <div class="stat-val glow-text-rose" id="statCritCount">0</div>
+                <div class="metric-sub mono">Active CISA KEV / RCE Flaws</div>
             </div>
-            <div class="glass-panel" style="padding: 16px; border-left: 3px solid #f97316;">
-                <div class="stat-label">P2 High Risk</div>
-                <div class="stat-val" id="statHighCount" style="font-size: 24px; font-weight: 800; color: #f97316; margin-top: 4px;">0</div>
+
+            <div class="metric-card accent-high">
+                <div class="metric-header">
+                    <span class="stat-label">P2 High Risk</span>
+                    <span class="metric-index mono">// P2.EXPLOIT</span>
+                </div>
+                <div class="stat-val glow-text-orange" id="statHighCount">0</div>
+                <div class="metric-sub mono">High Probability Weapons</div>
             </div>
-            <div class="glass-panel" style="padding: 16px; border-left: 3px solid #f59e0b;">
-                <div class="stat-label">P3 Medium Risk</div>
-                <div class="stat-val" id="statMedCount" style="font-size: 24px; font-weight: 800; color: #f59e0b; margin-top: 4px;">0</div>
+
+            <div class="metric-card accent-med">
+                <div class="metric-header">
+                    <span class="stat-label">P3 Medium Risk</span>
+                    <span class="metric-index mono">// P3.ATTACK</span>
+                </div>
+                <div class="stat-val glow-text-amber" id="statMedCount">0</div>
+                <div class="metric-sub mono">Transport &amp; Header Drift</div>
             </div>
-            <div class="glass-panel" style="padding: 16px; border-left: 3px solid #3b82f6;">
-                <div class="stat-label">P4 Low / Info</div>
-                <div class="stat-val" id="statLowCount" style="font-size: 24px; font-weight: 800; color: #3b82f6; margin-top: 4px;">0</div>
+
+            <div class="metric-card accent-low">
+                <div class="metric-header">
+                    <span class="stat-label">P4 Low / Info</span>
+                    <span class="metric-index mono">// P4.HYGIENE</span>
+                </div>
+                <div class="stat-val glow-text-blue" id="statLowCount">0</div>
+                <div class="metric-sub mono">Passive Telemetry Markers</div>
             </div>
         </div>
 
         <!-- SECTION 3: VISUAL EXPOSURE MATRIX & THREAT RADAR -->
-        <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 18px; margin: 0 24px 20px 24px;">
+        <div class="grid-dual-command">
             <!-- Exposure Matrix -->
-            <div class="glass-panel" style="padding: 18px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div class="tactical-panel matrix-panel">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
+
+                <div class="panel-header">
                     <div>
-                        <h3 style="font-size: 1rem; font-weight: 700; color: #fff;">Contextual Risk Exposure Matrix</h3>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+                        <div class="panel-title-row">
+                            <span class="panel-icon">📊</span>
+                            <h3 class="panel-title">Contextual Risk Exposure Matrix</h3>
+                        </div>
+                        <div class="panel-subtitle mono">
                             X: CVSS Theoretical Base Flaw &middot; Y: FIRST.org EPSS Real Weaponization (%)
                         </div>
                     </div>
-                    <span class="badge" id="matrixMetaBadge" style="background: rgba(0,240,255,0.12); color: #00f0ff; border: 1px solid rgba(0,240,255,0.25);">
+                    <span class="badge-tactical mono" id="matrixMetaBadge">
                         Plotted: 0 | Excluded: 0
                     </span>
                 </div>
-                <div style="height: 280px; position: relative;">
+                <div class="chart-canvas-container">
                     <canvas id="riskMatrixChart"></canvas>
                 </div>
             </div>
 
             <!-- Threat Radar -->
-            <div class="glass-panel" style="padding: 18px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <h3 style="font-size: 1rem; font-weight: 700; color: #fff;">Blind CVSS vs. AEGIS Contextual</h3>
+            <div class="tactical-panel radar-panel">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
+
+                <div class="panel-header">
+                    <div class="panel-title-row">
+                        <span class="panel-icon">🎯</span>
+                        <h3 class="panel-title">Blind CVSS vs. AEGIS Contextual</h3>
+                    </div>
                     <button class="btn btn-secondary btn-sm" id="btnResetThreatRadar">Reset</button>
                 </div>
-                <div style="height: 280px; position: relative;">
+                <div class="chart-canvas-container">
                     <canvas id="threatRadarChart"></canvas>
                 </div>
             </div>
         </div>
 
         <!-- SECTION 4: FINDINGS TRIAGE TABLE & ATTACK SIMULATOR -->
-        <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 18px; margin: 0 24px 20px 24px;">
+        <div class="grid-dual-command">
             <!-- Findings Table -->
-            <div class="glass-panel" style="padding: 18px;">
-                <h3 style="font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 12px;">Correlated Perimeter Findings</h3>
-                <div style="overflow-x: auto; max-height: 400px;">
-                    <table class="table-triage" style="width: 100%; border-collapse: collapse;">
+            <div class="tactical-panel table-panel">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
+
+                <div class="panel-header">
+                    <div class="panel-title-row">
+                        <span class="panel-icon">🛡️</span>
+                        <h3 class="panel-title">Correlated Perimeter Findings</h3>
+                    </div>
+                    <span class="panel-tag mono">Ranked by Attack Vector Impact</span>
+                </div>
+
+                <div class="table-scroll-wrap">
+                    <table class="table-triage">
                         <thead>
-                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left; font-size: 0.75rem; color: #94a3b8;">
-                                <th style="padding: 8px;">Priority</th>
-                                <th style="padding: 8px;">Score</th>
-                                <th style="padding: 8px;">Finding Title</th>
-                                <th style="padding: 8px;">CVEs</th>
-                                <th style="padding: 8px;">Source</th>
-                                <th style="padding: 8px;">EPSS Prob</th>
-                                <th style="padding: 8px;">Action</th>
+                            <tr>
+                                <th>Priority</th>
+                                <th>Score</th>
+                                <th>Finding Title</th>
+                                <th>CVEs</th>
+                                <th>Source</th>
+                                <th>EPSS Prob</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="findingsTableBody">
-                            <tr><td colspan="7" style="padding: 20px; text-align: center; color: #64748b;">Awaiting scan telemetry. Enter a target above and click "Run Audit".</td></tr>
+                            <tr><td colspan="7" class="table-empty">Awaiting scan telemetry. Enter a target above and click "Run Audit".</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
             <!-- Selected Finding & Attack Simulator -->
-            <div class="glass-panel" style="padding: 18px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3 style="font-size: 1rem; font-weight: 700; color: #fff;" id="selectedFindingTitle">Finding Triage Dossier</h3>
-                    <span class="badge" id="selectedFindingScore" style="background: rgba(0,240,255,0.15); color: #00f0ff; font-weight: 700;">-- / 10</span>
+            <div class="tactical-panel triage-panel">
+                <span class="corner-reticle tl"></span>
+                <span class="corner-reticle tr"></span>
+                <span class="corner-reticle bl"></span>
+                <span class="corner-reticle br"></span>
+
+                <div class="panel-header">
+                    <h3 class="panel-title" id="selectedFindingTitle">Finding Triage Dossier</h3>
+                    <span class="badge-score mono" id="selectedFindingScore">-- / 10</span>
                 </div>
-                <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 8px;" id="selectedFindingDesc">Select a row to inspect evidence and virtual patch.</div>
+                <div class="finding-desc" id="selectedFindingDesc">Select a row to inspect evidence and virtual patch.</div>
                 
-                <h4 style="font-size: 0.85rem; color: #00f0ff; margin-top: 14px; margin-bottom: 8px;">Illustrative Adversary Walkthrough</h4>
-                <div id="attackSimulatorContainer" style="display: flex; flex-direction: column; gap: 8px;"></div>
+                <div class="adversary-header">
+                    <span class="pulse-beacon"></span>
+                    <h4 class="adversary-title">Illustrative Adversary Walkthrough</h4>
+                </div>
+                <div id="attackSimulatorContainer" class="simulator-stream"></div>
             </div>
         </div>
 
         <!-- SECTION 5: MULTI-FRAMEWORK COMPLIANCE GOVERNANCE -->
-        <div class="glass-panel" style="margin: 0 24px 24px 24px; padding: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div class="tactical-panel compliance-panel">
+            <span class="corner-reticle tl"></span>
+            <span class="corner-reticle tr"></span>
+            <span class="corner-reticle bl"></span>
+            <span class="corner-reticle br"></span>
+
+            <div class="panel-header">
                 <div>
-                    <h3 style="font-size: 1.05rem; font-weight: 700; color: #fff;">Multi-Framework Governance &amp; Regulatory Compliance</h3>
-                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+                    <div class="panel-title-row">
+                        <span class="panel-icon">🏛️</span>
+                        <h3 class="panel-title">Multi-Framework Governance &amp; Regulatory Compliance</h3>
+                    </div>
+                    <div class="panel-subtitle mono">
                         Dynamically evaluated from discovered security controls. No hardcoded fixed percentages.
                     </div>
                 </div>
+                <span class="badge-tactical mono">ISO / NIST / PCI / SOC2</span>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;">
-                <div class="compliance-card" style="background: rgba(5,8,17,0.7); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 6px;">
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">PCI-DSS 4.0</div>
-                    <div style="font-size: 22px; font-weight: 800; color: #00f0ff; margin: 4px 0;" id="compPciScore">--%</div>
-                    <div style="font-size: 0.75rem; color: #64748b;" id="compPciPass">Awaiting Target</div>
+            <div class="compliance-grid">
+                <!-- PCI-DSS 4.0 -->
+                <div class="compliance-card">
+                    <div class="compliance-card-header">
+                        <span class="framework-name">PCI-DSS 4.0</span>
+                        <span class="comp-status-chip compliant" id="compPciStatus">MONITORED</span>
+                    </div>
+                    <div class="compliance-score glow-text-cyan" id="compPciScore">--%</div>
+                    <div class="compliance-progress-track">
+                        <div class="compliance-progress-fill" id="compPciBar" style="width: 0%;"></div>
+                    </div>
+                    <div class="compliance-controls mono" id="compPciPass">Awaiting Target</div>
                 </div>
 
-                <div class="compliance-card" style="background: rgba(5,8,17,0.7); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 6px;">
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">NIST CSF 2.0</div>
-                    <div style="font-size: 22px; font-weight: 800; color: #10b981; margin: 4px 0;" id="compNistScore">--%</div>
-                    <div style="font-size: 0.75rem; color: #64748b;" id="compNistPass">Awaiting Target</div>
+                <!-- NIST CSF 2.0 -->
+                <div class="compliance-card">
+                    <div class="compliance-card-header">
+                        <span class="framework-name">NIST CSF 2.0</span>
+                        <span class="comp-status-chip compliant" id="compNistStatus">MONITORED</span>
+                    </div>
+                    <div class="compliance-score glow-text-emerald" id="compNistScore">--%</div>
+                    <div class="compliance-progress-track">
+                        <div class="compliance-progress-fill" id="compNistBar" style="width: 0%;"></div>
+                    </div>
+                    <div class="compliance-controls mono" id="compNistPass">Awaiting Target</div>
                 </div>
 
-                <div class="compliance-card" style="background: rgba(5,8,17,0.7); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 6px;">
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">ISO/IEC 27001:2022</div>
-                    <div style="font-size: 22px; font-weight: 800; color: #38bdf8; margin: 4px 0;" id="compIsoScore">--%</div>
-                    <div style="font-size: 0.75rem; color: #64748b;" id="compIsoPass">Awaiting Target</div>
+                <!-- ISO/IEC 27001:2022 -->
+                <div class="compliance-card">
+                    <div class="compliance-card-header">
+                        <span class="framework-name">ISO/IEC 27001:2022</span>
+                        <span class="comp-status-chip compliant" id="compIsoStatus">MONITORED</span>
+                    </div>
+                    <div class="compliance-score glow-text-blue" id="compIsoScore">--%</div>
+                    <div class="compliance-progress-track">
+                        <div class="compliance-progress-fill" id="compIsoBar" style="width: 0%;"></div>
+                    </div>
+                    <div class="compliance-controls mono" id="compIsoPass">Awaiting Target</div>
                 </div>
 
-                <div class="compliance-card" style="background: rgba(5,8,17,0.7); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 6px;">
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">SOC 2 Type II</div>
-                    <div style="font-size: 22px; font-weight: 800; color: #f59e0b; margin: 4px 0;" id="compSoc2Score">--%</div>
-                    <div style="font-size: 0.75rem; color: #64748b;" id="compSoc2Pass">Awaiting Target</div>
+                <!-- SOC 2 Type II -->
+                <div class="compliance-card">
+                    <div class="compliance-card-header">
+                        <span class="framework-name">SOC 2 Type II</span>
+                        <span class="comp-status-chip partial" id="compSoc2Status">MONITORED</span>
+                    </div>
+                    <div class="compliance-score glow-text-amber" id="compSoc2Score">--%</div>
+                    <div class="compliance-progress-track">
+                        <div class="compliance-progress-fill" id="compSoc2Bar" style="width: 0%;"></div>
+                    </div>
+                    <div class="compliance-controls mono" id="compSoc2Pass">Awaiting Target</div>
                 </div>
             </div>
         </div>
@@ -297,9 +405,9 @@
     </main>
 
     <!-- FLOATING LAUNCHER FAB (shown when copilot dock is closed) -->
-    <button class="copilot-fab" id="copilotFab" aria-label="Open Aegis Copilot" style="display: flex;">
-        <span style="font-size: 1.2rem;">🤖</span>
-        <span>Aegis Copilot</span>
+    <button class="copilot-fab" id="copilotFab" aria-label="Open Aegis Copilot">
+        <span class="copilot-fab-icon">🤖</span>
+        <span class="copilot-fab-label">Aegis Copilot</span>
     </button>
 
     <!-- AEGIS COPILOT INTERACTIVE CHAT DOCK -->
@@ -312,7 +420,7 @@
                         Aegis Copilot
                         <span class="copilot-status-dot" title="SOC Guardrail Active"></span>
                     </div>
-                    <div class="copilot-header-sub">Grounded Defensive SOC Assistant</div>
+                    <div class="copilot-header-sub mono">Grounded Defensive SOC Assistant</div>
                 </div>
             </div>
             <div class="copilot-header-actions">

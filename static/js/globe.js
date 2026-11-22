@@ -49,7 +49,7 @@ window.AegisGlobe = (function () {
         [63, 67, -25, -13], [60, 83, -55, -20]
     ];
 
-    // Pre-calculate ~1,200 continental surface coordinates (lat, lon)
+    // Pre-calculate ~2,400 continental surface coordinates (lat, lon)
     const CONTINENT_POINTS = [];
     (function generateLandPoints() {
         for (let i = 0; i < CONTINENT_BOXES.length; i++) {
@@ -57,13 +57,13 @@ window.AegisGlobe = (function () {
             let lat = b[0];
             while (lat <= b[1]) {
                 let lon = b[2];
-                const cosLat = Math.max(0.2, Math.cos(lat * Math.PI / 180));
-                const stepLon = Math.min(8.0, 4.2 / cosLat);
+                const cosLat = Math.max(0.25, Math.cos(lat * Math.PI / 180));
+                const stepLon = Math.min(5.5, 3.0 / cosLat);
                 while (lon <= b[3]) {
                     CONTINENT_POINTS.push({ lat: lat, lon: lon });
                     lon += stepLon;
                 }
-                lat += 3.8;
+                lat += 2.8;
             }
         }
     })();
@@ -479,9 +479,9 @@ window.AegisGlobe = (function () {
         scene.add(globeGroup);
 
         // 1. Cosmic Dark Core Sphere
-        const sphereGeo = new THREE.SphereGeometry(75, 48, 48);
+        const sphereGeo = new THREE.SphereGeometry(74.5, 48, 48);
         const sphereMat = new THREE.MeshBasicMaterial({
-            color: 0x060d1d,
+            color: 0x040814,
             transparent: true,
             opacity: 0.95
         });
@@ -489,17 +489,32 @@ window.AegisGlobe = (function () {
         globeGroup.add(coreSphere);
 
         // 2. Holographic Latitude & Longitude Wireframe
-        const wireGeo = new THREE.SphereGeometry(75.5, 32, 32);
+        const wireGeo = new THREE.SphereGeometry(75.2, 28, 28);
         const wireMat = new THREE.MeshBasicMaterial({
             color: 0x00f0ff,
             wireframe: true,
             transparent: true,
-            opacity: 0.22
+            opacity: 0.16
         });
         const wireSphere = new THREE.Mesh(wireGeo, wireMat);
         globeGroup.add(wireSphere);
 
-        // 3. Continental Landmass Dot Matrix Cloud
+        // 3. Continental Landmass Glowing Dot Matrix Cloud
+        const dotCanvas = document.createElement('canvas');
+        dotCanvas.width = 32;
+        dotCanvas.height = 32;
+        const dCtx = dotCanvas.getContext('2d');
+        const dGrad = dCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        dGrad.addColorStop(0, '#ffffff');
+        dGrad.addColorStop(0.3, '#00f0ff');
+        dGrad.addColorStop(0.7, 'rgba(0, 240, 255, 0.45)');
+        dGrad.addColorStop(1, 'rgba(0, 240, 255, 0)');
+        dCtx.fillStyle = dGrad;
+        dCtx.beginPath();
+        dCtx.arc(16, 16, 16, 0, Math.PI * 2);
+        dCtx.fill();
+        const dotTexture = new THREE.CanvasTexture(dotCanvas);
+
         const landGeo = new THREE.BufferGeometry();
         const landPos = new Float32Array(CONTINENT_POINTS.length * 3);
         const rLand = 76.2;
@@ -517,20 +532,26 @@ window.AegisGlobe = (function () {
         landGeo.setAttribute('position', new THREE.BufferAttribute(landPos, 3));
         const landMat = new THREE.PointsMaterial({
             color: 0x00f0ff,
-            size: 2.4,
+            map: dotTexture,
+            size: 3.6,
+            sizeAttenuation: true,
             transparent: true,
-            opacity: 0.88
+            opacity: 0.95,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
         });
         const landPointsMesh = new THREE.Points(landGeo, landMat);
         globeGroup.add(landPointsMesh);
 
         // 4. Outer Atmospheric Glow Rings
-        const ringGeo = new THREE.RingGeometry(78, 88, 64);
+        const ringGeo = new THREE.RingGeometry(78, 87, 64);
         const ringMat = new THREE.MeshBasicMaterial({
             color: 0x00f0ff,
             side: THREE.DoubleSide,
             transparent: true,
-            opacity: 0.28
+            opacity: 0.28,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
         });
         const ringMesh = new THREE.Mesh(ringGeo, ringMat);
         ringMesh.rotation.x = Math.PI / 2.3;
@@ -541,7 +562,9 @@ window.AegisGlobe = (function () {
             color: 0x38bdf8,
             side: THREE.DoubleSide,
             transparent: true,
-            opacity: 0.20
+            opacity: 0.22,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
         });
         const ringMesh2 = new THREE.Mesh(ringGeo2, ringMat2);
         ringMesh2.rotation.x = Math.PI / 1.7;
@@ -729,30 +752,37 @@ window.AegisGlobe = (function () {
             mid.normalize().multiplyScalar(radius + Math.min(dist * 0.38, 30));
 
             const curve = new THREE.QuadraticBezierCurve3(arc.from, mid, arc.to);
-            const pts = curve.getPoints(45);
+            const pts = curve.getPoints(50);
             const arcGeo = new THREE.BufferGeometry().setFromPoints(pts);
             const arcMat = new THREE.LineBasicMaterial({
                 color: arc.color,
                 transparent: true,
-                opacity: 0.8,
-                linewidth: 2
+                opacity: 0.88,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
             });
             const line = new THREE.Line(arcGeo, arcMat);
             line.userData = { offset: idx * 0.4 };
             globeGroup.add(line);
             threeArcs.push(line);
 
-            // Add Photon Pulse Bead
-            const beadGeo = new THREE.SphereGeometry(1.9, 12, 12);
-            const beadMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            const beadMesh = new THREE.Mesh(beadGeo, beadMat);
-            beadMesh.userData = {
-                curve: curve,
-                speed: 0.005 + (idx % 3) * 0.002,
-                progress: (idx * 0.2) % 1
-            };
-            globeGroup.add(beadMesh);
-            threeBeads.push(beadMesh);
+            // Add dual traveling photon pulse beads per arc
+            for (let b = 0; b < 2; b++) {
+                const beadGeo = new THREE.SphereGeometry(2.2, 12, 12);
+                const beadMat = new THREE.MeshBasicMaterial({
+                    color: arc.isTarget ? 0x00f0ff : 0xffffff,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const beadMesh = new THREE.Mesh(beadGeo, beadMat);
+                beadMesh.userData = {
+                    curve: curve,
+                    speed: 0.005 + (idx % 3) * 0.002,
+                    progress: ((idx * 0.25) + (b * 0.5)) % 1
+                };
+                globeGroup.add(beadMesh);
+                threeBeads.push(beadMesh);
+            }
         });
 
         // Smoothly orient globe towards target if set
