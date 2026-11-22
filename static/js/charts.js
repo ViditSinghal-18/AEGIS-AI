@@ -90,10 +90,10 @@ window.AegisCharts = (function () {
             minY = -2;
             maxY = 12;
         } else {
-            // For low/zero EPSS (<1%), scale between 0.0% and 2.0%
+            // For low/zero EPSS (<1%), scale between 0.0% and 2.0% with headroom below y=0 for bubble radius
             suggestedMaxY = 2.0;
             yStep = 0.5;
-            minY = -0.5;
+            minY = -0.75;
             maxY = 2.5;
         }
 
@@ -123,10 +123,10 @@ window.AegisCharts = (function () {
                 maintainAspectRatio: false,
                 layout: {
                     padding: {
-                        left: 20,
-                        right: 24,
+                        left: 42,
+                        right: 28,
                         top: 16,
-                        bottom: 12
+                        bottom: 16
                     }
                 },
                 onClick: (e, elements) => {

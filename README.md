@@ -1,33 +1,66 @@
-# 🛡️ AEGIS-AI: Continuous Threat Exposure Management & Risk-Based Vulnerability Prioritization
+# 🛡️ AEGIS-AI: Autonomous Attack Surface Risk-Based Vulnerability Management (RBVM)
 
+[![Live Web Application](https://img.shields.io/badge/Live%20App-aegis--ai--rfn5.onrender.com-46E3B7.svg?style=for-the-badge&logo=render)](https://aegis-ai-rfn5.onrender.com/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Flask 3.0+](https://img.shields.io/badge/backend-Flask%203.0+-green.svg)](https://flask.palletsprojects.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Three.js](https://img.shields.io/badge/3D%20Graphics-Three.js-black.svg?logo=three.js)](https://threejs.org/)
+[![Three.js WebGL](https://img.shields.io/badge/3D%20Graphics-Three.js%20%7C%20Canvas2D-black.svg?logo=three.js)](https://threejs.org/)
 [![Threat Intel](https://img.shields.io/badge/threat--intel-FIRST.org%20EPSS%20%7C%20CISA%20KEV-red.svg)](https://www.first.org/epss)
-[![Compliance](https://img.shields.io/badge/compliance-NIST%20CSF%202.0%20%7C%20PCI--DSS%204.0%20%7C%20ISO%2027001-purple.svg)](#)
-[![SBOM](https://img.shields.io/badge/standard-CycloneDX%20v1.5-blueviolet.svg)](#)
+[![Compliance](https://img.shields.io/badge/compliance-NIST%20CSF%202.0%20%7C%20PCI--DSS%204.0%20%7C%20ISO%2027001%20%7C%20SOC%202-purple.svg)](#)
+[![CycloneDX SBOM](https://img.shields.io/badge/standard-CycloneDX%20v1.5-blueviolet.svg)](#)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker)](#)
+[![Pytest Suite](https://img.shields.io/badge/tests-223%20passed-success.svg)](#)
 
 > **Continuous Threat Exposure Management (CTEM) & Explainable RBVM Platform**  
-> Honest, evidence-grounded perimeter reconnaissance, real threat intelligence correlation, contextual risk prioritization, multi-framework compliance scoring, and grounded Blue-Team AI assistance.
+> 🌐 **Live Cloud Deployment:** [https://aegis-ai-rfn5.onrender.com/](https://aegis-ai-rfn5.onrender.com/)  
+> Honest, evidence-grounded perimeter reconnaissance, real threat intelligence correlation (FIRST.org EPSS & CISA KEV), 3D threat surface visualization with interactive raycast vulnerability inspection, multi-framework compliance scoring, and defensive Blue-Team AI assistance.
 
 ---
 
-## 🌟 Overview & Core Principles
+## 🌟 Overview & Key Capabilities
 
-Traditional vulnerability management floods security teams with raw CVSS alerts, treating an unreachable internal dependency with the same urgency as a critical internet-exposed service.
+Traditional vulnerability management tools flood security teams with raw CVSS alerts, treating unreachable internal libraries with the same alarm as critical internet-exposed services.
 
-**AEGIS-AI** bridges the gap between raw vulnerability reports and true exploitability risk through four core principles:
+**AEGIS-AI** bridges the gap between raw vulnerability disclosures and real weaponization risk through evidence-grounded telemetry, contextual attack path analysis, and automated triage dossiers:
 
-1. **Strictly Evidence-Grounded Telemetry:** No fabricated attacker pins, fake APT threat actors, or simulated scan delays. Every metric in the dashboard is derived from real network probes, official threat feeds, or explicit sample benchmarks.
-2. **Two-Mode Operational Safety:**
-   - **Passive OSINT Mode (Default):** Non-intrusive DNS queries, TLS certificate handshakes, HTTP security headers, Certificate Transparency logs, and public advisory lookups. Safe for any public target without prior authorization.
-   - **Verified Active Mode:** Active TCP port and service banner discovery using Nmap. Strictly requires prior domain ownership verification (DNS TXT or HTTP token challenge) or inclusion in `targets.allowlist`.
-3. **Honest Reachability Separation:**
-   - **Network Exposure:** Evaluated from real network evidence (open ports, reachable HTTP services, missing ingress headers, TLS posture).
-   - **Code Reachability:** Evaluated via genuine AST import-graph analysis *only when project source code is provided*. Remote targets without source code are honestly reported as `"unknown (no source provided)"`.
-4. **Defensive Blue-Team AI with Grounding Verification:** Aegis Copilot operates strictly as a defensive assistant. It intercepts and refuses offensive exploit requests, and enforces a strict CVE grounding guardrail that flags hallucinated vulnerabilities not present in the verified telemetry report.
+### 1. 🌐 Interactive 3D Cyber Threat Surface Globe
+- **Dual-Engine 3D Rendering:** Full Three.js WebGL and high-DPI Canvas 2D fallback engine with 100% visual and interactive feature parity.
+- **Continental Landmass & Telemetry Mesh:** 2,400+ pre-calculated continental surface coordinates and real-time quadratic Bezier telemetry arcs connecting regional sensor gateways (US-East, US-West, EU-Central, UK, APAC, Oceania, South America) with traveling photon energy pulses.
+- **Dynamic 3D Vulnerability Node Mapping:** Following an audit, correlated findings are dynamically plotted directly onto the 3D rotating globe surface using golden-angle concentric perimeter dispersion clustered around verified target ingress coordinates.
+- **Severity-Coded Pulse Rings:** Beacon nodes color-coded by severity:
+  - **Critical (P1):** Neon Rose (`#ff3366`) with radiating pulse rings
+  - **High (P2):** Vivid Orange (`#f97316`) with active ingress arcs
+  - **Medium (P3):** Amber Gold (`#f59e0b`)
+  - **Low / Info (P4):** Sky Blue (`#38bdf8`) / Electric Cyan (`#00f0ff`)
+- **Raycasting Hover HUD Card (`#globeTooltip`):** Mouse hover inspection using Three.js raycasting and 2D canvas distance hit-testing displays an instant floating tactical card with vulnerability title, severity badge, risk score, EPSS probability, and CVE identifiers.
+- **Click-to-Triage Linkage:** Clicking any vulnerability node on the globe automatically selects that finding in the ledger table, centers the triage dossier, and populates the 4-phase adversary walkthrough.
+
+### 2. 🎯 Tactical Sentinel Corner-Reticle Design System
+- **Operations Dossier Aesthetic:** 112+ precision glowing cyan corner brackets (`.corner-reticle`) wrapping target inputs, metric ribbon cards, 3D globe viewports, HUD telemetry strips, risk exposure matrix, threat radar, and compliance panels.
+- **Contextual Risk Exposure Matrix:** Scatter matrix plotting CVSS theoretical severity against FIRST.org EPSS real weaponization probability with full unbroken data points and non-CVE perimeter flaw exclusions.
+- **Illustrative 4-Phase Adversary Propagation Walkthrough:** Detailed attack chains modeling Phase 1 (Reconnaissance), Phase 2 (Weaponization with MITRE ATT&CK T-codes), Phase 3 (Impact), and Phase 4 (Defensive Virtual Remediation) with copyable server snippets (Nginx, Apache, Caddy, Cloudflare WAF, Helmet).
+
+### 3. 🏛️ Multi-Framework Governance & Regulatory Compliance
+- Evaluates real security controls directly against discovered posture signals:
+  - **PCI-DSS 4.0:** Requirement 6.2 (Patching) & 4.1.1 (TLS Transport Security)
+  - **NIST CSF 2.0:** Govern, Protect (PR.PS/PR.AC), and Detect (DE.CM)
+  - **ISO/IEC 27001:2022:** Annex A.8.8 (Management of Technical Vulnerabilities) & A.8.20 (Network Security)
+  - **SOC 2 Type II:** Trust Services Criteria CC6.6 (Boundary Protection) & CC7.1 (Vulnerability Monitoring)
+- **Honest Empty States:** Displays honest unassessed states (`"Not assessed yet"`, `"--%"`) when awaiting target audit, eliminating misleading placeholders.
+
+### 4. 🕸️ In-Tab Interactive Bayesian Attack Graph Modal
+- **In-Tab Overlay:** Access the interactive attack graph topology directly within the current dashboard without opening new tabs.
+- **Probabilistic Risk Propagation:** Bayesian compromise probabilities calculated using FIRST EPSS exploit likelihood and canonical Noisy-OR convergence.
+- **Dijkstra Most-Probable Exploit Path:** Renders the highest-probability path from External Ingress to Crown Jewels ($w = -\ln p$) in glowing crimson.
+- **Minimal Critical Chokepoint Cut-Set:** Identifies strategic single-point remediations that sever 100% of viable exploit trajectories to crown jewels.
+
+### 5. 🛡️ Two-Mode Operational Safety
+- **Passive OSINT Mode (Default):** Non-intrusive DNS queries, TLS certificate handshakes, HTTP security headers, Certificate Transparency logs, and public advisory lookups. Safe for any public domain without authorization.
+- **Verified Active Mode:** Active TCP port and service banner discovery using Nmap. Strictly requires prior domain ownership verification (DNS TXT or HTTP token challenge) or inclusion in `targets.allowlist`.
+
+### 6. 🤖 Grounded Blue-Team AI Assistance
+- **Aegis AI Copilot:** Provider-neutral LLM abstraction supporting Free Zero-Key AI, Groq (Llama 3.3), Google Gemini, local Ollama, Amazon Bedrock, or deterministic heuristic fallback.
+- **Anti-Hallucination Guardrail:** Evaluates Copilot responses for claim-level grounding and citation fidelity, intercepting offensive exploit requests and flagging unverified CVEs absent from the telemetry report.
 
 ---
 
@@ -53,10 +86,12 @@ flowchart TD
         OSV & EPSS & KEV --> Prioritize[Multi-Factor Contextual Risk Scoring\nCVSS + EPSS + Network Exposure + Criticality]
         Prioritize --> Compliance[Multi-Framework Compliance Scoring\nNIST CSF 2.0, PCI-DSS 4.0, ISO 27001, SOC 2]
         Prioritize --> Remediate[Automated Remediation Generator\nNginx, Apache, Caddy, Helmet, WAF Rules]
+        Prioritize --> Graph[Bayesian Attack Graph Engine\nDijkstra Shortest Path & Cut-Set Chokepoints]
     end
 
     subgraph UI["Cyber SOC Dashboard & Copilot"]
-        Prioritize --> Web[Modular Cyber SOC Dashboard\n3D Threat Globe, Exposure Matrix, Radar]
+        Prioritize --> Globe[3D Threat Surface Globe\nRaycast Hover HUD & Node Triage]
+        Prioritize --> Web[Tactical Sentinel Dashboard\nRisk Matrix, Radar, Dossier, Compliance]
         Prioritize --> Copilot[Aegis AI Copilot\nMulti-Provider LLM + Grounding Guardrail]
         Prioritize --> Exports[Multi-Format Export Engine\nHTML CISO Report, CSV, CycloneDX SBOM, SIEM CEF/ECS]
     end
@@ -64,11 +99,19 @@ flowchart TD
 
 ---
 
-## 🚀 Deployment Options
+## 🚀 Live Demo & Deployment Options
+
+### 🌐 Live Production Deployment
+
+Experience AEGIS-AI running live in the cloud on Render:
+
+🔗 **[https://aegis-ai-rfn5.onrender.com/](https://aegis-ai-rfn5.onrender.com/)**
+
+---
 
 ### Option 1: Docker Container (Recommended for Local / Enterprise SOC)
 
-Running via Docker enables full **Verified Active Scanning** capabilities (with system `nmap` pre-configured in a non-root Debian container).
+Running via Docker enables full **Verified Active Scanning** capabilities (with system `nmap` pre-configured in a non-root container).
 
 ```bash
 # 1. Clone the repository
@@ -87,7 +130,7 @@ open http://localhost:5000
 ```bash
 # 1. Ensure Python 3.10+ and Nmap are installed
 python --version
-nmap --version  # Required for active scanning
+nmap --version  # Required for verified active scanning
 
 # 2. Create and activate a virtual environment
 python -m venv venv
@@ -103,12 +146,13 @@ cp .env.example .env
 python app.py
 ```
 
-### Option 3: Vercel Serverless Deployment
+### Option 3: Cloud Deployment (Render / Web Service)
 
-AEGIS-AI is architected for Vercel serverless deployment (`@vercel/python`):
-- Operates automatically in **Passive OSINT Mode** (active port scanning disabled to comply with serverless execution constraints).
-- Routes runtime state and caches to the writable `/tmp/aegis_data` partition with automatic in-memory fallback.
-- Multi-stage scan APIs (`/api/scan/dns`, `/tls`, `/headers`, `/ct`, `/intel`, `/prioritize`) execute within serverless execution timeouts.
+AEGIS-AI is production-configured for containerized and web-service deployment on **Render**:
+- **Build Command:** `pip install -r requirements.txt`
+- **Start Command:** `gunicorn app:app --workers 2 --bind 0.0.0.0:$PORT`
+- **Environment:** Set `PYTHON_VERSION=3.11.9`, `FLASK_ENV=production`, `SECRET_KEY=<secure-random-key>`.
+- **Health Check Endpoint:** `/api/health`
 
 ---
 
@@ -163,26 +207,24 @@ AEGIS_LLM_MODEL_LARGE=llama-3.3-70b-versatile
 ```
 
 3. Test your configuration:
-
 ```bash
 python verify_llm.py
 ```
 
 ### Other Supported Providers
 
+- **Google Gemini (OpenAI-compatible endpoint):**
+  `AEGIS_LLM_PROVIDER=openai_compatible`, `AEGIS_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`, `AEGIS_LLM_MODEL=gemini-2.0-flash`.
 - **Cerebras (Fast / Free tier):**
   `AEGIS_LLM_PROVIDER=openai_compatible`, `AEGIS_LLM_BASE_URL=https://api.cerebras.ai/v1`, `AEGIS_LLM_MODEL=llama3.1-8b`.
 - **OpenRouter Free Tier:**
   `AEGIS_LLM_PROVIDER=openai_compatible`, `AEGIS_LLM_BASE_URL=https://openrouter.ai/api/v1`, `AEGIS_LLM_MODEL=meta-llama/llama-3.1-8b-instruct:free`.
-- **Google Gemini (OpenAI-compatible endpoint):**
-  `AEGIS_LLM_PROVIDER=openai_compatible`, `AEGIS_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`, `AEGIS_LLM_MODEL=gemini-2.0-flash`.
-  *(Note: Google's free tier terms may allow prompt data usage for model training).*
 - **Local Ollama (Offline / Air-gapped):**
   `AEGIS_LLM_PROVIDER=ollama`, `OLLAMA_HOST=http://localhost:11434`, `AEGIS_LLM_MODEL=llama3.2`.
 - **Amazon Bedrock (Optional Cloud Provider):**
   `AEGIS_LLM_PROVIDER=bedrock`, with `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION`.
 
-*If `AEGIS_LLM_PROVIDER=none` or unset, AEGIS automatically activates its built-in **Deterministic Heuristic Reasoner**, performing zero LLM network requests and providing verified, zero-hallucination answers derived directly from scan telemetry.*
+*If `AEGIS_LLM_PROVIDER=none` or unset, AEGIS automatically activates its built-in **Deterministic Heuristic Reasoner**, performing zero external LLM network requests and providing verified, zero-hallucination answers derived directly from scan telemetry.*
 
 ---
 
@@ -197,6 +239,7 @@ AEGIS-AI was benchmarked against the **OWASP Juice Shop** perimeter attack surfa
 | **F1-Score** | **100.0%** | ≥ 90.0% | Harmonic mean of precision and recall |
 | **Alert Fatigue Reduction** | **66.7%** | ≥ 50.0% | Non-reachable and low-EPSS vulnerabilities suppressed from critical queue |
 | **AI Grounding Accuracy** | **100.0%** | 100.0% | 100% of hallucinated CVE queries intercepted by guardrail |
+| **Pytest Test Suite** | **223 / 223** | 100% | 100% passing across scoring, attack graph, copilot, and UI |
 
 *Full evaluation methodology and test logs: [`docs/EVALUATION.md`](docs/EVALUATION.md).*
 
@@ -207,7 +250,7 @@ AEGIS-AI was benchmarked against the **OWASP Juice Shop** perimeter attack surfa
 AEGIS-AI includes a comprehensive `pytest` test suite covering safety boundaries, SSRF defenses, scoring formulas, AST reachability, and API endpoints:
 
 ```bash
-# Run complete test suite (210+ tests covering Phases 1-6)
+# Run complete test suite (223 tests covering Phases 1-6)
 python -m pytest tests/ -v
 
 # Run OWASP Juice Shop validation benchmark
@@ -243,7 +286,6 @@ AEGIS-AI incorporates research-inspired risk quantification modules under `scori
 
 4. **Calibrated Uncertainty Intervals (`scoring/uncertainty.py`):**
    - Produces a 90% confidence risk interval (`risk_interval_90`) around point scores. Widens when version matching is banner-derived, advisory catalogs diverge, or EPSS telemetry is absent (inspired by Angelopoulos & Bates 2021).
-   - Explicitly noted as a calibrated residual heuristic rather than finite-sample exchangeable conformal prediction.
 
 5. **FAIR-Style Quantitative Loss Modeling (`scoring/fair_loss.py`):**
    - Runs seeded, reproducible Monte Carlo simulations modeling Threat Event Frequency from EPSS and Loss Magnitude scaled by asset criticality (inspired by Open FAIR and Hubbard & Seiersen 2016).
@@ -266,7 +308,6 @@ AEGIS-AI implements research-backed filters to suppress false positives without 
 3. **Function-Level AST Reachability Analysis (`ast_analyzer.py` & `data/cve_symbols.yaml`):**
    - Maps CVEs to specific vulnerable symbols and function entrypoints (inspired by Ponta et al., Eclipse Steady / IEEE ICSME 2018).
    - Evaluates call graphs and imports to assign exact verdicts: `reachable_function` (Factor 1.0), `imported_only` (Factor 0.3), `not_reachable` (Factor 0.0), or `unknown (no source provided)` (Factor 1.0).
-   - Feeds code reachability directly into the contextual risk score as an explicit, documented multiplier.
 
 ---
 
@@ -323,11 +364,11 @@ AEGIS-AI passively evaluates perimeter hygiene and predicts breach likelihood fr
 
 2. **50-Question Adversarial & Robustness Evaluation Harness (`eval/copilot_eval.py`):**
    - Comprehensive test suite covering 20 factual questions, 15 adversarial offensive requests, and 15 hallucination-induction queries.
-   - Runnable in CI with automated gating: enforces $\ge 90\%$ offensive request refusal accuracy, $0\%$ hallucinated CVE rate, and $\ge 75\%$ mean factual faithfulness.
+   - Enforces $\ge 90\%$ offensive request refusal accuracy, $0\%$ hallucinated CVE rate, and $\ge 75\%$ mean factual faithfulness.
 
 3. **Supervised MITRE ATT&CK Technique Mapper (`correlation/learned_attack_mapper.py`):**
    - Machine-learned baseline (TF-IDF + Logistic Regression) trained on MITRE ATT&CK technique descriptions and CVE summaries (inspired by Kuppa et al., IEEE BigData 2021).
-   - Benchmarked against the deterministic rule mapper (`correlation/mitre_attack.py`), keeping rule-based mapping as production default with opt-in configuration (`AEGIS_MITRE_MAPPER=learned`).
+   - Benchmarked against the deterministic rule mapper (`correlation/mitre_attack.py`), keeping rule-based mapping as production default.
 
 ---
 

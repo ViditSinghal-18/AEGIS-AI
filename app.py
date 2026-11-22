@@ -309,6 +309,8 @@ def get_report_data(target: str | None = None) -> dict[str, Any] | None:
         data["prioritized_findings"] = findings
         if not data.get("target"):
             data["target"] = target or "target.local"
+        if not data.get("compliance_governance"):
+            data["compliance_governance"] = calculate_compliance(findings)
 
         # Check geo telemetry without inventing fake San Francisco coordinates
         geo = data.get("geo_telemetry")

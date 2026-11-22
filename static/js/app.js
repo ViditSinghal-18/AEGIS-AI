@@ -268,18 +268,18 @@ window.AegisApp = (function () {
         const setCard = (prefix, data) => {
             if (!data) return;
             let pct = 0;
-            if (typeof data.score === 'number' && data.score > 0) {
-                pct = data.score;
-            } else if (typeof data.percentage === 'number' && data.percentage > 0) {
-                pct = data.percentage;
-            } else if (data.passing_controls !== undefined && data.total_controls) {
+            if (data.passing_controls !== undefined && data.total_controls > 0) {
                 pct = Math.round((data.passing_controls / data.total_controls) * 100);
+            } else if (typeof data.score === 'number' && data.score > 0) {
+                pct = Math.round(data.score);
+            } else if (typeof data.percentage === 'number' && data.percentage > 0) {
+                pct = Math.round(data.percentage);
             } else if (typeof data.score === 'number') {
-                pct = data.score;
+                pct = Math.round(data.score);
             }
 
             AegisUtils.safeSetText(`${prefix}Score`, `${pct}%`);
-            AegisUtils.safeSetText(`${prefix}Pass`, `${data.passing_controls || 0}/${data.total_controls || 10} Controls`);
+            AegisUtils.safeSetText(`${prefix}Pass`, `${data.passing_controls !== undefined ? data.passing_controls : (data.pass || 0)}/${data.total_controls || 10} Controls`);
 
             const barEl = document.getElementById(`${prefix}Bar`);
             if (barEl) {
