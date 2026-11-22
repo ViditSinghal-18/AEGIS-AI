@@ -87,7 +87,7 @@ window.AegisGlobe = (function () {
         ['us-east', 'sa-east']
     ];
 
-    // Shared state
+    // Shared state & Unified Zoom Manager
     let isSpinning = true;
     let prefersReducedMotion = false;
     let currentTargetPin = null; // { name, lat, lon, city, country, asn }
@@ -95,6 +95,39 @@ window.AegisGlobe = (function () {
     let onSelectFindingCallback = null;
     let globalActiveMode = 'webgl'; // 'webgl' or 'canvas2d'
     let animationId = null;
+
+    let currentZoomLevel = 1.0;
+    const BASE_CAMERA_Z = 175; // Enhanced default scale (closer = larger globe)
+    const MIN_ZOOM = 0.60;     // ~60% compact
+    const MAX_ZOOM = 1.90;     // ~190% enlarged
+
+    function setZoom(level) {
+        currentZoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(level * 100) / 100));
+        if (globalActiveMode === 'webgl' && camera) {
+            camera.position.z = BASE_CAMERA_Z / currentZoomLevel;
+            camera.updateProjectionMatrix();
+        }
+        const zoomEl = document.getElementById('globeZoomLevel');
+        if (zoomEl) {
+            zoomEl.textContent = `${Math.round(currentZoomLevel * 100)}%`;
+        }
+    }
+
+    function zoomIn() {
+        setZoom(currentZoomLevel + 0.15);
+    }
+
+    function zoomOut() {
+        setZoom(currentZoomLevel - 0.15);
+    }
+
+    function resetZoom() {
+        setZoom(1.0);
+        if (globalActiveMode === 'webgl' && globeGroup) {
+            globeGroup.rotation.x = 0;
+            globeGroup.rotation.y = 0;
+        }
+    }
 
     // Three.js instances
     let scene, camera, renderer, globeGroup;
@@ -298,8 +331,8 @@ window.AegisGlobe = (function () {
                 const dx = e.clientX - prevMouse.x;
                 const dy = e.clientY - prevMouse.y;
                 dragDist += Math.abs(dx) + Math.abs(dy);
-                rotY += dx * 0.007;
-                rotX = Math.max(-0.6, Math.min(0.6, rotX + dy * 0.007));
+                rotY -= dx * 0.007; // Natural rotation matching drag direction
+                rotX = Math.max(-0.75, Math.min(0.75, rotX + dy * 0.007));
                 prevMouse = { x: e.clientX, y: e.clientY };
                 hideTooltip();
                 return;
@@ -309,7 +342,7 @@ window.AegisGlobe = (function () {
             const curH = container.clientHeight || height;
             const cx = curW / 2;
             const cy = curH / 2;
-            const radius = Math.min(curW, curH) * 0.38;
+            const radius = Math.min(curW, curH) * 0.44 * currentZoomLevel;
 
             let hit = null;
 
@@ -459,7 +492,7 @@ window.AegisGlobe = (function () {
 
             const cx = curW / 2;
             const cy = curH / 2;
-            const radius = Math.min(curW, curH) * 0.38;
+            const radius = Math.min(curW, curH) * 0.44 * currentZoomLevel;
 
             if (isSpinning && !prefersReducedMotion && !isDragging) {
                 rotY += 0.0035;
@@ -774,7 +807,7 @@ window.AegisGlobe = (function () {
 
         scene = new THREE.Scene();
         camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-        camera.position.z = 215;
+        camera.position.z = BASE_CAMERA_Z / currentZoomLevel;
 
         renderer.setSize(width, height);
         renderer.setPixelRatio(window.devicePixelRatio || 1);
@@ -901,8 +934,8 @@ window.AegisGlobe = (function () {
                 const deltaX = e.clientX - prevMouse.x;
                 const deltaY = e.clientY - prevMouse.y;
                 dragDist += Math.abs(deltaX) + Math.abs(deltaY);
-                globeGroup.rotation.y += deltaX * 0.006;
-                globeGroup.rotation.x += deltaY * 0.006;
+                globeGroup.rotation.y -= deltaX * 0.006; // Inverted to follow natural drag direction
+                globeGroup.rotation.x = Math.max(-0.85, Math.min(0.85, globeGroup.rotation.x + deltaY * 0.006));
                 prevMouse = { x: e.clientX, y: e.clientY };
                 hideTooltip();
                 return;
@@ -934,6 +967,55 @@ window.AegisGlobe = (function () {
                 hideTooltip();
             }
         });
+
+        // Mouse Wheel Zoom (Scroll up = enlarge/zoom in, Scroll down = shrink/zoom out)
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomDelta = e.deltaY < 0 ? 0.12 : -0.12;
+            setZoom(currentZoomLevel + zoomDelta);
+        }, { passive: false });
+
+        // Touch Gestures: Single finger drag to rotate + Two-finger pinch to zoom
+        let touchStartDist = 0;
+        let initialTouchZoom = 1.0;
+
+        container.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                touchStartDist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                initialTouchZoom = currentZoomLevel;
+            } else if (e.touches.length === 1) {
+                isDragging = true;
+                dragDist = 0;
+                prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+        }, { passive: true });
+
+        container.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 2 && touchStartDist > 0) {
+                const dist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const factor = dist / touchStartDist;
+                setZoom(initialTouchZoom * factor);
+            } else if (e.touches.length === 1 && isDragging) {
+                const deltaX = e.touches[0].clientX - prevMouse.x;
+                const deltaY = e.touches[0].clientY - prevMouse.y;
+                dragDist += Math.abs(deltaX) + Math.abs(deltaY);
+                globeGroup.rotation.y -= deltaX * 0.006;
+                globeGroup.rotation.x = Math.max(-0.85, Math.min(0.85, globeGroup.rotation.x + deltaY * 0.006));
+                prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                hideTooltip();
+            }
+        }, { passive: true });
+
+        container.addEventListener('touchend', (e) => {
+            if (e.touches.length < 2) touchStartDist = 0;
+            if (e.touches.length === 0) isDragging = false;
+        }, { passive: true });
 
         container.addEventListener('mouseleave', () => {
             if (hoveredMesh) {
@@ -1006,6 +1088,7 @@ window.AegisGlobe = (function () {
             const h = container.clientHeight || 400;
             if (w > 0 && h > 0) {
                 camera.aspect = w / h;
+                camera.position.z = BASE_CAMERA_Z / currentZoomLevel;
                 camera.updateProjectionMatrix();
                 renderer.setSize(w, h);
             }
@@ -1175,8 +1258,8 @@ window.AegisGlobe = (function () {
                 const pos = latLonToVec3(coords.lat, coords.lon, radius + 0.8);
                 const colorObj = getVulnColor(finding.severity || finding.priority_level);
 
-                // Vulnerability Core Sphere
-                const vulnGeo = new THREE.SphereGeometry(2.6, 16, 16);
+                // Vulnerability Core Sphere (Enhanced node visibility & accessible hover target)
+                const vulnGeo = new THREE.SphereGeometry(3.4, 16, 16);
                 const vulnMat = new THREE.MeshBasicMaterial({
                     color: colorObj.hex,
                     blending: THREE.AdditiveBlending,
@@ -1201,7 +1284,7 @@ window.AegisGlobe = (function () {
                 threeVulnNodes.push(vulnMesh);
 
                 // Radiating Pulsating Ring
-                const ringGeo = new THREE.RingGeometry(3.0, 5.2, 24);
+                const ringGeo = new THREE.RingGeometry(3.8, 6.4, 24);
                 const ringMat = new THREE.MeshBasicMaterial({
                     color: colorObj.hex,
                     side: THREE.DoubleSide,
@@ -1392,6 +1475,11 @@ window.AegisGlobe = (function () {
         initGlobe,
         plotRealTargetPins,
         plotVulnerabilities,
-        toggleSpin
+        toggleSpin,
+        zoomIn,
+        zoomOut,
+        resetZoom,
+        setZoom,
+        getZoom: () => currentZoomLevel
     };
 })();

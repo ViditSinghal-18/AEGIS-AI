@@ -449,6 +449,15 @@ window.AegisApp = (function () {
         const btnGlobeSpin = document.getElementById('btnToggleGlobeSpin');
         if (btnGlobeSpin) btnGlobeSpin.addEventListener('click', () => window.AegisGlobe && AegisGlobe.toggleSpin());
 
+        const btnGlobeZoomIn = document.getElementById('btnGlobeZoomIn');
+        if (btnGlobeZoomIn) btnGlobeZoomIn.addEventListener('click', () => window.AegisGlobe && AegisGlobe.zoomIn());
+
+        const btnGlobeZoomOut = document.getElementById('btnGlobeZoomOut');
+        if (btnGlobeZoomOut) btnGlobeZoomOut.addEventListener('click', () => window.AegisGlobe && AegisGlobe.zoomOut());
+
+        const btnGlobeZoomReset = document.getElementById('btnGlobeZoomReset');
+        if (btnGlobeZoomReset) btnGlobeZoomReset.addEventListener('click', () => window.AegisGlobe && AegisGlobe.resetZoom());
+
         const btnRadarReset = document.getElementById('btnResetThreatRadar');
         if (btnRadarReset) {
             btnRadarReset.addEventListener('click', () => {
