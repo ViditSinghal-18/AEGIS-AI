@@ -151,15 +151,28 @@ def correlate(discovered: dict | None = None) -> CorrelatedFindings:
         query_key = f"{product}|{version}"
         if query_key not in seen_queries:
             raw_cves = lookup_cves(product, version) if product and product != "unknown" else []
-            enriched = enrich_cves(raw_cves)
             # Backport-aware matching (Phase 2)
             bp_verdict = detect_backport(product, version)
             if bp_verdict.possibly_backported:
-                for c in enriched:
+                for c in raw_cves:
                     c.possibly_backported = True
                     c.confidence = "low"
-            seen_queries[query_key] = enriched
-        cves = seen_queries[query_key]
+            seen_queries[query_key] = raw_cves
+
+    # Enrich all unique matches together. The EPSS API accepts up to 50 CVEs
+    # per request, so batching avoids one request per product and rereading the
+    # KEV catalog for every distinct port service.
+    unique_cves: dict[str, CveRecord] = {}
+    for matches in seen_queries.values():
+        for cve in matches:
+            unique_cves.setdefault(cve.cve_id, cve)
+    if unique_cves:
+        enrich_cves(list(unique_cves.values()))
+
+    for raw in ports:
+        product = raw.get("product") or raw.get("service") or ""
+        version = raw.get("version") or ""
+        cves = seen_queries.get(f"{product}|{version}", [])
         port = raw.get("port")
         exposure = (
             f"Open {raw.get('protocol', 'tcp')}/{port} "

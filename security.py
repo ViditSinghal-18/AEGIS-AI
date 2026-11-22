@@ -10,6 +10,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
+import threading
 import time
 from typing import Any, Tuple
 
@@ -32,6 +33,7 @@ _ILLEGAL_CHARS_RE = re.compile(r"[\s<>'\"`;&|$\\\x00-\x1f]")
 
 # In-memory sliding window rate limiters: {key: [timestamps]}
 # Decoupled buckets so general telemetry/chat calls do not consume scan budgets
+_RATE_LIMIT_LOCK = threading.Lock()
 _SCAN_CLIENT_RATE_LIMITS: dict[str, list[float]] = {}
 _API_CLIENT_RATE_LIMITS: dict[str, list[float]] = {}
 _TARGET_RATE_LIMITS: dict[str, list[float]] = {}
@@ -179,18 +181,19 @@ def check_client_rate_limit(client_ip: str, max_per_minute: int = 30) -> Tuple[b
     window = 60.0
     ip_key = client_ip.strip() or "anonymous"
 
-    if ip_key not in _API_CLIENT_RATE_LIMITS:
-        _API_CLIENT_RATE_LIMITS[ip_key] = []
+    with _RATE_LIMIT_LOCK:
+        if ip_key not in _API_CLIENT_RATE_LIMITS:
+            _API_CLIENT_RATE_LIMITS[ip_key] = []
 
-    _API_CLIENT_RATE_LIMITS[ip_key] = [t for t in _API_CLIENT_RATE_LIMITS[ip_key] if now - t < window]
+        _API_CLIENT_RATE_LIMITS[ip_key] = [t for t in _API_CLIENT_RATE_LIMITS[ip_key] if now - t < window]
 
-    if len(_API_CLIENT_RATE_LIMITS[ip_key]) >= max_per_minute:
-        oldest = _API_CLIENT_RATE_LIMITS[ip_key][0]
-        retry_after = max(1, int(window - (now - oldest)))
-        return False, retry_after, f"Too many requests from IP {ip_key}. Max {max_per_minute}/min. Retry in {retry_after}s."
+        if len(_API_CLIENT_RATE_LIMITS[ip_key]) >= max_per_minute:
+            oldest = _API_CLIENT_RATE_LIMITS[ip_key][0]
+            retry_after = max(1, int(window - (now - oldest)))
+            return False, retry_after, f"Too many requests from IP {ip_key}. Max {max_per_minute}/min. Retry in {retry_after}s."
 
-    _API_CLIENT_RATE_LIMITS[ip_key].append(now)
-    return True, 0, ""
+        _API_CLIENT_RATE_LIMITS[ip_key].append(now)
+        return True, 0, ""
 
 
 def check_rate_limits(client_ip: str, target: str) -> Tuple[bool, int, str]:
@@ -201,30 +204,32 @@ def check_rate_limits(client_ip: str, target: str) -> Tuple[bool, int, str]:
     now = time.time()
     window = 60.0  # 1 minute window
 
-    # 1. Clean old entries and check client IP rate for scans
     ip_key = client_ip.strip() or "anonymous"
-    timestamps = _SCAN_CLIENT_RATE_LIMITS.setdefault(ip_key, [])
-    _SCAN_CLIENT_RATE_LIMITS[ip_key] = [t for t in timestamps if now - t < window]
-
-    if len(_SCAN_CLIENT_RATE_LIMITS[ip_key]) >= RATE_LIMIT_PER_MINUTE:
-        earliest = _SCAN_CLIENT_RATE_LIMITS[ip_key][0]
-        retry_after = max(1, int(window - (now - earliest)))
-        return False, retry_after, f"Rate limit exceeded. Maximum {RATE_LIMIT_PER_MINUTE} requests/min per IP."
-
-    # 2. Clean old entries and check target rate
     norm_target = normalize_host(target) or target
-    target_timestamps = _TARGET_RATE_LIMITS.setdefault(norm_target, [])
-    _TARGET_RATE_LIMITS[norm_target] = [t for t in target_timestamps if now - t < window]
 
-    if len(_TARGET_RATE_LIMITS[norm_target]) >= RATE_LIMIT_TARGET_PER_MINUTE:
-        earliest = _TARGET_RATE_LIMITS[norm_target][0]
-        retry_after = max(1, int(window - (now - earliest)))
-        return False, retry_after, f"Target rate limit exceeded. Maximum {RATE_LIMIT_TARGET_PER_MINUTE} scans/min against '{norm_target}'."
+    with _RATE_LIMIT_LOCK:
+        # 1. Clean old entries and check client IP rate for scans
+        timestamps = _SCAN_CLIENT_RATE_LIMITS.setdefault(ip_key, [])
+        _SCAN_CLIENT_RATE_LIMITS[ip_key] = [t for t in timestamps if now - t < window]
 
-    # Record current request
-    _SCAN_CLIENT_RATE_LIMITS[ip_key].append(now)
-    _TARGET_RATE_LIMITS[norm_target].append(now)
-    return True, 0, ""
+        if len(_SCAN_CLIENT_RATE_LIMITS[ip_key]) >= RATE_LIMIT_PER_MINUTE:
+            earliest = _SCAN_CLIENT_RATE_LIMITS[ip_key][0]
+            retry_after = max(1, int(window - (now - earliest)))
+            return False, retry_after, f"Rate limit exceeded. Maximum {RATE_LIMIT_PER_MINUTE} requests/min per IP."
+
+        # 2. Clean old entries and check target rate
+        target_timestamps = _TARGET_RATE_LIMITS.setdefault(norm_target, [])
+        _TARGET_RATE_LIMITS[norm_target] = [t for t in target_timestamps if now - t < window]
+
+        if len(_TARGET_RATE_LIMITS[norm_target]) >= RATE_LIMIT_TARGET_PER_MINUTE:
+            earliest = _TARGET_RATE_LIMITS[norm_target][0]
+            retry_after = max(1, int(window - (now - earliest)))
+            return False, retry_after, f"Target rate limit exceeded. Maximum {RATE_LIMIT_TARGET_PER_MINUTE} scans/min against '{norm_target}'."
+
+        # Record current request
+        _SCAN_CLIENT_RATE_LIMITS[ip_key].append(now)
+        _TARGET_RATE_LIMITS[norm_target].append(now)
+        return True, 0, ""
 
 
 def verify_api_token(request_headers: Any) -> bool:

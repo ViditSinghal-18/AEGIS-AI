@@ -98,6 +98,14 @@ def start_verification(domain: str) -> dict[str, str]:
         "dns_value": token,
         "file_url": well_known_url,
         "file_content": token,
+        "dns_txt_record": {
+            "host": txt_record_name,
+            "value": token,
+        },
+        "http_challenge": {
+            "url": well_known_url,
+            "content": token,
+        },
         "instructions": (
             f"Add a DNS TXT record named '{txt_record_name}' with value '{token}', OR "
             f"host a file at '{well_known_url}' containing the token."

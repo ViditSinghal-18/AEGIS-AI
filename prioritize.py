@@ -106,12 +106,20 @@ def prioritize_findings(
     for item in enriched:
         f = dict(item)
 
-        # S_CVSS: normalized 0.0 - 1.0
-        cvss_raw = float(f.get("cvss_score", 5.0))
+        # S_CVSS: normalized 0.0 - 1.0 (safely handle None or non-numeric types)
+        try:
+            cvss_val = f.get("cvss_score")
+            cvss_raw = float(cvss_val) if cvss_val is not None else 5.0
+        except (ValueError, TypeError):
+            cvss_raw = 5.0
         s_cvss = max(0.0, min(1.0, cvss_raw / 10.0))
 
         # S_EPSS: raw probability 0.0 - 1.0
-        s_epss = float(f.get("epss_probability", 0.005))
+        try:
+            epss_val = f.get("epss_probability")
+            s_epss = float(epss_val) if epss_val is not None else 0.005
+        except (ValueError, TypeError):
+            s_epss = 0.005
         # Boost for CISA KEV listing
         if f.get("in_cisa_kev"):
             s_epss = max(s_epss, 0.75)
@@ -306,9 +314,9 @@ def prioritize_findings(
         "cyclonedx_sbom": cyclonedx_sbom,
         "attack_simulator": top_walkthrough,
         "radar_comparison": {
-            "cvss_average": round(sum(f.get("cvss_score", 5.0) for f in prioritized_list) / max(1, len(prioritized_list)), 1),
+            "cvss_average": round(sum((float(f.get("cvss_score")) if f.get("cvss_score") is not None else 5.0) for f in prioritized_list) / max(1, len(prioritized_list)), 1),
             "contextual_average": round(sum(f["contextual_risk_score"] for f in prioritized_list) / max(1, len(prioritized_list)), 1),
-            "epss_max": round(max([f.get("epss_probability", 0.0) for f in prioritized_list] or [0.0]), 4),
+            "epss_max": round(max([(float(f.get("epss_probability")) if f.get("epss_probability") is not None else 0.0) for f in prioritized_list] or [0.0]), 4),
             "cisa_kev_flagged_count": sum(1 for f in prioritized_list if f.get("in_cisa_kev"))
         },
         "portfolio_fair_loss": simulate_portfolio_fair_loss(prioritized_list),

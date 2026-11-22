@@ -39,9 +39,14 @@ window.AegisVerification = (function () {
         const body = document.getElementById('verificationModalBody');
         if (!body) return;
 
+        const domainName = instructions.domain || '';
+        const dnsHost = (instructions.dns_txt_record && instructions.dns_txt_record.host) || instructions.dns_record || (`_aegis-verify.${domainName}`);
+        const tokenVal = (instructions.dns_txt_record && instructions.dns_txt_record.value) || instructions.dns_value || instructions.token || '';
+        const fileUrl = (instructions.http_challenge && instructions.http_challenge.url) || instructions.file_url || (`https://${domainName}/.well-known/aegis-verify.txt`);
+
         body.innerHTML = `
             <div style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 16px;">
-                To enable <strong>VERIFIED ACTIVE</strong> port scanning against <code>${AegisUtils.escapeHtml(instructions.domain)}</code>, 
+                To enable <strong>VERIFIED ACTIVE</strong> port scanning against <code>${AegisUtils.escapeHtml(domainName)}</code>, 
                 prove ownership via either DNS TXT record or HTTP challenge file:
             </div>
 
@@ -49,7 +54,7 @@ window.AegisVerification = (function () {
                 <h4 style="color:#00f0ff;margin-bottom:6px;font-size:0.9rem;">Option 1: DNS TXT Record (Recommended)</h4>
                 <div style="font-size:0.8rem;color:#cbd5e1;margin-bottom:6px;">Add this TXT record at your DNS registrar:</div>
                 <div style="display:flex;align-items:center;background:#030712;padding:6px 10px;border-radius:4px;font-family:monospace;font-size:0.8rem;">
-                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;">${AegisUtils.escapeHtml(instructions.dns_txt_record.host)} TXT "${AegisUtils.escapeHtml(instructions.dns_txt_record.value)}"</span>
+                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;">${AegisUtils.escapeHtml(dnsHost)} TXT "${AegisUtils.escapeHtml(tokenVal)}"</span>
                     <button class="btn btn-secondary btn-sm" id="btnCopyDnsToken" style="margin-left:8px;padding:3px 8px;">Copy</button>
                 </div>
             </div>
@@ -58,7 +63,7 @@ window.AegisVerification = (function () {
                 <h4 style="color:#f1f5f9;margin-bottom:6px;font-size:0.9rem;">Option 2: HTTP Token File</h4>
                 <div style="font-size:0.8rem;color:#cbd5e1;margin-bottom:6px;">Host this file on your web server:</div>
                 <div style="background:#030712;padding:6px 10px;border-radius:4px;font-family:monospace;font-size:0.8rem;">
-                    <code>${AegisUtils.escapeHtml(instructions.http_challenge.url)}</code>
+                    <code>${AegisUtils.escapeHtml(fileUrl)}</code>
                 </div>
             </div>
 

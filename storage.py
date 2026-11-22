@@ -165,17 +165,26 @@ def generate_csv_report(report: dict[str, Any]) -> str:
     writer.writerow([
         "Rank", "Severity", "Title", "Exploitability", "CVEs", "Source", "Why It Matters", "Suggested Defensive Action"
     ])
-    for f in report.get("findings") or []:
-        cves_str = ", ".join(f.get("related_cves") or [])
+    findings = report.get("findings") or report.get("prioritized_findings") or []
+    for f in findings:
+        cves_list = f.get("related_cves") or f.get("cve_aliases") or []
+        cves_str = ", ".join(cves_list)
+        rank_val = f.get("rank") or f.get("vuln_id") or ""
+        sev_val = f.get("severity") or f.get("priority_level") or ""
+        title_val = f.get("title") or f.get("summary") or "Security Finding"
+        exploit_val = f.get("exploitability") or f.get("exposure_context") or ""
+        source_val = f.get("source") or f.get("component") or "Perimeter"
+        why_val = f.get("why_it_matters") or f.get("summary") or ""
+        action_val = f.get("suggested_action") or f.get("recommended_remediation") or ""
         writer.writerow([
-            _sanitize_csv_cell(f.get("rank", "")),
-            _sanitize_csv_cell(f.get("severity", "")),
-            _sanitize_csv_cell(f.get("title", "")),
-            _sanitize_csv_cell(f.get("exploitability", "")),
+            _sanitize_csv_cell(rank_val),
+            _sanitize_csv_cell(sev_val),
+            _sanitize_csv_cell(title_val),
+            _sanitize_csv_cell(exploit_val),
             _sanitize_csv_cell(cves_str),
-            _sanitize_csv_cell(f.get("source", "")),
-            _sanitize_csv_cell(f.get("why_it_matters", "")),
-            _sanitize_csv_cell(f.get("suggested_action", "")),
+            _sanitize_csv_cell(source_val),
+            _sanitize_csv_cell(why_val),
+            _sanitize_csv_cell(action_val),
         ])
     return output.getvalue()
 
@@ -261,29 +270,33 @@ def generate_html_report(report: dict[str, Any]) -> str:
     summary = html.escape(str(report.get("summary") or "No summary available."), quote=True)
     model = html.escape(str(report.get("model_id") or "Heuristic"), quote=True)
     used_llm = "Yes" if report.get("used_llm") else "No (Fallback)"
-    findings = report.get("findings") or []
+    findings = report.get("findings") or report.get("prioritized_findings") or []
     top_risks = report.get("top_risks") or []
     notes = report.get("notes") or []
 
     findings_html = ""
     for f in findings:
-        raw_sev = str(f.get("severity") or "Info")
-        sev_color = {
-            "Critical": "#dc2626",
-            "High": "#ea580c",
-            "Medium": "#d97706",
-            "Low": "#2563eb",
-            "Info": "#4b5563",
-        }.get(raw_sev, "#4b5563")
+        raw_sev = str(f.get("severity") or f.get("priority_level") or "Info")
+        sev_lower = raw_sev.lower()
+        if "crit" in sev_lower or "p1" in sev_lower:
+            sev_color = "#dc2626"
+        elif "high" in sev_lower or "p2" in sev_lower:
+            sev_color = "#ea580c"
+        elif "med" in sev_lower or "p3" in sev_lower:
+            sev_color = "#d97706"
+        elif "low" in sev_lower or "p4" in sev_lower:
+            sev_color = "#2563eb"
+        else:
+            sev_color = "#4b5563"
 
-        esc_rank = html.escape(str(f.get("rank", "")), quote=True)
-        esc_title = html.escape(str(f.get("title", "")), quote=True)
+        esc_rank = html.escape(str(f.get("rank") or f.get("vuln_id") or ""), quote=True)
+        esc_title = html.escape(str(f.get("title") or f.get("summary") or "Security Finding"), quote=True)
         esc_sev = html.escape(raw_sev, quote=True)
-        esc_exploit = html.escape(str(f.get("exploitability", "")), quote=True)
-        esc_why = html.escape(str(f.get("why_it_matters", "")), quote=True)
-        esc_action = html.escape(str(f.get("suggested_action", "")), quote=True)
+        esc_exploit = html.escape(str(f.get("exploitability") or f.get("exposure_context") or "Public Ingress"), quote=True)
+        esc_why = html.escape(str(f.get("why_it_matters") or f.get("summary") or ""), quote=True)
+        esc_action = html.escape(str(f.get("suggested_action") or f.get("recommended_remediation") or "Apply defensive hardening"), quote=True)
 
-        cves_list = f.get("related_cves") or []
+        cves_list = f.get("related_cves") or f.get("cve_aliases") or []
         esc_cves = ", ".join(html.escape(str(c), quote=True) for c in cves_list)
         cve_badge = f'<span style="background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;font-size:12px;">{esc_cves}</span>' if esc_cves else ''
 

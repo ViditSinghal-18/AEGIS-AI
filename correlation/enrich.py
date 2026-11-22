@@ -209,9 +209,18 @@ def enrich_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
             pass
 
     for f in valid_findings:
-        f_cves = f.get("related_cves", [])
+        raw_cves = f.get("related_cves", [])
+        if isinstance(raw_cves, str):
+            f_cves = [raw_cves]
+        elif isinstance(raw_cves, list):
+            f_cves = [str(c) for c in raw_cves if c]
+        else:
+            f_cves = []
         is_kev = bool(f.get("in_cisa_kev") or f.get("kev") or any(c in kev_catalog for c in f_cves))
-        existing_epss = float(f.get("epss_probability") or f.get("epss") or 0.0)
+        try:
+            existing_epss = float(f.get("epss_probability") or f.get("epss") or 0.0)
+        except (ValueError, TypeError):
+            existing_epss = 0.0
         cve_epss = [epss_scores.get(c, 0.0) for c in f_cves]
         max_epss = max(cve_epss + [existing_epss], default=0.0)
         f["kev"] = is_kev

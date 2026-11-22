@@ -70,6 +70,8 @@ from ai import query_copilot, compare_rankings
 from dashboard.attack_graph import render_attack_surface_graph_html
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_INVENTORY_CACHE_TTL_SECONDS = 10.0
+_inventory_cache: dict[str, Any] = {"expires_at": 0.0, "signature": None, "items": []}
 
 app = Flask(
     __name__,
@@ -131,59 +133,86 @@ def make_content_disposition(base_name: str, target: str | None, ext: str) -> st
 
 def load_dynamic_inventory() -> list[dict[str, Any]]:
     """Dynamically aggregate real verified targets and completed scans in DATA_DIR."""
+    now = time.monotonic()
+    try:
+        verified_targets = sorted(load_verified_targets())
+    except Exception:
+        verified_targets = []
+
+    report_files: list[Path] = []
+    if DATA_DIR.exists():
+        report_files = sorted(
+            (directory / "prioritized_report.json")
+            for directory in DATA_DIR.iterdir()
+            if directory.is_dir()
+            and directory.name not in ("cache", "sample", "history")
+            and not directory.name.startswith(".")
+            and (directory / "prioritized_report.json").is_file()
+        )
+    report_signature = tuple(
+        (path.parent.name, path.stat().st_mtime_ns, path.stat().st_size)
+        for path in report_files
+    )
+    signature = (report_signature, tuple(verified_targets))
+    if (
+        _inventory_cache["signature"] == signature
+        and now < _inventory_cache["expires_at"]
+    ):
+        return [dict(item) for item in _inventory_cache["items"]]
+
     inventory = []
     seen = set()
 
     # 1. Verified targets
-    try:
-        verified = load_verified_targets()
-        for domain in verified:
-            seen.add(domain)
-            rep = get_report_data(domain)
-            score = (rep or {}).get("overall_risk_score", (rep or {}).get("score", "Awaiting Scan"))
-            findings = (rep or {}).get("findings", (rep or {}).get("prioritized_findings", []))
+    for domain in verified_targets:
+        seen.add(domain)
+        rep = get_report_data(domain)
+        score = (rep or {}).get("overall_risk_score", (rep or {}).get("score", "Awaiting Scan"))
+        findings = (rep or {}).get("findings", (rep or {}).get("prioritized_findings", []))
+        inventory.append({
+            "id": f"AST-{len(inventory)+1:03d}",
+            "name": domain,
+            "target": domain,
+            "port": "443, 80",
+            "stack": "Production Ingress",
+            "risk": f"{score}/100" if isinstance(score, (int, float)) else str(score),
+            "type": "Verified Domain",
+            "status": "Verified Active",
+            "findings_count": len(findings),
+        })
+
+    # 2. Read only directories with reports, avoiding repeated parsing of every
+    # unrelated data directory on this frequently polled endpoint.
+    for report_path in report_files:
+        target_name = report_path.parent.name
+        if target_name in seen:
+            continue
+        seen.add(target_name)
+        try:
+            rep = get_report_data(target_name)
+        except Exception:
+            continue
+        if rep:
+            score = rep.get("overall_risk_score", rep.get("score", "Audited"))
+            findings = rep.get("findings", rep.get("prioritized_findings", []))
+            mode = rep.get("operational_mode") or rep.get("mode") or "Passive OSINT"
             inventory.append({
                 "id": f"AST-{len(inventory)+1:03d}",
-                "name": domain,
-                "target": domain,
+                "name": target_name,
+                "target": target_name,
                 "port": "443, 80",
-                "stack": "Production Ingress",
+                "stack": rep.get("server_fingerprint", {}).get("cloud_cdn_waf", "Perimeter Ingress"),
                 "risk": f"{score}/100" if isinstance(score, (int, float)) else str(score),
-                "type": "Verified Domain",
-                "status": "Verified Active",
+                "type": "Audited Asset",
+                "status": mode,
                 "findings_count": len(findings),
             })
-    except Exception:
-        pass
 
-    # 2. Scanned target directories in DATA_DIR
-    try:
-        if DATA_DIR.exists():
-            for d in sorted(DATA_DIR.iterdir(), key=lambda p: p.name):
-                if d.is_dir() and d.name not in ("cache", "sample", "history") and not d.name.startswith("."):
-                    target_name = d.name
-                    if target_name in seen:
-                        continue
-                    seen.add(target_name)
-                    rep = get_report_data(target_name)
-                    if rep:
-                        score = rep.get("overall_risk_score", rep.get("score", "Audited"))
-                        findings = rep.get("findings", rep.get("prioritized_findings", []))
-                        mode = rep.get("operational_mode") or rep.get("mode") or "Passive OSINT"
-                        inventory.append({
-                            "id": f"AST-{len(inventory)+1:03d}",
-                            "name": target_name,
-                            "target": target_name,
-                            "port": "443, 80",
-                            "stack": rep.get("server_fingerprint", {}).get("cloud_cdn_waf", "Perimeter Ingress"),
-                            "risk": f"{score}/100" if isinstance(score, (int, float)) else str(score),
-                            "type": "Audited Asset",
-                            "status": mode,
-                            "findings_count": len(findings),
-                        })
-    except Exception:
-        pass
-
+    _inventory_cache.update(
+        expires_at=now + _INVENTORY_CACHE_TTL_SECONDS,
+        signature=signature,
+        items=[dict(item) for item in inventory],
+    )
     return inventory
 
 @app.route("/")
@@ -1208,8 +1237,7 @@ def view_attack_graph():
         try:
             target_param = validate_target_input(target_param)
         except ValidationError as e:
-            if request.path.startswith("/api/") or request.args.get("format") == "json":
-                return jsonify({"success": False, "error": str(e)}), 400
+            return jsonify({"success": False, "error": str(e)}), 400
     data = get_report_data(target_param)
 
     if target_param and not data and (request.path.startswith("/api/") or request.args.get("format") == "json"):

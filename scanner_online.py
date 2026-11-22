@@ -249,24 +249,62 @@ def assess_website(target_input):
                 validated_ips = resolve_and_validate_hostname(hostname)
                 target_ip = validated_ips[0]
 
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with socket.create_connection((target_ip, port or 443), timeout=5) as sock:
-                with ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
-                    cert = ssock.getpeercert(binary_form=False)
-                    cipher = ssock.cipher()
-                    tls_version = ssock.version()
-                    
-                    results["ssl_telemetry"] = {
-                        "enabled": True,
-                        "tls_version": tls_version,
-                        "cipher_suite": cipher[0] if cipher else "Unknown",
-                        "cipher_bits": cipher[2] if cipher else 0,
-                        "issuer": dict(x[0] for x in cert.get('issuer', [])) if cert and 'issuer' in cert else "Trusted / Hidden",
-                        "subject": dict(x[0] for x in cert.get('subject', [])) if cert and 'subject' in cert else hostname,
-                        "valid_to": cert.get('notAfter', 'Active') if cert else "Active",
-                    }
+            # First attempt with standard verification to extract peer cert metadata
+            cert = {}
+            cipher = None
+            tls_version = None
+            cert_verified = False
+
+            try:
+                verify_ctx = ssl.create_default_context()
+                with socket.create_connection((target_ip, port or 443), timeout=5) as sock:
+                    with verify_ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
+                        cert = ssock.getpeercert(binary_form=False) or {}
+                        cipher = ssock.cipher()
+                        tls_version = ssock.version()
+                        cert_verified = True
+            except ssl.SSLCertVerificationError as cert_err:
+                # Certificate untrusted / self-signed / expired; inspect with CERT_NONE
+                unverified_ctx = ssl.create_default_context()
+                unverified_ctx.check_hostname = False
+                unverified_ctx.verify_mode = ssl.CERT_NONE
+                try:
+                    with socket.create_connection((target_ip, port or 443), timeout=5) as sock:
+                        with unverified_ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
+                            cipher = ssock.cipher()
+                            tls_version = ssock.version()
+                except Exception:
+                    pass
+                results["findings"].append({
+                    "id": "SEC-TLS-UNVERIFIED",
+                    "title": "TLS Certificate Validation Failed (Untrusted / Expired)",
+                    "severity": "HIGH",
+                    "deduction": 20,
+                    "category": "Transport Security",
+                    "details": f"Certificate verification failed: {str(cert_err)}",
+                    "remediation": "Deploy a valid, unexpired TLS certificate signed by a recognized Certificate Authority (e.g. Let's Encrypt)."
+                })
+                results["score"] = max(0, results["score"] - 20)
+            except Exception:
+                # Fallback to CERT_NONE for network or probe issues
+                unverified_ctx = ssl.create_default_context()
+                unverified_ctx.check_hostname = False
+                unverified_ctx.verify_mode = ssl.CERT_NONE
+                with socket.create_connection((target_ip, port or 443), timeout=5) as sock:
+                    with unverified_ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
+                        cipher = ssock.cipher()
+                        tls_version = ssock.version()
+
+            results["ssl_telemetry"] = {
+                "enabled": True,
+                "tls_version": tls_version or "Unknown",
+                "cipher_suite": cipher[0] if cipher else "Unknown",
+                "cipher_bits": cipher[2] if cipher else 0,
+                "certificate_verified": cert_verified,
+                "issuer": dict(x[0] for x in cert.get('issuer', [])) if cert and 'issuer' in cert else "Trusted / Hidden",
+                "subject": dict(x[0] for x in cert.get('subject', [])) if cert and 'subject' in cert else hostname,
+                "valid_to": cert.get('notAfter', 'Active') if cert else "Active",
+            }
         except Exception as e:
             results["ssl_telemetry"] = {
                 "enabled": False,
@@ -749,14 +787,15 @@ def convert_to_prioritized_report(online_res):
         "compliance_governance": compliance_data,
         "threat_actor_attribution": threat_actors,
         "geo_telemetry": online_res.get("geo_telemetry", {
-            "country": "United States",
+            "country": "Global",
             "city": "Cloud Edge",
             "region": "Anycast Ingress",
             "asn": "Edge Network Transit",
-            "lat": 37.7749,
-            "lon": -122.4194,
+            "lat": None,
+            "lon": None,
             "datacenter": fw,
-            "round_trip_latency_ms": 18.0
+            "round_trip_latency_ms": 0.0,
+            "coordinates_available": False,
         }),
         "dns_intelligence": online_res.get("dns_intelligence", {}),
         "subdomains": online_res.get("subdomains", []),

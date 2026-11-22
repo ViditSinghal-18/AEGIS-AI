@@ -193,6 +193,14 @@ window.AegisApp = (function () {
 
         const target = (currentReport && currentReport.target) || 'target.site';
         const mitre = finding.mitre_attack || { technique_id: 'T1190', technique_name: 'Exploit Public-Facing App', tactic: 'Initial Access' };
+        const findingTitle = finding.title || finding.summary || finding.vuln_id || 'Security Weakness';
+        const findingAction = finding.remediation || finding.suggested_action || finding.recommended_remediation || 'Enforce WAF virtual patch.';
+        let epssPercent = 0.5;
+        if (finding.epss_probability !== undefined && finding.epss_probability !== null) {
+            epssPercent = parseFloat(finding.epss_probability) * 100;
+        } else if (finding.threat_intel && finding.threat_intel.epss_percent !== undefined) {
+            epssPercent = parseFloat(finding.threat_intel.epss_percent);
+        }
 
         container.innerHTML = `
             <div style="font-size:0.75rem;color:#f59e0b;background:rgba(245,158,11,0.1);border-left:3px solid #f59e0b;padding:6px 10px;margin-bottom:12px;border-radius:3px;">
@@ -201,7 +209,7 @@ window.AegisApp = (function () {
 
             <div class="sim-phase-card">
                 <div class="sim-phase-header"><span class="sim-phase-badge">Phase 1</span> <strong>Reconnaissance & Asset Ingress</strong></div>
-                <div class="sim-phase-body">Adversary discovers public endpoint on ${AegisUtils.escapeHtml(target)} disclosing '${AegisUtils.escapeHtml(finding.title)}'.</div>
+                <div class="sim-phase-body">Adversary discovers public endpoint on ${AegisUtils.escapeHtml(target)} disclosing '${AegisUtils.escapeHtml(findingTitle)}'.</div>
             </div>
 
             <div class="sim-phase-card">
@@ -211,12 +219,12 @@ window.AegisApp = (function () {
 
             <div class="sim-phase-card">
                 <div class="sim-phase-header"><span class="sim-phase-badge">Phase 3</span> <strong>Adversary Impact (${AegisUtils.escapeHtml(mitre.tactic || 'Impact')})</strong></div>
-                <div class="sim-phase-body">Exposure allows potential unauthorized session reading or service manipulation (EPSS: ${(finding.epss_probability * 100 || 0.5).toFixed(2)}%).</div>
+                <div class="sim-phase-body">Exposure allows potential unauthorized session reading or service manipulation (EPSS: ${epssPercent.toFixed(2)}%).</div>
             </div>
 
             <div class="sim-phase-card" style="border-left-color:#10b981;">
                 <div class="sim-phase-header"><span class="sim-phase-badge" style="background:#10b981;">Phase 4</span> <strong style="color:#10b981;">Defensive Remediation</strong></div>
-                <div class="sim-phase-body"><code>${AegisUtils.escapeHtml(finding.remediation || 'Enforce WAF virtual patch.')}</code></div>
+                <div class="sim-phase-body"><code>${AegisUtils.escapeHtml(findingAction)}</code></div>
             </div>
         `;
     }
