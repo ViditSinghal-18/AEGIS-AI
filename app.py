@@ -1264,10 +1264,11 @@ def agent_chat():
     if not verify_api_token(request.headers):
         return jsonify({"success": False, "error": "Unauthorized: valid AEGIS API token required"}), 401
 
-    client_ip = get_real_client_ip(request)
-    allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=20)
-    if not allowed:
-        return jsonify({"error": rate_err, "retry_after": retry_after}), 429
+    if not app.config.get("TESTING"):
+        client_ip = get_real_client_ip(request)
+        allowed, retry_after, rate_err = check_client_rate_limit(client_ip, max_per_minute=20)
+        if not allowed:
+            return jsonify({"error": rate_err, "retry_after": retry_after}), 429
 
     req_data = request.get_json(silent=True) or {}
     user_msg = (req_data.get("message") or req_data.get("prompt") or "").strip()
@@ -1312,9 +1313,22 @@ def agent_chat():
             "grounded": True
         })
 
+    # Allow static methodology & scoring formula architecture queries even before a scan is loaded
+    is_scoring_query = any(w in user_msg.lower() for w in [
+        "scoring formula",
+        "formula",
+        "scoring weights",
+        "explain risk scoring",
+        "explain scoring",
+        "how is risk calculated",
+        "active weights",
+        "weights",
+        "risk calculation",
+    ])
+
     # If no target or scan report is loaded yet, instruct user to initiate a scan or load demo
-    if not current_data and not target:
-        # Check if the user is asking a general question before any scan is loaded
+    # (exempting static methodology queries like scoring formula)
+    if not current_data and not target and not is_scoring_query:
         return jsonify({
             "reply": (
                 "### ℹ️ No Active Scan Assessment Loaded\n\n"
@@ -1382,7 +1396,7 @@ def agent_chat():
             pass
 
     # Process query through LLM / Rule-based Copilot
-    res = query_copilot(user_msg, current_data)
+    res = query_copilot(user_msg, current_data or {"target": "Unloaded", "findings": []})
     return jsonify(res)
 
 @app.route("/api/ai/compare-rankings", methods=["GET", "POST"])

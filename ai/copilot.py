@@ -175,10 +175,11 @@ User Request: {prompt_text}"""
         return None
 
 
-def _respond_scoring_formula(prompt_text: str, report: dict[str, Any]) -> str:
-    """Explain mathematical risk scoring formula, active weights, CISA KEV override, and SSVC."""
+def _respond_scoring_formula(prompt_text: str, report: dict[str, Any] | None = None) -> str:
+    """Explain mathematical risk scoring formula, active weights, CISA KEV override, SSVC, and Bayesian Noisy-OR."""
     from prioritize import get_active_weights
     w_cvss, w_epss, w_exp, w_crit, source = get_active_weights()
+    report = report or {}
     target = report.get("target", "Target")
     findings = report.get("findings", [])
 
@@ -189,10 +190,10 @@ def _respond_scoring_formula(prompt_text: str, report: dict[str, Any]) -> str:
         f"$$\\text{{Risk Score}} = ({w_cvss:.2f} \\times S_{{\\text{{CVSS}}}}) + ({w_epss:.2f} \\times S_{{\\text{{EPSS}}}}) + ({w_exp:.2f} \\times S_{{\\text{{Exposure}}}}) + ({w_crit:.2f} \\times S_{{\\text{{Criticality}}}})$$",
         "",
         f"#### ⚖️ Active Scoring Weights Source: `{source}`",
-        f"- **$w_1$ Base CVSS Severity:** `{w_cvss:.2f}` (Weight: {int(w_cvss*100)}%) — Normalized theoretical vulnerability severity (0–10).",
-        f"- **$w_2$ FIRST.org EPSS Exploit Probability:** `{w_epss:.2f}` (Weight: {int(w_epss*100)}%) — Empirical 30-day weaponization probability in the wild.",
-        f"- **$w_3$ Network Reachability & Exposure Context:** `{w_exp:.2f}` (Weight: {int(w_exp*100)}%) — Direct public ingress vs isolated service.",
-        f"- **$w_4$ Mission Asset Criticality:** `{w_crit:.2f}` (Weight: {int(w_crit*100)}%) — Crown Jewels impact scaling tier.",
+        f"- **$w_1$ Base CVSS Severity ($S_{{\\text{{CVSS}}}}$):** `{w_cvss:.2f}` (Weight: {int(w_cvss*100)}%) — Normalized theoretical vulnerability severity (0–10).",
+        f"- **$w_2$ FIRST.org EPSS Exploit Probability ($S_{{\\text{{EPSS}}}}$):** `{w_epss:.2f}` (Weight: {int(w_epss*100)}%) — Empirical 30-day weaponization probability in the wild (0–10 scaled).",
+        f"- **$w_3$ Network Reachability & Exposure Context ($S_{{\\text{{Exposure}}}}$):** `{w_exp:.2f}` (Weight: {int(w_exp*100)}%) — Direct public ingress vs isolated service.",
+        f"- **$w_4$ Mission Asset Criticality ($S_{{\\text{{Crit}}}}$):** `{w_crit:.2f}` (Weight: {int(w_crit*100)}%) — Crown Jewels impact scaling tier.",
         "",
         "#### 🛡️ CISA KEV Override Policy (BOD 22-01):",
         "If a vulnerability is actively exploited in the wild and listed in the CISA Known Exploited Vulnerabilities (KEV) catalog, "
@@ -203,6 +204,11 @@ def _respond_scoring_formula(prompt_text: str, report: dict[str, Any]) -> str:
         "- **Attend:** Proof-of-concept exists + exposed perimeter -> 7-14 day remediation cycle.",
         "- **Track*:** Weaponized but internal / shielded perimeter -> Monitor and virtual patch.",
         "- **Track:** No known exploit + low exposure -> Standard routine patch cycle.",
+        "",
+        "#### 🕸️ Bayesian Attack Path Propagation (Noisy-OR Convergence):",
+        "For multi-step lateral movement trajectories terminating at Crown Jewels, node compromise probability is evaluated via canonical Noisy-OR:",
+        "$$P(A) = 1 - \\prod_{i} (1 - P(B_i) \\cdot p_{i \\to A})$$",
+        "The highest-likelihood attack vector is resolved via Dijkstra shortest path over negative log-transformed exploit probabilities ($w = -\\ln p$).",
     ]
 
     if findings:
@@ -228,6 +234,12 @@ def _respond_scoring_formula(prompt_text: str, report: dict[str, Any]) -> str:
             f"- Exposure component: `{w_exp:.2f} × {reach} = {exp_comp}`",
             f"- Criticality component: `{w_crit:.2f} × {crit} = {crit_comp}`",
             f"- **Formula Sum:** `{c_comp} + {e_comp} + {exp_comp} + {crit_comp} = {round(c_comp+e_comp+exp_comp+crit_comp, 2)}`",
+        ])
+    else:
+        lines.extend([
+            "",
+            "#### ℹ️ Target Scan Telemetry:",
+            "*No active target scan is currently loaded. Enter a domain and click **⚡ Run Audit** or click **🧪 Load Verified Demo Scan** to inspect a live per-finding score decomposition.*"
         ])
 
     return "\n".join(lines)
@@ -329,7 +341,7 @@ def _generate_offline_copilot_response(prompt_text: str, report: dict[str, Any])
             )
 
     # 1. Distinct Intent: Scoring Formula & Active Weights
-    if any(w in p for w in ["scoring formula", "formula", "scoring weights", "explain risk scoring", "how is risk calculated", "active weights"]):
+    if any(w in p for w in ["scoring formula", "formula", "scoring weights", "explain risk scoring", "explain scoring", "how is risk calculated", "active weights", "weights", "scoring", "risk calculation"]):
         return _respond_scoring_formula(prompt_text, report)
 
     # 2. Distinct Intent: Regulatory Compliance Readiness

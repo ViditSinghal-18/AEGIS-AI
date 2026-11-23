@@ -32,8 +32,12 @@ def render_attack_surface_graph_html(
     patched_node_id: Optional[str] = None,
 ) -> str:
     """Generate interactive HTML5 / SVG Bayesian Network Attack Graph."""
-    def _safe(text: Any) -> str:
-        return html.escape(str(text or ""), quote=True)
+    def _sanitize_label(text: Any) -> str:
+        """Escape HTML/XML tag delimiters to prevent XSS while preserving natural ampersands."""
+        if not text:
+            return ""
+        s = html.unescape(str(text))
+        return s.replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
     # 1. Build and evaluate empirical Bayesian Attack Graph
     bag = build_attack_graph_from_findings(
@@ -104,10 +108,14 @@ def render_attack_surface_graph_html(
         if is_crit:
             desc += " [ON MOST PROBABLE ATTACK PATH]"
 
+        raw_name = _sanitize_label(node.name)
+        display_name = f"{raw_name} ({prob_pct})"
+        clean_desc = _sanitize_label(desc)
+
         nodes.append({
             "id": nid,
-            "name": _safe(f"{node.name} ({prob_pct})"),
-            "raw_name": _safe(node.name),
+            "name": display_name,
+            "raw_name": raw_name,
             "prob_pct": prob_pct,
             "prob_val": prob,
             "type": node.node_type,
@@ -116,7 +124,7 @@ def render_attack_surface_graph_html(
             "icon": icon,
             "is_critical": is_crit,
             "is_chokepoint": is_choke,
-            "desc": _safe(desc),
+            "desc": clean_desc,
         })
 
     # 4. Assemble visualization links
@@ -126,11 +134,14 @@ def render_attack_surface_graph_html(
         color = "#ef4444" if is_crit_edge else "rgba(56, 189, 248, 0.35)"
         width = 3.0 if is_crit_edge else 1.4
 
+        raw_label = _sanitize_label(edge.label)
+        edge_label = f"{raw_label} (p={edge.exploit_probability:.0%})" if raw_label else f"p={edge.exploit_probability:.0%}"
+
         links.append({
             "source": edge.source,
             "target": edge.target,
             "prob": edge.exploit_probability,
-            "label": _safe(f"{edge.label or ''} (p={edge.exploit_probability:.0%})"),
+            "label": edge_label,
             "color": color,
             "width": width,
             "is_critical": is_crit_edge,
@@ -140,8 +151,8 @@ def render_attack_surface_graph_html(
     most_prob_p_str = f"{most_probable_path.path_probability:.1%}" if most_probable_path else "0.0% (Severed)"
     choke_count = len(chokepoints.chokepoint_nodes)
 
-    nodes_json = json.dumps(nodes)
-    links_json = json.dumps(links)
+    nodes_json = json.dumps(nodes).replace("</", "<\\/")
+    links_json = json.dumps(links).replace("</", "<\\/")
 
     html_code = f"""
     <!DOCTYPE html>
@@ -272,6 +283,15 @@ def render_attack_surface_graph_html(
     const nodes = {nodes_json};
     const links = {links_json};
 
+    function escapeHtml(str) {{
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }}
+
     const container = document.getElementById('graph-container');
     const width = Math.max(window.innerWidth || 0, container.clientWidth || 0, 900);
     const height = Math.max(container.clientHeight || 0, 560);
@@ -332,7 +352,7 @@ def render_attack_surface_graph_html(
             .attr("stroke", d => d.color)
             .attr("stroke-width", 2.2);
 
-        // Labels
+        // Labels (D3 textContent: renders plain & cleanly without literal &amp;)
         node.append("text")
             .text(d => d.name)
             .attr("x", 0)
@@ -356,9 +376,9 @@ def render_attack_surface_graph_html(
         const tooltip = document.getElementById("tooltip");
         node.on("mouseover", (event, d) => {{
             tooltip.style.display = "block";
-            tooltip.innerHTML = `<div style="font-weight:700;color:${{d.color}};margin-bottom:2px;">${{d.icon}} ${{d.raw_name}}</div>
-                                 <div style="font-size:11px;color:#38bdf8;margin-bottom:4px;">Compromise Probability: <b>${{d.prob_pct}}</b></div>
-                                 <div style="font-size:11px;color:#94a3b8;">${{d.desc}}</div>`;
+            tooltip.innerHTML = `<div style="font-weight:700;color:${{d.color}};margin-bottom:2px;">${{d.icon}} ${{escapeHtml(d.raw_name)}}</div>
+                                 <div style="font-size:11px;color:#38bdf8;margin-bottom:4px;">Compromise Probability: <b>${{escapeHtml(d.prob_pct)}}</b></div>
+                                 <div style="font-size:11px;color:#94a3b8;">${{escapeHtml(d.desc)}}</div>`;
         }})
         .on("mousemove", (event) => {{
             const rect = container.getBoundingClientRect();
@@ -446,7 +466,7 @@ def render_attack_surface_graph_html(
                     <circle cx="${{p.x}}" cy="${{p.y}}" r="${{n.radius + 3}}" fill="${{n.color}}" opacity="0.25"/>
                     <circle cx="${{p.x}}" cy="${{p.y}}" r="${{n.radius}}" fill="#0f172a" stroke="${{n.color}}" stroke-width="2.2"/>
                     <text x="${{p.x}}" y="${{p.y + 4}}" text-anchor="middle" font-size="${{n.radius > 20 ? 14 : 11}}px" pointer-events="none">${{n.icon}}</text>
-                    <text x="${{p.x}}" y="${{p.y + n.radius + 14}}" text-anchor="middle" font-size="11px" font-weight="${{n.is_critical ? 700 : 600}}" fill="${{n.is_critical ? '#f87171' : '#cbd5e1'}}" pointer-events="none">${{n.name}}</text>
+                    <text x="${{p.x}}" y="${{p.y + n.radius + 14}}" text-anchor="middle" font-size="11px" font-weight="${{n.is_critical ? 700 : 600}}" fill="${{n.is_critical ? '#f87171' : '#cbd5e1'}}" pointer-events="none">${{escapeHtml(n.name)}}</text>
                 </g>
             `;
         }});
@@ -461,9 +481,9 @@ def render_attack_surface_graph_html(
             el.addEventListener('mouseenter', (e) => {{
                 if (!tooltip) return;
                 tooltip.style.display = "block";
-                tooltip.innerHTML = `<div style="font-weight:700;color:${{n.color}};margin-bottom:2px;">${{n.icon}} ${{n.raw_name}}</div>
-                                     <div style="font-size:11px;color:#38bdf8;margin-bottom:4px;">Compromise Probability: <b>${{n.prob_pct}}</b></div>
-                                     <div style="font-size:11px;color:#94a3b8;">${{n.desc}}</div>`;
+                tooltip.innerHTML = `<div style="font-weight:700;color:${{n.color}};margin-bottom:2px;">${{n.icon}} ${{escapeHtml(n.raw_name)}}</div>
+                                     <div style="font-size:11px;color:#38bdf8;margin-bottom:4px;">Compromise Probability: <b>${{escapeHtml(n.prob_pct)}}</b></div>
+                                     <div style="font-size:11px;color:#94a3b8;">${{escapeHtml(n.desc)}}</div>`;
             }});
             el.addEventListener('mousemove', (e) => {{
                 if (!tooltip) return;

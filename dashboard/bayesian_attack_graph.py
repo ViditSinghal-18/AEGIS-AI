@@ -19,6 +19,7 @@ Inspired by:
 from __future__ import annotations
 
 import heapq
+import html
 import math
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -114,13 +115,15 @@ class BayesianAttackGraph:
         epss_score: Optional[float] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> AttackNode:
+        clean_name = html.unescape(str(name or ""))
+        clean_desc = html.unescape(str(description or ""))
         node = AttackNode(
             id=node_id,
-            name=name,
+            name=clean_name,
             node_type=node_type,
             base_probability=base_probability,
             compromise_probability=base_probability,
-            description=description,
+            description=clean_desc,
             cve_id=cve_id,
             epss_score=epss_score,
             metadata=metadata or {},
@@ -140,12 +143,13 @@ class BayesianAttackGraph:
         vulnerability_id: Optional[str] = None,
         label: str = "",
     ) -> AttackEdge:
+        clean_label = html.unescape(str(label or ""))
         edge = AttackEdge(
             source=source,
             target=target,
             exploit_probability=exploit_probability,
             vulnerability_id=vulnerability_id,
-            label=label,
+            label=clean_label,
         )
         self.edges.append(edge)
         self._adj.setdefault(source, []).append(edge)

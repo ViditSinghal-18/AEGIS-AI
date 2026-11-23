@@ -279,9 +279,9 @@ def call_rule_based_fallback(prompt: str, report: Dict[str, Any]) -> str:
         )
 
     # 1. Scoring Formula & Active Weights
-    if any(k in p for k in ["scoring formula", "formula", "weights", "scoring weights", "score calculation", "how is risk calculated"]):
+    if any(k in p for k in ["scoring formula", "formula", "weights", "scoring weights", "score calculation", "how is risk calculated", "explain risk scoring", "explain scoring", "risk calculation"]):
         from ai.copilot import _respond_scoring_formula
-        return _respond_scoring_formula(prompt, report)
+        return _respond_scoring_formula(prompt, report or {})
 
     # 2. Compliance / Regulatory
     if any(k in p for k in ["compliance", "nist", "pci", "iso", "soc", "governance"]):
@@ -379,6 +379,26 @@ def query_copilot(prompt: str, report: Dict[str, Any]) -> Dict[str, Any]:
             ),
             "provider": "guardrail",
             "model": "AEGIS Anti-Exploit Hard Gate",
+            "grounded": True
+        }
+
+    # Scoring Formula & Active Weights: Always use deterministic verified mathematical formula
+    if any(k in p_lower for k in [
+        "scoring formula",
+        "formula",
+        "weights",
+        "scoring weights",
+        "score calculation",
+        "how is risk calculated",
+        "explain risk scoring",
+        "explain scoring",
+        "risk calculation",
+    ]):
+        from ai.copilot import _respond_scoring_formula
+        return {
+            "reply": _respond_scoring_formula(prompt, report or {}),
+            "provider": "formula",
+            "model": "AEGIS Scoring Specification Engine",
             "grounded": True
         }
 

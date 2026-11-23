@@ -34,6 +34,9 @@ from storage import generate_html_report
 @pytest.fixture
 def client():
     app.config["TESTING"] = True
+    from security import _API_CLIENT_RATE_LIMITS, _SCAN_CLIENT_RATE_LIMITS
+    _API_CLIENT_RATE_LIMITS.clear()
+    _SCAN_CLIENT_RATE_LIMITS.clear()
     with app.test_client() as c:
         yield c
 
@@ -66,6 +69,28 @@ def test_attack_graph_payload_unassessed_target(client):
     data = resp.get_json()
     assert "nodes" in data and len(data["nodes"]) >= 2
     assert "edges" in data and len(data["edges"]) >= 1
+
+
+def test_attack_graph_node_labels_decode_ampersand(client):
+    """Verify Crown Jewels and node labels render with clean & rather than literal &amp;."""
+    # Test JSON API payload
+    resp = client.get("/api/attack-graph?target=example.com&format=json")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    node_names = [n["name"] for n in data.get("nodes", [])]
+    assert any("Crown Jewels: Database & Data Exfiltration" in n for n in node_names), (
+        f"Expected 'Crown Jewels: Database & Data Exfiltration', got: {node_names}"
+    )
+    assert not any("&amp;" in n for n in node_names), (
+        f"Found literal &amp; in JSON node names: {[n for n in node_names if '&amp;' in n]}"
+    )
+
+    # Test HTML template rendering
+    html_resp = client.get("/attack-graph?target=example.com")
+    assert html_resp.status_code == 200
+    html_text = html_resp.get_data(as_text=True)
+    assert "Database & Data Exfiltration" in html_text
+    assert "&amp; Data Exfiltration" not in html_text, "Found literal '&amp; Data Exfiltration' in attack graph HTML!"
 
 
 # ------------------------------------------------------------------------------
@@ -115,6 +140,38 @@ def test_copilot_js_file_has_no_literal_emdash():
     assert copilot_js.exists()
     content = copilot_js.read_text(encoding="utf-8")
     assert "&mdash;" not in content, "Found literal &mdash; in static/js/copilot.js"
+
+
+def test_prescan_copilot_scoring_formula(client):
+    """Verify that clicking Scoring Formula before running a scan explains the formula rather than falling back to identical Summary message."""
+    # 1. Scoring formula pre-scan query
+    resp_formula = client.post("/api/agent-chat", json={"target": "", "message": "Explain risk scoring formula"})
+    assert resp_formula.status_code == 200
+    formula_reply = resp_formula.get_json().get("reply", "")
+
+    # Must NOT be intercepted by the generic 'No Active Scan Assessment Loaded' guard
+    assert "### ℹ️ No Active Scan Assessment Loaded" not in formula_reply, (
+        f"Scoring formula intercepted by generic guard: {formula_reply}"
+    )
+
+    # Must explain the active mathematical formula & weights
+    assert "Contextual Risk Scoring Formula" in formula_reply
+    assert "CVSS" in formula_reply and "EPSS" in formula_reply
+    assert "0.35" in formula_reply or "w_1" in formula_reply
+    assert "CISA KEV" in formula_reply
+    assert "SSVC" in formula_reply
+    assert "Noisy-OR" in formula_reply or "Bayesian Attack Path" in formula_reply
+    # Must note that no active scan is loaded yet for concrete decomposition
+    assert any(w in formula_reply for w in ["No active target scan", "Target Scan Telemetry", "not currently loaded"])
+
+    # 2. In contrast, 'Summarize top findings' before a scan MUST trigger the telemetry guard
+    resp_sum = client.post("/api/agent-chat", json={"target": "", "message": "Summarize top findings"})
+    assert resp_sum.status_code == 200
+    summary_reply = resp_sum.get_json().get("reply", "")
+    assert "No Active Scan Assessment Loaded" in summary_reply
+
+    # Must be completely distinct
+    assert formula_reply != summary_reply
 
 
 # ------------------------------------------------------------------------------
