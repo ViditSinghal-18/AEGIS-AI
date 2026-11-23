@@ -9,7 +9,7 @@
 [![Compliance](https://img.shields.io/badge/compliance-NIST%20CSF%202.0%20%7C%20PCI--DSS%204.0%20%7C%20ISO%2027001%20%7C%20SOC%202-purple.svg)](#)
 [![CycloneDX SBOM](https://img.shields.io/badge/standard-CycloneDX%20v1.5-blueviolet.svg)](#)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker)](#)
-[![Pytest Suite](https://img.shields.io/badge/tests-223%20passed-success.svg)](#)
+[![Pytest Suite](https://img.shields.io/badge/tests-235%20passed-success.svg)](#)
 
 > **Continuous Threat Exposure Management (CTEM) & Explainable RBVM Platform**  
 > 🌐 **Live Cloud Deployment:** [https://aegis-ai-rfn5.onrender.com/](https://aegis-ai-rfn5.onrender.com/)  

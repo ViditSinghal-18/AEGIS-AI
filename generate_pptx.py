@@ -91,7 +91,7 @@ def build_presentation(filename="AEGIS_AI_Presentation.pptx"):
     p4.font.color.rgb = MUTED
 
     p5 = tf.add_paragraph()
-    p5.text = "Live Demo: https://aegis-ai-khaki-eight.vercel.app  |  GitHub: ViditSinghal-18/AEGIS-AI"
+    p5.text = "Live Demo: https://aegis-ai-rfn5.onrender.com/  |  GitHub: ViditSinghal-18/AEGIS-AI"
     p5.font.size = Pt(12)
     p5.font.color.rgb = EMERALD
 
@@ -492,14 +492,14 @@ def build_presentation(filename="AEGIS_AI_Presentation.pptx"):
     tf = c_box.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
-    p.text = "🌐 Live Cloud Platform: https://aegis-ai-khaki-eight.vercel.app\n"
+    p.text = "🌐 Live Cloud Platform: https://aegis-ai-rfn5.onrender.com/\n"
     p.font.size = Pt(20)
     p.font.bold = True
     p.font.color.rgb = CYAN
 
     p2 = tf.add_paragraph()
     p2.text = (
-        "• Global Production Deployment: Hosted serverless on Vercel with zero cold-start delay.\n\n"
+        "• Global Production Deployment: Hosted on Render with high-availability web service.\n\n"
         "• Interactive 3D Cyber Threat Globe with spatial raycast HUD overlays.\n\n"
         "• Live Universal Web Security Assessor (Audit any public domain: owasp.org, google.com).\n\n"
         "• Open Source GitHub Repository: https://github.com/ViditSinghal-18/AEGIS-AI\n\n"
