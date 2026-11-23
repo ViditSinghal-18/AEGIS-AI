@@ -24,17 +24,19 @@ from schemas import TlsGrade
 SSL_LABS_ANALYZE = "https://api.ssllabs.com/api/v3/analyze"
 
 
-def inspect_local_tls(host: str, port: int = 443, timeout: float = 3.0) -> dict[str, Any]:
+def inspect_local_tls(host: str, port: int = 443, timeout: float = 8.0) -> dict[str, Any]:
     """
     Perform direct local TLS handshake using Python's ssl module.
     Works on localhost, loopback, and lab containers without needing SSL Labs.
+    IPv4 is preferred; falls back to IPv6. 8-second handshake timeout.
+    Returns probe_error key on failure so callers can skip failed probes.
     """
     result: dict[str, Any] = {
         "reachable": False,
-        "protocol": "",
+        "protocol": "unavailable",
         "issues": [],
         "subject": {},
-        "issuer": {},
+        "issuer": "unavailable",
         "expires_on": "",
         "days_until_expiry": None,
     }
@@ -44,12 +46,26 @@ def inspect_local_tls(host: str, port: int = 443, timeout: float = 3.0) -> dict[
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
 
+    # Resolve with IPv4 preference, fall back to IPv6
+    resolved_ip: str | None = None
+    for family in (socket.AF_INET, socket.AF_INET6):
+        try:
+            infos = socket.getaddrinfo(host, port, family, socket.SOCK_STREAM)
+            if infos:
+                resolved_ip = infos[0][4][0]
+                break
+        except (socket.gaierror, OSError):
+            continue
+
+    connect_target = resolved_ip if resolved_ip else host
+
     try:
-        with socket.create_connection((host, port), timeout=timeout) as sock:
+        with socket.create_connection((connect_target, port), timeout=timeout) as sock:
+            sock.settimeout(timeout)  # Explicit 8-second SSL handshake timeout
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                 result["reachable"] = True
-                result["protocol"] = ssock.version() or ""
-                
+                result["protocol"] = ssock.version() or "unknown"
+
                 # Check for deprecated TLS version
                 if result["protocol"] in {"TLSv1", "TLSv1.0", "TLSv1.1", "SSLv2", "SSLv3"}:
                     result["issues"].append("tls-deprecated-version: Legacy deprecated TLS protocol in use")
@@ -57,19 +73,49 @@ def inspect_local_tls(host: str, port: int = 443, timeout: float = 3.0) -> dict[
                 # Get binary certificate for parsing
                 der_cert = ssock.getpeercert(binary_form=True)
                 if der_cert:
-                    # Parse peer cert in decoded form
-                    # Reconnect with unverified getpeercert to extract fields
-                    pass
-    except Exception:
-        # Port is not running TLS or unreachable
-        return result
+                    # Attempt structured cert decode via cryptography if available
+                    decoded_ok = False
+                    try:
+                        from cryptography import x509
+                        cert_obj = x509.load_der_x509_certificate(der_cert)
+                        exp_dt = cert_obj.not_valid_after_utc
+                        result["days_until_expiry"] = (exp_dt - datetime.datetime.now(datetime.timezone.utc)).days
+                        result["expires_on"] = exp_dt.isoformat()
+                        result["issuer"] = cert_obj.issuer.rfc4514_string()
+                        result["subject"] = cert_obj.subject.rfc4514_string()
+                        decoded_ok = True
+                    except Exception:
+                        decoded_ok = False
 
-    # Try to extract cert metadata if possible
-    try:
-        cert_dict = ssl.get_server_certificate((host, port))
-        loaded_cert = ssl.PEM_cert_to_DER_cert(cert_dict)
-    except Exception:
-        pass
+                    if not decoded_ok:
+                        # Fallback to standard getpeercert decode
+                        try:
+                            ctx2 = ssl.create_default_context()
+                            ctx2.check_hostname = False
+                            ctx2.verify_mode = ssl.CERT_NONE
+                            with socket.create_connection((connect_target, port), timeout=timeout) as sock2:
+                                with ctx2.wrap_socket(sock2, server_hostname=host) as ssock2:
+                                    cert = ssock2.getpeercert(binary_form=False) or {}
+                                    if cert:
+                                        not_after_str = cert.get("notAfter")
+                                        if not_after_str:
+                                            exp_dt = datetime.datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z")
+                                            result["days_until_expiry"] = (exp_dt - datetime.datetime.utcnow()).days
+                                            result["expires_on"] = not_after_str
+                                        issuer_dict = dict(x[0] for x in cert.get("issuer", ()))
+                                        subject_dict = dict(x[0] for x in cert.get("subject", ()))
+                                        result["issuer"] = issuer_dict.get("organizationName") or issuer_dict.get("commonName", "unavailable")
+                                        result["subject"] = subject_dict
+                        except Exception:
+                            pass
+    except Exception as exc:
+        # TLS unreachable — return structured probe_error so callers can skip scoring
+        result["probe_error"] = "tls_unreachable"
+        result["probe_error_detail"] = str(exc)
+        result["days_until_expiry"] = None
+        result["protocol"] = "unavailable"
+        result["issuer"] = "unavailable"
+        return result
 
     return result
 

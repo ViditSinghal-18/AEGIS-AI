@@ -159,15 +159,167 @@ def analyze_python_source(code_str: str) -> List[Dict[str, Any]]:
         return []
 
 
+class JsAstAnalyzer:
+    """Parses JavaScript / Node.js source files to extract imports, aliases, routes, and symbol calls using AST."""
+
+    def __init__(self):
+        self.imports: Set[str] = set()
+        self.module_aliases: Dict[str, str] = {}
+        self.imported_symbols: Dict[str, str] = {}
+        self.routes: List[Dict[str, Any]] = []
+        self.calls: List[Dict[str, Any]] = []
+        self._current_route_calls: Optional[List[str]] = None
+
+    def visit(self, node: Any) -> None:
+        if not node or not hasattr(node, "type"):
+            return
+
+        # Variable declarations: const _ = require('lodash'); const { parse } = require('tough-cookie');
+        if node.type == "VariableDeclarator" and getattr(node, "init", None) and getattr(node.init, "type", None) == "CallExpression":
+            callee = node.init.callee
+            if getattr(callee, "type", None) == "Identifier" and callee.name == "require":
+                args = getattr(node.init, "arguments", [])
+                if args and hasattr(args[0], "value") and isinstance(args[0].value, str):
+                    raw_pkg = args[0].value
+                    if not raw_pkg.startswith("."):
+                        base_pkg = raw_pkg.split("/")[0].lstrip("@")
+                        self.imports.add(base_pkg)
+                        if node.id.type == "Identifier":
+                            self.module_aliases[node.id.name] = base_pkg
+                        elif node.id.type == "ObjectPattern":
+                            for prop in getattr(node.id, "properties", []):
+                                sym_name = getattr(getattr(prop, "value", None), "name", None) or getattr(getattr(prop, "key", None), "name", None)
+                                if sym_name:
+                                    self.imported_symbols[sym_name] = base_pkg
+
+        # ImportDeclaration: import _ from 'lodash'; import { parse } from 'tough-cookie';
+        elif node.type == "ImportDeclaration":
+            raw_pkg = getattr(node.source, "value", "")
+            if isinstance(raw_pkg, str) and not raw_pkg.startswith("."):
+                base_pkg = raw_pkg.split("/")[0].lstrip("@")
+                self.imports.add(base_pkg)
+                for spec in getattr(node, "specifiers", []):
+                    if spec.type in ("ImportDefaultSpecifier", "ImportNamespaceSpecifier"):
+                        self.module_aliases[spec.local.name] = base_pkg
+                    elif spec.type == "ImportSpecifier":
+                        self.imported_symbols[spec.local.name] = base_pkg
+
+        # CallExpression: routes and function calls
+        elif node.type == "CallExpression":
+            callee = node.callee
+            line = getattr(node.loc.start, "line", 0) if hasattr(node, "loc") and node.loc else 0
+
+            # Standalone require call e.g. require('dotenv').config()
+            if getattr(callee, "type", None) == "Identifier" and callee.name == "require":
+                args = getattr(node, "arguments", [])
+                if args and hasattr(args[0], "value") and isinstance(args[0].value, str):
+                    raw_pkg = args[0].value
+                    if not raw_pkg.startswith("."):
+                        base_pkg = raw_pkg.split("/")[0].lstrip("@")
+                        self.imports.add(base_pkg)
+
+            # MemberExpression call: app.get(...), _.template(...)
+            elif getattr(callee, "type", None) == "MemberExpression":
+                obj_name = getattr(callee.object, "name", "")
+                prop_name = getattr(callee.property, "name", "")
+
+                # Check if route handler: app.get('/path', handler)
+                if prop_name in ("get", "post", "put", "delete", "use", "patch"):
+                    args = getattr(node, "arguments", [])
+                    if args and hasattr(args[0], "value") and isinstance(args[0].value, str):
+                        path_str = args[0].value
+                        route_entry = {
+                            "method": prop_name.upper(),
+                            "path": path_str,
+                            "line": line,
+                            "calls": [],
+                        }
+                        self.routes.append(route_entry)
+                        prev_route_calls = self._current_route_calls
+                        self._current_route_calls = route_entry["calls"]
+                        for arg in args[1:]:
+                            self.visit(arg)
+                        self._current_route_calls = prev_route_calls
+
+                qual = f"{obj_name}.{prop_name}" if obj_name else prop_name
+                resolved_qual = qual
+                if obj_name in self.module_aliases:
+                    resolved_qual = f"{self.module_aliases[obj_name]}.{prop_name}"
+
+                call_record = {
+                    "call": prop_name,
+                    "qual_call": qual,
+                    "resolved_call": resolved_qual,
+                    "line": line,
+                    "enclosing_func": "<script>",
+                }
+                self.calls.append(call_record)
+                if self._current_route_calls is not None:
+                    self._current_route_calls.append(prop_name)
+                    if qual != prop_name:
+                        self._current_route_calls.append(qual)
+                    if resolved_qual != qual:
+                        self._current_route_calls.append(resolved_qual)
+
+            # Identifier call: parse(...), template(...)
+            elif getattr(callee, "type", None) == "Identifier":
+                func_name = callee.name
+                line = getattr(node.loc.start, "line", 0) if hasattr(node, "loc") and node.loc else 0
+                qual = func_name
+                if func_name in self.imported_symbols:
+                    qual = f"{self.imported_symbols[func_name]}.{func_name}"
+                call_record = {
+                    "call": func_name,
+                    "qual_call": qual,
+                    "line": line,
+                    "enclosing_func": "<script>",
+                }
+                self.calls.append(call_record)
+                if self._current_route_calls is not None:
+                    self._current_route_calls.append(func_name)
+                    if qual != func_name:
+                        self._current_route_calls.append(qual)
+
+        # Recurse children (skip arguments for route methods since visited manually above)
+        for key, val in node.__dict__.items():
+            if key == "arguments" and getattr(node, "type", None) == "CallExpression" and getattr(getattr(node, "callee", None), "type", None) == "MemberExpression" and getattr(node.callee.property, "name", None) in ("get", "post", "put", "delete", "use", "patch"):
+                continue
+            if isinstance(val, list):
+                for item in val:
+                    if hasattr(item, "type"):
+                        self.visit(item)
+            elif hasattr(val, "type"):
+                self.visit(val)
+
+
 def analyze_javascript_source(code_str: str) -> List[Dict[str, Any]]:
-    """Static pattern analysis of JS routes and sinks."""
-    routes = []
-    for m in re.finditer(r"(?:app|router)\.(get|post|put|delete|use)\s*\(\s*['\"]([^'\"]+)['\"]\s*,", code_str):
-        routes.append({
-            "method": m.group(1).upper(),
-            "path": m.group(2)
-        })
-    return routes
+    """Parse JS source string using AST (esprima) with regex fallback to extract routes and dangerous sinks."""
+    try:
+        import esprima
+        tree = esprima.parseScript(code_str, {"loc": True, "tolerant": True})
+        analyzer = JsAstAnalyzer()
+        analyzer.visit(tree)
+        results = []
+        for r in analyzer.routes:
+            sinks = [{"sink": c, "line": r.get("line", 0)} for c in r.get("calls", []) if c in ["eval", "Function", "exec", "spawn", "template", "send", "redirect"]]
+            results.append({
+                "handler_name": f"{r['method']} {r['path']}",
+                "route_path": r["path"],
+                "method": r["method"],
+                "line_number": r.get("line", 0),
+                "calls": r.get("calls", []),
+                "dangerous_sinks": sinks,
+            })
+        return results
+    except Exception:
+        # Fallback to regex
+        routes = []
+        for m in re.finditer(r"(?:app|router)\.(get|post|put|delete|use)\s*\(\s*['\"]([^'\"]+)['\"]\s*,", code_str):
+            routes.append({
+                "method": m.group(1).upper(),
+                "path": m.group(2),
+            })
+        return routes
 
 
 def analyze_python_file(filepath: Path) -> Dict[str, Any]:
@@ -189,47 +341,64 @@ def analyze_python_file(filepath: Path) -> Dict[str, Any]:
 
 
 def analyze_js_file(filepath: Path) -> Dict[str, Any]:
-    """Lightweight regex-based import, route, and symbol call analysis for JS/TS."""
+    """Parse a JavaScript/TypeScript source file using AST (esprima) with regex fallback."""
     try:
         content = filepath.read_text(encoding="utf-8", errors="ignore")
     except Exception:
-        return {"file": str(filepath), "imports": [], "routes": [], "calls": []}
+        return {"file": str(filepath), "imports": [], "imported_symbols": {}, "routes": [], "calls": []}
 
-    imports = set()
-    calls = []
+    try:
+        import esprima
+        tree = esprima.parseScript(content, {"loc": True, "tolerant": True})
+        analyzer = JsAstAnalyzer()
+        analyzer.visit(tree)
+        for r in analyzer.routes:
+            r["file"] = str(filepath)
+        return {
+            "file": str(filepath),
+            "imports": sorted(list(analyzer.imports)),
+            "imported_symbols": analyzer.imported_symbols,
+            "module_aliases": analyzer.module_aliases,
+            "routes": analyzer.routes,
+            "calls": analyzer.calls,
+        }
+    except Exception:
+        # Graceful fallback to regex
+        imports = set()
+        calls = []
 
-    # Match require('pkg') and import ... from 'pkg'
-    for m in re.finditer(r"(?:(?:const|let|var)\s+(\{?[^=]+?\}?)\s*=\s*require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s+(.*?)\s+from\s+['\"]([^'\"]+)['\"])", content):
-        pkg = m.group(2) or m.group(4)
-        if pkg and not pkg.startswith("."):
-            base_pkg = pkg.split("/")[0].lstrip("@")
-            imports.add(base_pkg)
+        # Match require('pkg') and import ... from 'pkg'
+        for m in re.finditer(r"(?:(?:const|let|var)\s+(\{?[^=]+?\}?)\s*=\s*require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)|import\s+(.*?)\s+from\s+['\"]([^'\"]+)['\"])", content):
+            pkg = m.group(2) or m.group(4)
+            if pkg and not pkg.startswith("."):
+                base_pkg = pkg.split("/")[0].lstrip("@")
+                imports.add(base_pkg)
 
-    # Match calls like pkg.func( or direct func(
-    for m in re.finditer(r"\b([a-zA-Z0-9_$]+)\.([a-zA-Z0-9_$]+)\s*\(", content):
-        receiver = m.group(1)
-        method = m.group(2)
-        calls.append({
-            "call": method,
-            "qual_call": f"{receiver}.{method}",
-            "enclosing_func": "<script>"
-        })
+        # Match calls like pkg.func( or direct func(
+        for m in re.finditer(r"\b([a-zA-Z0-9_$]+)\.([a-zA-Z0-9_$]+)\s*\(", content):
+            receiver = m.group(1)
+            method = m.group(2)
+            calls.append({
+                "call": method,
+                "qual_call": f"{receiver}.{method}",
+                "enclosing_func": "<script>"
+            })
 
-    # Match routes: app.get('/path', ...) or router.post(...)
-    routes = []
-    for m in re.finditer(r"(?:app|router)\.(get|post|put|delete|use)\s*\(\s*['\"]([^'\"]+)['\"]\s*,", content):
-        routes.append({
-            "method": m.group(1).upper(),
-            "path": m.group(2),
-            "file": str(filepath)
-        })
+        routes = []
+        for m in re.finditer(r"(?:app|router)\.(get|post|put|delete|use)\s*\(\s*['\"]([^'\"]+)['\"]\s*,", content):
+            routes.append({
+                "method": m.group(1).upper(),
+                "path": m.group(2),
+                "file": str(filepath)
+            })
 
-    return {
-        "file": str(filepath),
-        "imports": list(imports),
-        "routes": routes,
-        "calls": calls
-    }
+        return {
+            "file": str(filepath),
+            "imports": sorted(list(imports)),
+            "imported_symbols": {},
+            "routes": routes,
+            "calls": calls
+        }
 
 
 def analyze_source_tree(source_path: str) -> Dict[str, Any]:

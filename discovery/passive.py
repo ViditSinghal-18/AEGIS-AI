@@ -145,52 +145,60 @@ def _inspect_passive_tls(domain: str) -> TlsGrade:
     """Inspect the public TLS certificate on port 443 safely using pinned IP connection."""
     raw_info: dict[str, Any] = {
         "reachable": False,
-        "protocol": "",
-        "issuer": "",
-        "subject": "",
+        "protocol": "unavailable",
+        "issuer": "unavailable",
+        "subject": "unavailable",
         "days_until_expiry": None,
         "issues": [],
+        "probe_error": None,
     }
 
     try:
         from discovery.safe_fetch import resolve_and_validate_hostname
         validated_ips = resolve_and_validate_hostname(domain)
+        if not validated_ips:
+            raw_info["probe_error"] = "dns_resolution_failed"
+            return TlsGrade(
+                skipped=True,
+                reason="Passive TLS resolution returned no IP addresses",
+                host=domain,
+                raw=raw_info,
+            )
         pinned_ip = validated_ips[0]
     except Exception as exc:
+        raw_info["probe_error"] = "dns_resolution_failed"
         return TlsGrade(
             skipped=True,
             reason=f"Passive TLS resolution aborted: {exc}",
             host=domain,
-            raw={"error": str(exc)},
+            raw=raw_info,
         )
 
     ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
     try:
         with socket.create_connection((pinned_ip, 443), timeout=5.0) as sock:
             with ctx.wrap_socket(sock, server_hostname=domain) as ssock:
                 raw_info["reachable"] = True
-                raw_info["protocol"] = ssock.version() or ""
-                cert = ssock.getpeercert()
-                if cert:
-                    # Calculate expiry days
-                    not_after_str = cert.get("notAfter")
-                    if not_after_str:
-                        exp_dt = datetime.datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z")
-                        days_left = (exp_dt - datetime.datetime.utcnow()).days
+                raw_info["protocol"] = ssock.version() or "unknown"
+                der = ssock.getpeercert(binary_form=True)
+                if der:
+                    try:
+                        from cryptography import x509
+                        cert_obj = x509.load_der_x509_certificate(der)
+                        exp_dt = cert_obj.not_valid_after_utc
+                        days_left = (exp_dt - datetime.datetime.now(datetime.timezone.utc)).days
                         raw_info["days_until_expiry"] = days_left
                         if days_left < 0:
                             raw_info["issues"].append("tls-cert-expired: Public TLS certificate has expired")
                         elif days_left < 15:
                             raw_info["issues"].append(f"tls-cert-expiring-soon: Public TLS certificate expires in {days_left} days")
-
-                    # Extract subject and issuer
-                    issuer_dict = dict(x[0] for x in cert.get("issuer", ()))
-                    subject_dict = dict(x[0] for x in cert.get("subject", ()))
-                    raw_info["issuer"] = issuer_dict.get("organizationName") or issuer_dict.get("commonName", "")
-                    raw_info["subject"] = subject_dict.get("commonName", "")
-
-                    if raw_info["issuer"] == raw_info["subject"] and raw_info["issuer"]:
-                        raw_info["issues"].append("tls-self-signed: Public TLS certificate is self-signed")
+                        raw_info["issuer"] = cert_obj.issuer.rfc4514_string()
+                        raw_info["subject"] = cert_obj.subject.rfc4514_string()
+                    except Exception:
+                        pass
 
         return TlsGrade(
             skipped=False,
@@ -200,11 +208,17 @@ def _inspect_passive_tls(domain: str) -> TlsGrade:
             raw=raw_info,
         )
     except Exception as exc:
+        raw_info["reachable"] = False
+        raw_info["probe_error"] = "tls_unreachable"
+        raw_info["protocol"] = "unavailable"
+        raw_info["issuer"] = "unavailable"
+        raw_info["days_until_expiry"] = None
         return TlsGrade(
             skipped=True,
             reason=f"Passive TLS connection failed: {exc.__class__.__name__}",
             host=domain,
-            raw={"error": str(exc)},
+            grade="",
+            raw=raw_info,
         )
 
 
@@ -220,32 +234,127 @@ def _query_dns_records(domain: str) -> dict[str, Any]:
         "issues": [],
     }
 
-    # Query TXT and SPF
+    # DNS A-record lookup with IPv4 preference, IPv6 fallback, 5-second timeout
+    import signal as _signal
+
+    def _resolve_a_records(host: str) -> list[str]:
+        """Resolve A records using getaddrinfo, IPv4 first, then IPv6."""
+        addrs: list[str] = []
+        for family in (socket.AF_INET, socket.AF_INET6):
+            try:
+                res = socket.getaddrinfo(host, None, family, socket.SOCK_STREAM)
+                for item in res:
+                    ip = item[4][0]
+                    if ip not in addrs:
+                        addrs.append(ip)
+            except (socket.gaierror, OSError):
+                continue
+        return addrs
+
     try:
-        proc = subprocess.run(["nslookup", "-type=TXT", domain], capture_output=True, text=True, timeout=5)
-        out = proc.stdout
-        for line in out.splitlines():
-            line_s = line.strip()
-            if "text =" in line_s or "v=spf1" in line_s:
-                records["TXT"].append(line_s)
-                if "v=spf1" in line_s:
-                    records["spf_present"] = True
+        import threading
+
+        a_result: list[Any] = [None]
+        a_error: list[Any] = [None]
+
+        def _run_resolve() -> None:
+            try:
+                a_result[0] = _resolve_a_records(domain)
+            except Exception as exc:
+                a_error[0] = exc
+
+        t = threading.Thread(target=_run_resolve, daemon=True)
+        t.start()
+        t.join(timeout=5.0)
+        if t.is_alive() or a_error[0] is not None:
+            # Timeout or error — mark as probe_error, never emit "0 A record(s)"
+            records["A"] = []
+            records["a_probe_error"] = "dns_timeout"
+            records["a_probe_result"] = {"probe_error": "dns_timeout", "records": [], "count": 0}
+        else:
+            records["A"] = a_result[0] or []
+            records["a_probe_result"] = {
+                "probe_error": None,
+                "records": records["A"],
+                "count": len(records["A"]),
+            }
+    except Exception:
+        records["A"] = []
+        records["a_probe_result"] = {"probe_error": "dns_timeout", "records": [], "count": 0}
+
+    # Query TXT and SPF via DoH first, then nslookup fallback
+    txt_queried = False
+    try:
+        doh_resp = safe_fetch(
+            f"https://cloudflare-dns.com/dns-query?name={domain}&type=TXT",
+            headers={"Accept": "application/dns-json"},
+            timeout=3.0,
+        )
+        if doh_resp.status_code == 200:
+            txt_queried = True
+            for ans in doh_resp.json().get("Answer", []):
+                txt_val = ans.get("data", "").strip('"')
+                if txt_val:
+                    records["TXT"].append(txt_val)
+                    if "v=spf1" in txt_val:
+                        records["spf_present"] = True
     except Exception:
         pass
 
-    if not records["spf_present"]:
+    if not txt_queried:
+        try:
+            proc = subprocess.run(["nslookup", "-type=TXT", domain], capture_output=True, text=True, timeout=4)
+            if proc.returncode == 0 or proc.stdout:
+                txt_queried = True
+                out = proc.stdout
+                for line in out.splitlines():
+                    line_s = line.strip()
+                    if "text =" in line_s or "v=spf1" in line_s:
+                        records["TXT"].append(line_s)
+                        if "v=spf1" in line_s:
+                            records["spf_present"] = True
+        except Exception:
+            pass
+
+    if not txt_queried:
+        records["txt_probe_error"] = "dns_unreachable"
+    elif not records["spf_present"]:
         records["issues"].append("email-missing-spf: No SPF (Sender Policy Framework) DNS record found to prevent email spoofing.")
 
-    # Query DMARC
+    # Query DMARC via DoH first, then nslookup fallback
+    dmarc_queried = False
     try:
-        proc_dmarc = subprocess.run(["nslookup", "-type=TXT", f"_dmarc.{domain}"], capture_output=True, text=True, timeout=5)
-        if "v=DMARC1" in proc_dmarc.stdout:
-            records["dmarc_present"] = True
+        doh_dmarc = safe_fetch(
+            f"https://cloudflare-dns.com/dns-query?name=_dmarc.{domain}&type=TXT",
+            headers={"Accept": "application/dns-json"},
+            timeout=3.0,
+        )
+        if doh_dmarc.status_code == 200:
+            dmarc_queried = True
+            for ans in doh_dmarc.json().get("Answer", []):
+                ddata = ans.get("data", "").strip('"')
+                if "v=DMARC1" in ddata:
+                    records["dmarc_present"] = True
     except Exception:
         pass
 
-    if not records["dmarc_present"]:
+    if not dmarc_queried:
+        try:
+            proc_dmarc = subprocess.run(["nslookup", "-type=TXT", f"_dmarc.{domain}"], capture_output=True, text=True, timeout=4)
+            if proc_dmarc.returncode == 0 or proc_dmarc.stdout:
+                dmarc_queried = True
+                if "v=DMARC1" in proc_dmarc.stdout:
+                    records["dmarc_present"] = True
+        except Exception:
+            pass
+
+    if not dmarc_queried:
+        records["dmarc_probe_error"] = "dns_unreachable"
+    elif not records["dmarc_present"]:
         records["issues"].append("email-missing-dmarc: No DMARC DNS record found to enforce email authentication policies.")
+
+    if records.get("a_probe_error"):
+        records["probe_error"] = records["a_probe_error"]
 
     return records
 

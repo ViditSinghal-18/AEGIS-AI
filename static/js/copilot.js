@@ -59,15 +59,35 @@ window.AegisCopilot = (function () {
             }
         }
 
-        // Add welcome message if container is empty
+        // Add welcome message if container is empty or target updated
         const container = document.getElementById('copilotMessages');
-        if (container && container.children.length === 0) {
-            appendChatMessage(
-                'ai',
-                `**Analyst Margin Notes** &mdash; Grounded in perimeter telemetry for \`${target || 'active asset'}\`.\n\nAsk questions about prioritized findings, compliance gaps, or virtual patch hardening.`,
-                'rule-based',
-                'SOC Telemetry Engine'
-            );
+        if (container) {
+            if (container.children.length === 0) {
+                if (target) {
+                    appendChatMessage(
+                        'ai',
+                        `**Analyst Margin Notes** — Grounded in perimeter telemetry for \`${target}\`.\n\nAsk questions about prioritized findings, compliance gaps, or virtual patch hardening.`,
+                        'rule-based',
+                        'SOC Telemetry Engine'
+                    );
+                } else {
+                    appendChatMessage(
+                        'ai',
+                        `**Analyst Margin Notes** — No scan assessment loaded yet.\n\nEnter a target domain above and click **Run Audit**, or click **Load Verified Demo Scan** to explore live CVE triage and grounded Copilot insights.`,
+                        'rule-based',
+                        'SOC Telemetry Engine'
+                    );
+                }
+            } else if (target && container.dataset.loadedTarget !== target) {
+                // If target changed from empty to a specific target, notify copilot
+                container.dataset.loadedTarget = target;
+                appendChatMessage(
+                    'ai',
+                    `**Assessment Telemetry Loaded:** Now grounded in perimeter signals for \`${target}\`. Ask about specific CVEs, compliance readiness, or virtual patches.`,
+                    'rule-based',
+                    'SOC Telemetry Engine'
+                );
+            }
         }
     }
 

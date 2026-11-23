@@ -424,6 +424,78 @@ window.AegisApp = (function () {
             }
         }
 
+        function openModelRoutingModal() {
+            const modal = document.getElementById('modelRoutingModal');
+            const content = document.getElementById('modelRoutingContent');
+            if (modal) modal.style.display = 'flex';
+            if (content) content.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:24px;">Loading model routing telemetry...</div>';
+
+            const inputScan = document.getElementById('scanTargetInput');
+            const target = (currentReport && currentReport.target) || (inputScan ? inputScan.value.trim() : '');
+            const url = target ? `/api/ai/model-routing?target=${encodeURIComponent(target)}` : '/api/ai/model-routing';
+            fetch(url).then(r => r.json()).then(d => {
+                if (!content) return;
+                const tiers = d.routing_tiers || {};
+                const guard = d.guardrail_state || {};
+                const savings = d.savings_summary || {};
+                content.innerHTML = `
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px;">
+                        <div style="background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.3);border-radius:8px;padding:12px;">
+                            <div style="font-size:0.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Active Provider</div>
+                            <div style="font-size:1.1rem;font-weight:700;color:#38bdf8;margin-top:4px;">${d.active_provider || 'Deterministic Heuristic'}</div>
+                            <div style="font-size:0.75rem;color:#10b981;margin-top:2px;">● ${d.fallback_status || 'Active'}</div>
+                        </div>
+                        <div style="background:rgba(15,23,42,0.85);border:1px solid rgba(16,185,129,0.3);border-radius:8px;padding:12px;">
+                            <div style="font-size:0.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Zero-Cost Template Ratio</div>
+                            <div style="font-size:1.1rem;font-weight:700;color:#10b981;margin-top:4px;">${savings.template_zero_cost_pct || 0}%</div>
+                            <div style="font-size:0.75rem;color:#94a3b8;margin-top:2px;">Est. Token Reduction: ${savings.estimated_token_reduction_pct || 0}%</div>
+                        </div>
+                        <div style="background:rgba(15,23,42,0.85);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:12px;">
+                            <div style="font-size:0.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Routing Pattern</div>
+                            <div style="font-size:0.95rem;font-weight:700;color:#f59e0b;margin-top:4px;">${savings.model_routing_pattern || 'Strands Decider'}</div>
+                            <div style="font-size:0.75rem;color:#94a3b8;margin-top:2px;">Analyzed Findings: ${d.total_findings || 0}</div>
+                        </div>
+                    </div>
+
+                    <h4 style="color:#fff;font-size:0.95rem;margin:16px 0 10px 0;display:flex;align-items:center;gap:6px;">
+                        <span>🎯 Execution Tiers</span>
+                    </h4>
+                    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
+                        <div style="background:rgba(30,41,59,0.7);border-left:4px solid #10b981;padding:10px 14px;border-radius:4px;display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div style="font-weight:700;color:#10b981;">Tier 1: Template (${tiers.template?.count || 0} findings)</div>
+                                <div style="font-size:0.78rem;color:#94a3b8;">${tiers.template?.description || 'Zero token cost, ~0ms latency'}</div>
+                            </div>
+                            <span class="badge" style="background:rgba(16,185,129,0.2);color:#10b981;padding:4px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">ZERO TOKEN COST</span>
+                        </div>
+                        <div style="background:rgba(30,41,59,0.7);border-left:4px solid #38bdf8;padding:10px 14px;border-radius:4px;display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div style="font-weight:700;color:#38bdf8;">Tier 2: Small Model (${tiers.small?.count || 0} findings)</div>
+                                <div style="font-size:0.78rem;color:#94a3b8;">${tiers.small?.description || 'Low latency, minimal cost for standard CVEs'}</div>
+                            </div>
+                            <span class="badge" style="background:rgba(56,189,248,0.2);color:#38bdf8;padding:4px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">LOW LATENCY</span>
+                        </div>
+                        <div style="background:rgba(30,41,59,0.7);border-left:4px solid #f43f5e;padding:10px 14px;border-radius:4px;display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div style="font-weight:700;color:#f43f5e;">Tier 3: Large Model (${tiers.large?.count || 0} findings)</div>
+                                <div style="font-size:0.78rem;color:#94a3b8;">${tiers.large?.description || 'Full reasoning for Critical/High KEV & complex attack paths'}</div>
+                            </div>
+                            <span class="badge" style="background:rgba(244,63,94,0.2);color:#f43f5e;padding:4px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">DEEP REASONING</span>
+                        </div>
+                    </div>
+
+                    <h4 style="color:#fff;font-size:0.95rem;margin:16px 0 10px 0;">🛡️ Grounding &amp; Defensive Guardrails</h4>
+                    <div style="background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.2);border-radius:6px;padding:12px;font-size:0.82rem;color:#cbd5e1;display:flex;flex-direction:column;gap:6px;">
+                        <div>• <b>CVE Anti-Hallucination Guardrail:</b> <span style="color:#10b981;">${guard.anti_hallucination_filter || 'Active (Enforced)'}</span> — Unverified absent CVEs intercepted with zero fabrication.</div>
+                        <div>• <b>ALCE Faithfulness Verification:</b> <span style="color:#10b981;">${guard.alce_faithfulness_verification || 'Active'}</span> — Natural language inference verifies claim citations against scan telemetry.</div>
+                        <div>• <b>Offensive Request Refusal Filter:</b> <span style="color:#10b981;">${guard.defensive_refusal_filter || 'Active'}</span> — 100% strict refusal on offensive exploit payload generation.</div>
+                    </div>
+                `;
+            }).catch(err => {
+                if (content) content.innerHTML = `<div style="color:#ef4444;padding:18px;">Failed to load model routing status: ${err.message}</div>`;
+            });
+        }
+
         const btnAttackGraph = document.getElementById('btnOpenAttackGraph');
         if (btnAttackGraph) btnAttackGraph.addEventListener('click', openAttackGraph);
 
@@ -434,6 +506,33 @@ window.AegisApp = (function () {
                 const frame = document.getElementById('attackGraphFrame');
                 if (modal) modal.style.display = 'none';
                 if (frame) frame.src = '';
+            });
+        }
+
+        const btnCloseModelRouting = document.getElementById('btnCloseModelRoutingModal');
+        if (btnCloseModelRouting) {
+            btnCloseModelRouting.addEventListener('click', () => {
+                const modal = document.getElementById('modelRoutingModal');
+                if (modal) modal.style.display = 'none';
+            });
+        }
+
+        // Demo Scan Button
+        const btnDemoScan = document.getElementById('btnLoadDemoScan');
+        if (btnDemoScan) {
+            btnDemoScan.addEventListener('click', async () => {
+                AegisUtils.showToast('Loading Verified Demo Scan (OWASP Juice Shop)...', 'info');
+                try {
+                    const resp = await fetch('/api/demo/load');
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const demoData = await resp.json();
+                    const targetInput = document.getElementById('scanTargetInput');
+                    if (targetInput) targetInput.value = demoData.target || 'localhost:3000';
+                    applyReportData(demoData);
+                    AegisUtils.showToast('Verified Demo Scan loaded! Explore live CVE triage, attack graph, and virtual patches.', 'success');
+                } catch (err) {
+                    AegisUtils.showToast(`Failed to load demo scan: ${err.message}`, 'error');
+                }
             });
         }
 
@@ -531,9 +630,7 @@ window.AegisApp = (function () {
                 if (action === 'attack-graph') {
                     openAttackGraph();
                 } else if (action === 'model-routing') {
-                    fetch('/api/ai/model-routing').then(r => r.json()).then(d => {
-                        alert('Model Routing Architecture:\n• Zero-Cost Template Tier: ' + d.savings_summary.template_zero_cost_pct + '%\n• Estimated Token Reduction: ' + d.savings_summary.estimated_token_reduction_pct + '%\n• Pattern: ' + d.savings_summary.model_routing_pattern);
-                    });
+                    openModelRoutingModal();
                 } else if (action === 'terminal') {
                     document.getElementById('auditTerminal')?.classList.add('active');
                 } else if (action === 'ciso') {

@@ -158,7 +158,8 @@ def render_attack_surface_graph_html(
         }}
         #graph-container {{
             width: 100%;
-            height: 520px;
+            height: 100vh;
+            min-height: 580px;
             position: relative;
             background: radial-gradient(circle at center, #0f172a 0%, #060911 100%);
             border: 1px solid rgba(56, 189, 248, 0.25);
@@ -273,124 +274,218 @@ def render_attack_surface_graph_html(
 
     const container = document.getElementById('graph-container');
     const width = Math.max(window.innerWidth || 0, container.clientWidth || 0, 900);
-    const height = 520;
+    const height = Math.max(container.clientHeight || 0, 560);
 
-    const svg = d3.select("#network-svg")
-        .attr("viewBox", [0, 0, width, height]);
+    function renderWithD3() {{
+        const svg = d3.select("#network-svg")
+            .attr("viewBox", [0, 0, width, height]);
 
-    const g = svg.append("g");
+        const g = svg.append("g");
 
-    // Force simulation
-    const simulation = d3.forceSimulation(nodes)
-        .force("link", d3.forceLink(links).id(d => d.id).distance(120))
-        .force("charge", d3.forceManyBody().strength(-280))
-        .force("center", d3.forceCenter(width / 2, height / 2 + 10))
-        .force("collision", d3.forceCollide().radius(d => d.radius + 16));
+        // Force simulation
+        const simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(links).id(d => d.id).distance(120))
+            .force("charge", d3.forceManyBody().strength(-280))
+            .force("center", d3.forceCenter(width / 2, height / 2 + 10))
+            .force("collision", d3.forceCollide().radius(d => d.radius + 16));
 
-    // Links
-    const link = g.append("g")
-        .selectAll("line")
-        .data(links)
-        .join("line")
-        .attr("stroke", d => d.color)
-        .attr("stroke-width", d => d.width)
-        .attr("stroke-dasharray", d => d.is_critical ? "none" : "3,3");
+        // Links
+        const link = g.append("g")
+            .selectAll("line")
+            .data(links)
+            .join("line")
+            .attr("stroke", d => d.color)
+            .attr("stroke-width", d => d.width)
+            .attr("stroke-dasharray", d => d.is_critical ? "none" : "3,3");
 
-    // Node groups
-    const node = g.append("g")
-        .selectAll(".node")
-        .data(nodes)
-        .join("g")
-        .attr("class", "node")
-        .call(d3.drag()
-            .on("start", dragstarted)
-            .on("drag", dragged)
-            .on("end", dragended));
+        // Node groups
+        const node = g.append("g")
+            .selectAll(".node")
+            .data(nodes)
+            .join("g")
+            .attr("class", "node")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
 
-    // Outer Aura for Chokepoints and Critical Path
-    node.filter(d => d.is_chokepoint || d.is_critical)
-        .append("circle")
-        .attr("r", d => d.radius + 6)
-        .attr("fill", "none")
-        .attr("stroke", d => d.is_chokepoint ? "#f59e0b" : "#ef4444")
-        .attr("stroke-width", 2)
-        .attr("stroke-dasharray", d => d.is_chokepoint ? "4,2" : "none")
-        .attr("opacity", 0.85);
+        // Outer Aura for Chokepoints and Critical Path
+        node.filter(d => d.is_chokepoint || d.is_critical)
+            .append("circle")
+            .attr("r", d => d.radius + 6)
+            .attr("fill", "none")
+            .attr("stroke", d => d.is_chokepoint ? "#f59e0b" : "#ef4444")
+            .attr("stroke-width", 2)
+            .attr("stroke-dasharray", d => d.is_chokepoint ? "4,2" : "none")
+            .attr("opacity", 0.85);
 
-    // Glow Circles
-    node.append("circle")
-        .attr("r", d => d.radius + 3)
-        .attr("fill", d => d.color)
-        .attr("opacity", 0.22);
+        // Glow Circles
+        node.append("circle")
+            .attr("r", d => d.radius + 3)
+            .attr("fill", d => d.color)
+            .attr("opacity", 0.22);
 
-    // Node body
-    node.append("circle")
-        .attr("r", d => d.radius)
-        .attr("fill", "#0f172a")
-        .attr("stroke", d => d.color)
-        .attr("stroke-width", 2.2);
+        // Node body
+        node.append("circle")
+            .attr("r", d => d.radius)
+            .attr("fill", "#0f172a")
+            .attr("stroke", d => d.color)
+            .attr("stroke-width", 2.2);
 
-    // Labels
-    node.append("text")
-        .text(d => d.name)
-        .attr("x", 0)
-        .attr("y", d => d.radius + 14)
-        .attr("text-anchor", "middle")
-        .attr("fill", d => d.is_critical ? "#f87171" : "#cbd5e1")
-        .attr("font-size", "11px")
-        .attr("font-weight", d => d.is_critical ? "700" : "600")
-        .attr("pointer-events", "none");
+        // Labels
+        node.append("text")
+            .text(d => d.name)
+            .attr("x", 0)
+            .attr("y", d => d.radius + 14)
+            .attr("text-anchor", "middle")
+            .attr("fill", d => d.is_critical ? "#f87171" : "#cbd5e1")
+            .attr("font-size", "11px")
+            .attr("font-weight", d => d.is_critical ? "700" : "600")
+            .attr("pointer-events", "none");
 
-    // Icons
-    node.append("text")
-        .text(d => d.icon)
-        .attr("x", 0)
-        .attr("y", 4)
-        .attr("text-anchor", "middle")
-        .attr("font-size", d => d.radius > 20 ? "14px" : "11px")
-        .attr("pointer-events", "none");
+        // Icons
+        node.append("text")
+            .text(d => d.icon)
+            .attr("x", 0)
+            .attr("y", 4)
+            .attr("text-anchor", "middle")
+            .attr("font-size", d => d.radius > 20 ? "14px" : "11px")
+            .attr("pointer-events", "none");
 
-    // Tooltip
-    const tooltip = document.getElementById("tooltip");
-    node.on("mouseover", (event, d) => {{
-        tooltip.style.display = "block";
-        tooltip.innerHTML = `<div style="font-weight:700;color:${{d.color}};margin-bottom:2px;">${{d.icon}} ${{d.raw_name}}</div>
-                             <div style="font-size:11px;color:#38bdf8;margin-bottom:4px;">Compromise Probability: <b>${{d.prob_pct}}</b></div>
-                             <div style="font-size:11px;color:#94a3b8;">${{d.desc}}</div>`;
-    }})
-    .on("mousemove", (event) => {{
-        const rect = container.getBoundingClientRect();
-        tooltip.style.left = (event.clientX - rect.left + 15) + "px";
-        tooltip.style.top = (event.clientY - rect.top + 10) + "px";
-    }})
-    .on("mouseout", () => {{
-        tooltip.style.display = "none";
-    }});
+        // Tooltip
+        const tooltip = document.getElementById("tooltip");
+        node.on("mouseover", (event, d) => {{
+            tooltip.style.display = "block";
+            tooltip.innerHTML = `<div style="font-weight:700;color:${{d.color}};margin-bottom:2px;">${{d.icon}} ${{d.raw_name}}</div>
+                                 <div style="font-size:11px;color:#38bdf8;margin-bottom:4px;">Compromise Probability: <b>${{d.prob_pct}}</b></div>
+                                 <div style="font-size:11px;color:#94a3b8;">${{d.desc}}</div>`;
+        }})
+        .on("mousemove", (event) => {{
+            const rect = container.getBoundingClientRect();
+            tooltip.style.left = (event.clientX - rect.left + 15) + "px";
+            tooltip.style.top = (event.clientY - rect.top + 10) + "px";
+        }})
+        .on("mouseout", () => {{
+            tooltip.style.display = "none";
+        }});
 
-    simulation.on("tick", () => {{
-        link
-            .attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y);
+        simulation.on("tick", () => {{
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
 
-        node
-            .attr("transform", d => `translate(${{d.x}},${{d.y}})`);
-    }});
+            node
+                .attr("transform", d => `translate(${{d.x}},${{d.y}})`);
+        }});
 
-    function dragstarted(event, d) {{
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
+        function dragstarted(event, d) {{
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }}
+        function dragged(event, d) {{
+            d.fx = event.x;
+            d.fy = event.y;
+        }}
+        function dragended(event, d) {{
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }}
     }}
-    function dragged(event, d) {{
-        d.fx = event.x;
-        d.fy = event.y;
+
+    function renderFallbackSvg() {{
+        // Reliable pure-SVG fallback when external D3 CDN is blocked or loading
+        const svgEl = document.getElementById("network-svg");
+        if (!svgEl) return;
+        svgEl.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
+
+        const typeOrder = {{ 'attacker': 0, 'ingress': 1, 'port': 2, 'vulnerability': 3, 'privilege': 4, 'goal': 5 }};
+        const columns = [[], [], [], [], [], []];
+        nodes.forEach(n => {{
+            const col = typeOrder[n.type] !== undefined ? typeOrder[n.type] : 2;
+            columns[col].push(n);
+        }});
+
+        const nodePos = {{}};
+        const colWidth = width / 6;
+        columns.forEach((colNodes, cIdx) => {{
+            const rowHeight = height / (colNodes.length + 1);
+            colNodes.forEach((n, rIdx) => {{
+                const x = colWidth * (cIdx + 0.5);
+                const y = rowHeight * (rIdx + 1);
+                nodePos[n.id] = {{ x, y, node: n }};
+            }});
+        }});
+
+        let linksMarkup = '';
+        links.forEach(l => {{
+            const sId = typeof l.source === 'object' ? l.source.id : l.source;
+            const tId = typeof l.target === 'object' ? l.target.id : l.target;
+            const s = nodePos[sId];
+            const t = nodePos[tId];
+            if (s && t) {{
+                const stroke = l.is_critical ? '#ef4444' : 'rgba(56, 189, 248, 0.45)';
+                const strokeWidth = l.is_critical ? 3 : 1.5;
+                const dash = l.is_critical ? 'none' : '4,3';
+                linksMarkup += `<line x1="${{s.x}}" y1="${{s.y}}" x2="${{t.x}}" y2="${{t.y}}" stroke="${{stroke}}" stroke-width="${{strokeWidth}}" stroke-dasharray="${{dash}}"/>`;
+            }}
+        }});
+
+        let nodesMarkup = '';
+        Object.values(nodePos).forEach(p => {{
+            const n = p.node;
+            const aura = (n.is_chokepoint || n.is_critical)
+                ? `<circle cx="${{p.x}}" cy="${{p.y}}" r="${{n.radius + 6}}" fill="none" stroke="${{n.is_chokepoint ? '#f59e0b' : '#ef4444'}}" stroke-width="2" stroke-dasharray="${{n.is_chokepoint ? '4,2' : 'none'}}" opacity="0.85"/>`
+                : '';
+            nodesMarkup += `
+                <g class="fallback-node" style="cursor: pointer;" data-id="${{n.id}}">
+                    ${{aura}}
+                    <circle cx="${{p.x}}" cy="${{p.y}}" r="${{n.radius + 3}}" fill="${{n.color}}" opacity="0.25"/>
+                    <circle cx="${{p.x}}" cy="${{p.y}}" r="${{n.radius}}" fill="#0f172a" stroke="${{n.color}}" stroke-width="2.2"/>
+                    <text x="${{p.x}}" y="${{p.y + 4}}" text-anchor="middle" font-size="${{n.radius > 20 ? 14 : 11}}px" pointer-events="none">${{n.icon}}</text>
+                    <text x="${{p.x}}" y="${{p.y + n.radius + 14}}" text-anchor="middle" font-size="11px" font-weight="${{n.is_critical ? 700 : 600}}" fill="${{n.is_critical ? '#f87171' : '#cbd5e1'}}" pointer-events="none">${{n.name}}</text>
+                </g>
+            `;
+        }});
+
+        svgEl.innerHTML = `<g id="fallback-layer">${{linksMarkup}}${{nodesMarkup}}</g>`;
+
+        const tooltip = document.getElementById("tooltip");
+        svgEl.querySelectorAll('.fallback-node').forEach(el => {{
+            const nid = el.getAttribute('data-id');
+            const n = nodePos[nid]?.node;
+            if (!n) return;
+            el.addEventListener('mouseenter', (e) => {{
+                if (!tooltip) return;
+                tooltip.style.display = "block";
+                tooltip.innerHTML = `<div style="font-weight:700;color:${{n.color}};margin-bottom:2px;">${{n.icon}} ${{n.raw_name}}</div>
+                                     <div style="font-size:11px;color:#38bdf8;margin-bottom:4px;">Compromise Probability: <b>${{n.prob_pct}}</b></div>
+                                     <div style="font-size:11px;color:#94a3b8;">${{n.desc}}</div>`;
+            }});
+            el.addEventListener('mousemove', (e) => {{
+                if (!tooltip) return;
+                const rect = container.getBoundingClientRect();
+                tooltip.style.left = (e.clientX - rect.left + 15) + "px";
+                tooltip.style.top = (e.clientY - rect.top + 10) + "px";
+            }});
+            el.addEventListener('mouseleave', () => {{
+                if (tooltip) tooltip.style.display = "none";
+            }});
+        }});
     }}
-    function dragended(event, d) {{
-        if (!event.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
+
+    if (typeof d3 !== 'undefined' && typeof d3.forceSimulation === 'function') {{
+        try {{
+            renderWithD3();
+        }} catch (err) {{
+            console.warn('D3 simulation error, engaging fallback SVG layout:', err);
+            renderFallbackSvg();
+        }}
+    }} else {{
+        renderFallbackSvg();
     }}
     </script>
     </body>

@@ -278,6 +278,11 @@ def call_rule_based_fallback(prompt: str, report: Dict[str, Any]) -> str:
             f"   - *Effort:* Add TXT records at DNS registrar to block email spoofing."
         )
 
+    # 1. Scoring Formula & Active Weights
+    if any(k in p for k in ["scoring formula", "formula", "weights", "scoring weights", "score calculation", "how is risk calculated"]):
+        from ai.copilot import _respond_scoring_formula
+        return _respond_scoring_formula(prompt, report)
+
     # 2. Compliance / Regulatory
     if any(k in p for k in ["compliance", "nist", "pci", "iso", "soc", "governance"]):
         pci = compliance.get("pci_dss_4", {})

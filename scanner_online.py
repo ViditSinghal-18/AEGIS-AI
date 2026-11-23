@@ -146,12 +146,15 @@ def assess_website(target_input):
     results["geo_telemetry"] = geo
 
     # 1b. Passive DNS Intelligence via Cloudflare DoH (SPF, DMARC, MX)
-    dns_records = {"has_spf": False, "has_dmarc": False, "mx_records": []}
+    dns_records = {"has_spf": False, "has_dmarc": False, "mx_records": [], "probe_error": None}
+    txt_queried = False
+    dmarc_queried = False
     if not is_private and "." in hostname:
         try:
             doh_headers = {"Accept": "application/dns-json"}
             txt_resp = safe_fetch(f"https://cloudflare-dns.com/dns-query?name={hostname}&type=TXT", headers=doh_headers, timeout=3.0)
             if txt_resp.status_code == 200:
+                txt_queried = True
                 answers = txt_resp.json().get("Answer", [])
                 for ans in answers:
                     data_str = ans.get("data", "")
@@ -161,6 +164,7 @@ def assess_website(target_input):
 
             dmarc_resp = safe_fetch(f"https://cloudflare-dns.com/dns-query?name=_dmarc.{hostname}&type=TXT", headers=doh_headers, timeout=3.0)
             if dmarc_resp.status_code == 200:
+                dmarc_queried = True
                 answers = dmarc_resp.json().get("Answer", [])
                 for ans in answers:
                     data_str = ans.get("data", "")
@@ -175,8 +179,11 @@ def assess_website(target_input):
         except Exception:
             pass
 
+    if not txt_queried and not dmarc_queried and not is_private and "." in hostname:
+        dns_records["probe_error"] = "dns_query_failed"
+
     results["dns_telemetry"] = dns_records
-    if not is_private and "." in hostname:
+    if not is_private and "." in hostname and not dns_records["probe_error"]:
         if not dns_records["has_spf"]:
             results["findings"].append({
                 "id": "DNS-MISSING-SPF",

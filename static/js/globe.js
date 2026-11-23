@@ -331,7 +331,7 @@ window.AegisGlobe = (function () {
                 const dx = e.clientX - prevMouse.x;
                 const dy = e.clientY - prevMouse.y;
                 dragDist += Math.abs(dx) + Math.abs(dy);
-                rotY -= dx * 0.007; // Natural rotation matching drag direction
+                rotY += dx * 0.007; // Natural rotation matching drag direction
                 rotX = Math.max(-0.75, Math.min(0.75, rotX + dy * 0.007));
                 prevMouse = { x: e.clientX, y: e.clientY };
                 hideTooltip();
@@ -934,7 +934,7 @@ window.AegisGlobe = (function () {
                 const deltaX = e.clientX - prevMouse.x;
                 const deltaY = e.clientY - prevMouse.y;
                 dragDist += Math.abs(deltaX) + Math.abs(deltaY);
-                globeGroup.rotation.y -= deltaX * 0.006; // Inverted to follow natural drag direction
+                globeGroup.rotation.y += deltaX * 0.006; // Follow natural drag direction with pointer
                 globeGroup.rotation.x = Math.max(-0.85, Math.min(0.85, globeGroup.rotation.x + deltaY * 0.006));
                 prevMouse = { x: e.clientX, y: e.clientY };
                 hideTooltip();
@@ -1005,7 +1005,7 @@ window.AegisGlobe = (function () {
                 const deltaX = e.touches[0].clientX - prevMouse.x;
                 const deltaY = e.touches[0].clientY - prevMouse.y;
                 dragDist += Math.abs(deltaX) + Math.abs(deltaY);
-                globeGroup.rotation.y -= deltaX * 0.006;
+                globeGroup.rotation.y += deltaX * 0.006;
                 globeGroup.rotation.x = Math.max(-0.85, Math.min(0.85, globeGroup.rotation.x + deltaY * 0.006));
                 prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
                 hideTooltip();

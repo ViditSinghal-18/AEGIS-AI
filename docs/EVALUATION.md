@@ -37,14 +37,36 @@ AEGIS-AI was evaluated on its ability to discover perimeter misconfigurations an
 
 ---
 
-## 3. Alert Fatigue Reduction Analysis
+## 3. Alert Fatigue Reduction & Unified Scoring Weights
 
 Standard vulnerability scanners rely exclusively on **raw CVSS base scores**, triggering alert fatigue by classifying non-exploitable or internal dependencies as urgent emergencies.
 
-AEGIS-AI incorporates:
-$$\text{Priority} = 0.35 \cdot S_{\text{CVSS}} + 0.30 \cdot S_{\text{EPSS}} + 0.20 \cdot S_{\text{Exposure}} + 0.15 \cdot S_{\text{Crit}}$$
+### Unified Scoring Formulation
 
-### Alert Suppression Metrics:
+$$\text{Priority} = w_{\text{CVSS}} \cdot S_{\text{CVSS}} + w_{\text{EPSS}} \cdot S_{\text{EPSS}} + w_{\text{Exposure}} \cdot S_{\text{Exposure}} + w_{\text{Crit}} \cdot S_{\text{Crit}}$$
+
+Where $\sum w_i = 1.0$, and single source of truth is declared in `config.py` and `prioritize.py`.
+
+### Production vs. Calibrated Weight Sets
+
+| Weight Parameter | Default Production (`config.py`) | Calibrated (`reports/calibration_20261112.json`) | Calibration Rationale |
+| :--- | :--- | :--- | :--- |
+| **$w_{\text{CVSS}}$ (Severity)** | **0.35** | **0.172** | Down-weighted: CVSS over-predicts in-the-wild exploitation |
+| **$w_{\text{EPSS}}$ (Exploitability)** | **0.30** | **0.507** | Up-weighted: EPSS strongly separates active exploitation |
+| **$w_{\text{Exposure}}$ (Attack Surface)** | **0.20** | **0.190** | Empirical network ingress / WAF / perimeter reachability |
+| **$w_{\text{Crit}}$ (Asset Impact)** | **0.15** | **0.131** | Business criticality and crown-jewel data sensitivity |
+| **Weight Sum** | **1.000** | **1.000** | Normalized probability conservation |
+
+### Calibration Benchmark Metrics (Temporal Split on CISA KEV)
+
+From the temporal validation benchmark (`split_year = 2023`, $N = 300$, $N_{\text{pos}} = 86$):
+- **Precision@10:** 100.0% (calibrated) vs. 100.0% (default)
+- **Precision@25:** 100.0% (calibrated) vs. 100.0% (default)
+- **Precision@50:** 100.0% (calibrated) vs. 100.0% (default)
+- **Recall@50:** 58.14% (calibrated) vs. 58.14% (default)
+- **Recall@100:** 98.84% (calibrated) vs. 98.84% (default)
+
+### Alert Suppression Metrics (OWASP Juice Shop Testbed):
 - **Raw CVSS High/Critical Count:** `3`
 - **AEGIS Contextual High/Critical Count:** `1`
 - **Net Alert Reduction:** **66.7%**

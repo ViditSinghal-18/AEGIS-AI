@@ -65,10 +65,19 @@ window.AegisTelemetry = (function () {
                     let summaryText = 'Completed successfully.';
 
                     if (stage.id === 'dns') {
-                        summaryText = `Resolved ${data.A ? data.A.length : 0} A record(s). SPF: ${data.spf_present ? 'Enforced' : 'Missing'}, DMARC: ${data.dmarc_present ? 'Enforced' : 'Missing'}.`;
+                        if (data.probe_error || data.a_probe_error) {
+                            summaryText = `DNS probe unavailable (${data.probe_error || data.a_probe_error}). SPF: ${data.spf_present ? 'Enforced' : (data.txt_probe_error ? 'Unverified' : 'Missing')}, DMARC: ${data.dmarc_present ? 'Enforced' : (data.dmarc_probe_error ? 'Unverified' : 'Missing')}.`;
+                        } else {
+                            summaryText = `Resolved ${data.A ? data.A.length : 0} A record(s). SPF: ${data.spf_present ? 'Enforced' : 'Missing'}, DMARC: ${data.dmarc_present ? 'Enforced' : 'Missing'}.`;
+                        }
                         aggregatedDiscovery.dns = data;
                     } else if (stage.id === 'tls') {
-                        summaryText = `Protocol: ${data.protocol || 'None'}, Days to Expiry: ${data.days_until_expiry !== null ? data.days_until_expiry : 'Unknown'}, Issuer: ${data.issuer || 'Unknown'}.`;
+                        if (data.probe_error && (!data.protocol || data.protocol === 'unavailable')) {
+                            summaryText = `TLS probe unavailable (${data.probe_error}): Port 443 handshake inaccessible.`;
+                        } else {
+                            const expDays = (data.days_until_expiry !== null && data.days_until_expiry !== undefined) ? `${data.days_until_expiry} days` : 'Unknown';
+                            summaryText = `Protocol: ${data.protocol || 'None'}, Days to Expiry: ${expDays}, Issuer: ${data.issuer || 'Unknown'}.`;
+                        }
                         aggregatedDiscovery.tls = data;
                     } else if (stage.id === 'headers') {
                         summaryText = `Status HTTP ${data.status_code || 0}, Missing Headers: ${(data.missing_security_headers || []).length}, Server: '${data.server_banner || 'Hidden'}'.`;

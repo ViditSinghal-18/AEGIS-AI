@@ -439,6 +439,54 @@ class BayesianAttackGraph:
             ),
         }
 
+    def export_payload(self) -> Dict[str, Any]:
+        """Export serialized node/edge graph representation with Bayesian risk metrics."""
+        node_probs = self.evaluate_bayesian_probabilities()
+        most_probable = self.find_most_probable_path()
+        chokepoints = self.compute_minimal_chokepoints()
+
+        crit_nodes = set(most_probable.path_nodes) if most_probable else set()
+        choke_nodes = set(chokepoints.chokepoint_nodes)
+
+        nodes_list = []
+        for nid, node in self.nodes.items():
+            prob = node_probs.get(nid, node.compromise_probability)
+            nodes_list.append({
+                "id": nid,
+                "name": node.name,
+                "type": node.node_type,
+                "base_probability": node.base_probability,
+                "compromise_probability": round(prob, 4),
+                "compromise_percentage": f"{round(prob * 100, 1)}%",
+                "is_critical_path": nid in crit_nodes,
+                "is_chokepoint": nid in choke_nodes,
+                "cve_id": node.cve_id,
+                "epss_score": node.epss_score,
+                "description": node.description,
+                "metadata": node.metadata,
+            })
+
+        edges_list = []
+        for edge in self.edges:
+            edges_list.append({
+                "source": edge.source,
+                "target": edge.target,
+                "exploit_probability": edge.exploit_probability,
+                "weight": round(edge.weight, 4),
+                "vulnerability_id": edge.vulnerability_id,
+                "label": edge.label,
+            })
+
+        return {
+            "target": self.target_name,
+            "nodes": nodes_list,
+            "edges": edges_list,
+            "crown_jewels_probability": round(node_probs.get("crown_jewels", 0.0), 4),
+            "crown_jewels_percentage": f"{round(node_probs.get('crown_jewels', 0.0) * 100, 1)}%",
+            "most_probable_path": most_probable.to_dict() if most_probable else None,
+            "chokepoints": chokepoints.to_dict(),
+        }
+
 
 def build_attack_graph_from_findings(
     target: str,
@@ -496,8 +544,16 @@ def build_attack_graph_from_findings(
         title = str(f.get("title", f"Vulnerability #{idx+1}"))
         sev = str(f.get("severity", "Medium")).title()
 
-        # Empirical exploit probability grounded in EPSS and CISA KEV
-        epss_prob = float(f.get("epss_probability") or f.get("epss") or 0.05)
+        # Empirical exploit probability grounded in EPSS, KEV, or CVSS for misconfigurations
+        epss_val = f.get("epss_probability") or f.get("epss") or f.get("epss_score")
+        if epss_val is not None and float(epss_val) > 0.0:
+            epss_prob = float(epss_val)
+        elif f.get("cvss_score") or f.get("cvss"):
+            cvss_val = float(f.get("cvss_score") or f.get("cvss") or 4.0)
+            epss_prob = round(min(0.50, max(0.08, cvss_val / 10.0 * 0.35)), 3)
+        else:
+            epss_prob = 0.12
+
         if f.get("in_cisa_kev") or f.get("kev"):
             epss_prob = max(epss_prob, 0.75)
         # Bounded between 0.05 and 0.95
@@ -524,8 +580,23 @@ def build_attack_graph_from_findings(
         node_type="privilege",
         description="Attacker establishes initial code execution or session hijacking behind perimeter.",
     )
-    for fnid in flaw_node_ids[:3]:
-        bag.add_edge(fnid, "lateral_access", exploit_probability=0.70, label="Pivot / Post-Exploitation")
+    if flaw_node_ids:
+        for fnid in flaw_node_ids[:3]:
+            bag.add_edge(fnid, "lateral_access", exploit_probability=0.70, label="Pivot / Post-Exploitation")
+    else:
+        # Provide baseline exposure milestone so topology remains fully connected
+        base_fnid = "baseline_perimeter"
+        bag.add_node(
+            node_id=base_fnid,
+            name="Baseline Perimeter Ingress",
+            node_type="vulnerability",
+            epss_score=0.08,
+            description="Default public ingress awaiting full active scan verification.",
+            metadata={"severity": "Low", "contextual_risk_score": 2.0},
+        )
+        parent_port = port_node_ids[0] if port_node_ids else "ingress_perimeter"
+        bag.add_edge(parent_port, base_fnid, exploit_probability=0.25, label="Ingress Probing (25%)")
+        bag.add_edge(base_fnid, "lateral_access", exploit_probability=0.30, label="Pivot Assessment (30%)")
 
     # 6. Crown Jewels / Critical Target Asset
     bag.add_node(

@@ -19,6 +19,10 @@ openai>=1.0.0
 
 # Optional Active Network Reconnaissance
 python-nmap>=0.7.1
+cryptography>=41.0.0
+
+# JavaScript AST Reachability Analysis
+esprima>=4.0.1
 
 # Presentation Generation
 python-pptx>=0.6.21

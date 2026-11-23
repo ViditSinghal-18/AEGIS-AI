@@ -267,12 +267,24 @@ def generate_html_report(report: dict[str, Any]) -> str:
     All dynamic variables are rigorously HTML-escaped to prevent Cross-Site Scripting (XSS).
     """
     target = html.escape(str(report.get("target") or "Unknown"), quote=True)
-    summary = html.escape(str(report.get("summary") or "No summary available."), quote=True)
-    model = html.escape(str(report.get("model_id") or "Heuristic"), quote=True)
-    used_llm = "Yes" if report.get("used_llm") else "No (Fallback)"
     findings = report.get("findings") or report.get("prioritized_findings") or []
     top_risks = report.get("top_risks") or []
     notes = report.get("notes") or []
+
+    # Ensure a non-empty, grounded executive summary
+    raw_summary = str(report.get("summary") or "").strip()
+    if not raw_summary or raw_summary.lower() in ("no summary available.", "none", ""):
+        crit_count = sum(1 for f in findings if "crit" in str(f.get("severity") or f.get("priority_level", "")).lower() or "p1" in str(f.get("priority_level", "")).lower())
+        high_count = sum(1 for f in findings if "high" in str(f.get("severity") or f.get("priority_level", "")).lower() or "p2" in str(f.get("priority_level", "")).lower())
+        raw_summary = (
+            f"External perimeter assessment for '{report.get('target', 'Target')}' evaluated {len(findings)} exposures "
+            f"({crit_count} Critical, {high_count} High). Identified key posture risks across external transport encryption, "
+            f"HTTP security headers, DNS authentication, and public ingress services."
+        )
+    summary = html.escape(raw_summary, quote=True)
+
+    model = html.escape(str(report.get("model_id") or "Heuristic"), quote=True)
+    used_llm = "Yes" if report.get("used_llm") else "No (Fallback)"
 
     findings_html = ""
     for f in findings:
@@ -294,7 +306,32 @@ def generate_html_report(report: dict[str, Any]) -> str:
         esc_sev = html.escape(raw_sev, quote=True)
         esc_exploit = html.escape(str(f.get("exploitability") or f.get("exposure_context") or "Public Ingress"), quote=True)
         esc_why = html.escape(str(f.get("why_it_matters") or f.get("summary") or ""), quote=True)
-        esc_action = html.escape(str(f.get("suggested_action") or f.get("recommended_remediation") or "Apply defensive hardening"), quote=True)
+
+        # Build specific, non-generic remediation guidance
+        raw_action = str(f.get("suggested_action") or f.get("recommended_remediation") or f.get("remediation") or "").strip()
+        title_l = str(f.get("title") or f.get("summary") or "").lower()
+        vuln_id_l = str(f.get("vuln_id") or "").lower()
+
+        if not raw_action or raw_action.lower() in ("apply defensive hardening", "none", ""):
+            if "content-security-policy" in title_l or "csp" in title_l or "csp" in vuln_id_l:
+                raw_action = "Add HTTP header: Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; upgrade-insecure-requests;"
+            elif "strict-transport-security" in title_l or "hsts" in title_l or "hsts" in vuln_id_l:
+                raw_action = "Add HTTP header: Strict-Transport-Security: max-age=31536000; includeSubDomains; preload"
+            elif "x-frame-options" in title_l or "clickjacking" in title_l or "frame" in vuln_id_l:
+                raw_action = "Add HTTP header: X-Frame-Options: SAMEORIGIN (or configure CSP frame-ancestors 'self')"
+            elif "x-content-type-options" in title_l or "sniffing" in title_l:
+                raw_action = "Add HTTP header: X-Content-Type-Options: nosniff"
+            elif "referrer-policy" in title_l or "referer" in title_l:
+                raw_action = "Add HTTP header: Referrer-Policy: strict-origin-when-cross-origin"
+            elif "spf" in title_l or "dmarc" in title_l:
+                raw_action = "Publish valid SPF TXT record (v=spf1 ... -all) and strict DMARC policy (_dmarc with p=reject or p=quarantine)"
+            elif f.get("related_cves"):
+                cve_str = ", ".join(f.get("related_cves"))
+                raw_action = f"Apply vendor security patch or upgrade affected package to resolve {cve_str}."
+            else:
+                raw_action = f"Remediate exposure by applying vendor patch or restrictive ingress filtering."
+
+        esc_action = html.escape(raw_action, quote=True)
 
         cves_list = f.get("related_cves") or f.get("cve_aliases") or []
         esc_cves = ", ".join(html.escape(str(c), quote=True) for c in cves_list)
